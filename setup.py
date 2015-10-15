@@ -10,14 +10,14 @@ MYDIR = path.abspath(os.path.dirname(__file__))
 
 
 # NOTE
-REQUIRES = ['falcon', 'mongoengine', 'blinker']
+REQUIRES = ['falcon', 'mongoengine', 'blinker', 'gunicorn', 'werkzeug', 'httpie']
 
 cmdclass = {}
 ext_modules = []
 
 setup(
     name='auth',
-    version='0.0.5',
+    version='0.0.6',
     description='Authorization for humans',
     long_description=io.open('README.rst', 'r', encoding='utf-8').read(),
     classifiers=[
@@ -29,7 +29,6 @@ setup(
         'Operating System :: MacOS :: MacOS X',
         'Operating System :: Microsoft :: Windows',
         'Operating System :: POSIX',
-        'Topic :: Internet :: WWW/HTTP :: AUTH',
         'Topic :: Software Development :: Libraries :: Python Modules',
         'Programming Language :: Python',
         'Programming Language :: Python :: Implementation :: CPython',

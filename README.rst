@@ -1,9 +1,170 @@
+====================================
+Auth | Authorization for Humans
+====================================
+
+RESTful, Simple Authorization system
+
+ 
+***************
+What is Auth?
+***************
+Auth is a module that makes authorization simple and also scalable and powerful.  It also has a beautiful RESTful API for use in micro-service architectures and platforms.  It is originally desinged to use in Appido, a scalable media market in Iran.
 
 
-Auth is a centeral Authorization system
+*******************
+requirements
+*******************
 
-Please NOTICE:
+You need to access to **mongodb**.  If you are using a remote mongodb,  provide these environment variables:
 
-package is under development and not ready
+``MONGO_HOST`` and ``MONGO_PORT``
+   
+
+*******************
+Installation
+*******************
+
+.. code:: Bash
+
+    pip install auth
+
+
+*******************
+Show me an example
+*******************
+ok, lets image you have two users, **Jack** and **Sara**.  Sara can cook and Jack can dance. Both can laugh.
+
+You also need to choose a secret key for your application.  Because you may want to use Auth in various tools and each must have a secret key for seperating their scope.
+
+.. code:: Python
+
+    my_secret_key = "pleaSeDoN0tKillMyC_at"
+    from auth import Authorization
+    cas = Authorization(my_secret_key)
+
+Now, Lets add 3 groups, Cookers, Dancers and Laughers:
+
+.. code:: Python
+
+    cas.add_group('coockers')
+    cas.add_group('dancers')
+    cas.add_group('laughers')
+
+
+Ok, great. You have 3 groups and you need to authorize them to do special things.
+
+.. code:: Python
+
+    cas.add_permission('coockers', 'cook')
+    cas.add_permission('dancers', 'dance')
+    cas.add_permission('laughers', 'laugh')
+
+
+Good.  You let cookers to cook and dancers to dance etc...
+The final part is to set memberships for Sara and Jack:
+
+.. code:: Python
+
+    cas.add_membership('sara', 'cookers')
+    cas.add_membership('sara', 'laughers')
+    cas.add_membership('jack', 'dancers')
+    cas.add_membership('jack', 'laughers')
+
+
+
+That's all we need.  Now lets ensure that jack can dance:
+
+.. code:: Python
+
+    if cas.user_has_permission('jack', 'dance'):
+        print('YES!!! Jack can dance.')
+
+
+*******************
+RESTful API
+*******************
+Lets run the server on port 4000:
+
+.. code:: Python
+
+    from auth import api, serve
+    serve('localhost', 4000, api)
+
+Simple! Authorization server is ready to use.  You can use it via simple curl or using mighty Requests module.  So in you remote application, you can do something like this:
+
+.. code:: Python
+
+    import requests
+    secret_key = "pleaSeDoN0tKillMyC_at"
+    auth_api = "http://127.0.0.1:4000/api"
+
+
+Lets create admin group:
+
+.. code:: Python
+
+    requests.post(auth_api+'/role/'+secret_key+'/admin')
+
+
+And lets make Jack an admin:
+
+.. code:: Python
+
+    requests.post(auth_api+'/permission/'+secret_key+'/jack/admin')
+
+And finally let's check if Sara still can cook:.. code:: Python
+
+.. code:: Python
+
+    requests.get(auth_api+'/has_permission/'+secret_key+'/sara/cook')
+
+
+
+*******************
+API Methods
+*******************
+- ``/ping`` [GET]
+
+
+ Ping API, useful for your monitoring tools
+
+----
+
+- ``/api/membership/{KEY}/{user}/{group}`` [GET/POST/DELETE]
+
+ Adding, removing and getting membership information.
+
+----
+
+- ``/api/permission/{client}/{group}/{name}`` [GET/POST/DELETE]
+
+ Adding, removing and getting permissions
+
+----
+
+- ``/api/has_permission/{client}/{user}/{name}`` [GET]
+
+ Getting user permission info
+
+----
+
+- ``/api/role/{client}/{group}`` [GET/POST/DELETE]
+
+  Adding, removing and getting roles
+
+
+*******************
+Copyright
+*******************
+ 
+- Farsheed Ashouri `@ <mailto:rodmena@me.com>`_
+
+
+*******************
+Documentation
+*******************
+Feel free to dig into source code.  If you think you can improve the documentation, please do so and send me a pull request.
+
+
 
 
