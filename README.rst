@@ -42,7 +42,7 @@ You also need to choose a secret key for your application.  Because you may want
     from auth import Authorization
     cas = Authorization(my_secret_key)
 
-Now, Lets add 3 groups, Cookers, Dancers and Laughers:
+Now, Lets add 3 groups, Cookers, Dancers and Laughers.  Remember that groups are Roles.  So when we create a group, indeed we create a role:
 
 .. code:: Python
 
@@ -112,7 +112,7 @@ And lets make Jack an admin:
 
     requests.post(auth_api+'/permission/'+secret_key+'/jack/admin')
 
-And finally let's check if Sara still can cook:.. code:: Python
+And finally let's check if Sara still can cook:
 
 .. code:: Python
 
@@ -130,13 +130,13 @@ API Methods
 
 ----
 
-- ``/api/membership/{KEY}/{user}/{group}`` [GET/POST/DELETE]
+- ``/api/membership/{KEY}/{user}/{role}`` [GET/POST/DELETE]
 
  Adding, removing and getting membership information.
 
 ----
 
-- ``/api/permission/{KEY}/{group}/{name}`` [GET/POST/DELETE]
+- ``/api/permission/{KEY}/{role}/{name}`` [GET/POST/DELETE]
 
  Adding, removing and getting permissions
 
@@ -148,7 +148,7 @@ API Methods
 
 ----
 
-- ``/api/role/{KEY}/{rolename}`` [GET/POST/DELETE]
+- ``/api/role/{KEY}/{role}`` [GET/POST/DELETE]
 
   Adding, removing and getting roles
 
