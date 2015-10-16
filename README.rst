@@ -4,7 +4,11 @@ Auth | Authorization for Humans
 
 RESTful, Simple Authorization system
 
- 
+.. image:: https://badge.fury.io/py/auth.svg
+    :target: https://badge.fury.io/py/auth
+
+
+
 ***************
 What is Auth?
 ***************
