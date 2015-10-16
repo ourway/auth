@@ -7,6 +7,12 @@ RESTful, Simple Authorization system
 .. image:: https://badge.fury.io/py/auth.svg
     :target: https://badge.fury.io/py/auth
 
+.. image:: https://img.shields.io/pypi/dm/auth.svg
+    :target: https://pypi.python.org/pypi/auth
+
+
+
+
 .. image:: https://api.travis-ci.org/ourway/auth.svg
     :target: https://travis-ci.org/ourway/auth
 
