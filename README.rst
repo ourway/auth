@@ -27,6 +27,8 @@ What is Auth?
 ***************
 Auth is a module that makes authorization simple and also scalable and powerful.  It also has a beautiful RESTful API for use in micro-service architectures and platforms.  It is originally desinged to use in Appido, a scalable media market in Iran.
 
+It supports Python2.6+
+
 I use Travis and Codecov to keep myself honest.
 
 *******************
