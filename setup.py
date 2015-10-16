@@ -17,7 +17,7 @@ ext_modules = []
 
 setup(
     name='auth',
-    version='0.1.1',
+    version='0.1.2',
     description='Authorization for humans',
     long_description=io.open('README.rst', 'r', encoding='utf-8').read(),
     classifiers=[
@@ -50,4 +50,9 @@ setup(
     cmdclass=cmdclass,
     ext_modules=ext_modules,
     test_suite='nose.collector',
+    entry_points={
+        'console_scripts': [
+                'auth-server = auth.cmd.server:main'
+             ]
+        }
 )

@@ -100,6 +100,13 @@ Lets run the server on port 4000:
     from auth import api, serve
     serve('localhost', 4000, api)
 
+Or, from version 0.1.2+ you can use this command:
+
+.. code:: Bash
+
+    auth-server
+
+
 Simple! Authorization server is ready to use.  You can use it via simple curl or using mighty Requests module.  So in you remote application, you can do something like this:
 
 .. code:: Python

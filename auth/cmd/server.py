@@ -1,0 +1,27 @@
+
+from auth import api, serve
+import sys
+import multiprocessing
+CPUs = multiprocessing.cpu_count()
+
+
+_help = '''
+    ---------------------------------------------------------------
+    | GET             | /ping                                     |
+    | GET POST DELETE | /api/permission/{key}/{role}/{action}     |
+    | GET POST DELETE | /api/membership/{key}/{user}/{role}       |
+    | GET             | /api/has_permission/{key}/{user}/{action} |
+    ---------------------------------------------------------------
+'''
+
+
+
+def main(port=4000):
+    print('\n\n        Python Auth Server ------------\n\t'
+          'by: Farsheed Ashouri (@rodmena)\n')
+    print(_help)
+    serve('0.0.0.0', port, api, processes=CPUs*2)
+
+
+if __name__ == '__main__':
+    main()
