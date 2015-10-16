@@ -14,9 +14,6 @@ RESTful, Simple Authorization system
 
 
 
-
-
-
 ***************
 What is Auth?
 ***************
