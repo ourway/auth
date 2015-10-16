@@ -1,0 +1,280 @@
+<!DOCTYPE html>
+<html lang="en-us">
+  <head>
+    <meta charset="UTF-8">
+    <title>Auth by ourway</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <link rel="stylesheet" type="text/css" href="stylesheets/normalize.css" media="screen">
+    <link href='https://fonts.googleapis.com/css?family=Open+Sans:400,700' rel='stylesheet' type='text/css'>
+    <link rel="stylesheet" type="text/css" href="stylesheets/stylesheet.css" media="screen">
+    <link rel="stylesheet" type="text/css" href="stylesheets/github-light.css" media="screen">
+  </head>
+  <body>
+    <section class="page-header">
+      <h1 class="project-name">Auth</h1>
+      <h2 class="project-tagline">Authorization for humans</h2>
+      <a href="https://github.com/ourway/auth" class="btn">View on GitHub</a>
+      <a href="https://github.com/ourway/auth/zipball/master" class="btn">Download .zip</a>
+      <a href="https://github.com/ourway/auth/tarball/master" class="btn">Download .tar.gz</a>
+    </section>
+
+    <section class="main-content">
+      <h1></h1>
+
+<h1>
+<a id="auth--authorization-for-humans" class="anchor" href="#auth--authorization-for-humans" aria-hidden="true"><span class="octicon octicon-link"></span></a>Auth | Authorization for Humans</h1>
+
+<p>RESTful, Simple Authorization system</p>
+
+<p>.. image:: <a href="https://badge.fury.io/py/auth.svg">https://badge.fury.io/py/auth.svg</a>
+    :target: <a href="https://badge.fury.io/py/auth">https://badge.fury.io/py/auth</a></p>
+
+<p>.. image:: <a href="https://img.shields.io/pypi/dm/auth.svg">https://img.shields.io/pypi/dm/auth.svg</a>
+    :target: <a href="https://pypi.python.org/pypi/auth">https://pypi.python.org/pypi/auth</a></p>
+
+<p>.. image:: <a href="https://api.travis-ci.org/ourway/auth.svg">https://api.travis-ci.org/ourway/auth.svg</a>
+    :target: <a href="https://travis-ci.org/ourway/auth">https://travis-ci.org/ourway/auth</a></p>
+
+<p>.. image:: <a href="https://codecov.io/github/ourway/auth/coverage.svg?branch=master">https://codecov.io/github/ourway/auth/coverage.svg?branch=master</a>
+    :target: <a href="https://codecov.io/github/ourway/auth?branch=master">https://codecov.io/github/ourway/auth?branch=master</a></p>
+
+<hr>
+
+<p>What is Auth?</p>
+
+<hr>
+
+<p>Auth is a module that makes authorization simple and also scalable and powerful.  It also has a beautiful RESTful API for use in micro-service architectures and platforms.  It is originally desinged to use in Appido, a scalable media market in Iran.</p>
+
+<p>It supports Python2.6+</p>
+
+<p>I use Travis and Codecov to keep myself honest.</p>
+
+<hr>
+
+<p>requirements</p>
+
+<hr>
+
+<p>You need to access to <strong>mongodb</strong>.  If you are using a remote mongodb,  provide these environment variables:</p>
+
+<p><code>MONGO_HOST</code> and <code>MONGO_PORT</code></p>
+
+<hr>
+
+<p>Installation</p>
+
+<hr>
+
+<p>.. code:: Bash</p>
+
+<pre><code>pip install auth
+</code></pre>
+
+<hr>
+
+<p>Show me an example</p>
+
+<hr>
+
+<p>ok, lets image you have two users, <strong>Jack</strong> and <strong>Sara</strong>.  Sara can cook and Jack can dance. Both can laugh.</p>
+
+<p>You also need to choose a secret key for your application.  Because you may want to use Auth in various tools and each must have a secret key for seperating their scope.</p>
+
+<p>.. code:: Python</p>
+
+<pre><code>my_secret_key = "pleaSeDoN0tKillMyC_at"
+from auth import Authorization
+cas = Authorization(my_secret_key)
+</code></pre>
+
+<p>Now, Lets add 3 groups, Cookers, Dancers and Laughers.  Remember that groups are Roles.  So when we create a group, indeed we create a role:</p>
+
+<p>.. code:: Python</p>
+
+<pre><code>cas.add_group('cookers')
+cas.add_group('dancers')
+cas.add_group('laughers')
+</code></pre>
+
+<p>Ok, great. You have 3 groups and you need to authorize them to do special things.</p>
+
+<p>.. code:: Python</p>
+
+<pre><code>cas.add_permission('cookers', 'cook')
+cas.add_permission('dancers', 'dance')
+cas.add_permission('laughers', 'laugh')
+</code></pre>
+
+<p>Good.  You let cookers to cook and dancers to dance etc...
+The final part is to set memberships for Sara and Jack:</p>
+
+<p>.. code:: Python</p>
+
+<pre><code>cas.add_membership('sara', 'cookers')
+cas.add_membership('sara', 'laughers')
+cas.add_membership('jack', 'dancers')
+cas.add_membership('jack', 'laughers')
+</code></pre>
+
+<p>That's all we need.  Now lets ensure that jack can dance:</p>
+
+<p>.. code:: Python</p>
+
+<pre><code>if cas.user_has_permission('jack', 'dance'):
+    print('YES!!! Jack can dance.')
+</code></pre>
+
+<hr>
+
+<p>RESTful API</p>
+
+<hr>
+
+<p>Lets run the server on port 4000:</p>
+
+<p>.. code:: Python</p>
+
+<pre><code>from auth import api, serve
+serve('localhost', 4000, api)
+</code></pre>
+
+<p>Or, from version 0.1.2+ you can use this command:</p>
+
+<p>.. code:: Bash</p>
+
+<pre><code>auth-server
+</code></pre>
+
+<p>Simple! Authorization server is ready to use.  You can use it via simple curl or using mighty Requests module.  So in you remote application, you can do something like this:</p>
+
+<p>.. code:: Python</p>
+
+<pre><code>import requests
+secret_key = "pleaSeDoN0tKillMyC_at"
+auth_api = "http://127.0.0.1:4000/api"
+</code></pre>
+
+<p>Lets create admin group:</p>
+
+<p>.. code:: Python</p>
+
+<pre><code>requests.post(auth_api+'/role/'+secret_key+'/admin')
+</code></pre>
+
+<p>And lets make Jack an admin:</p>
+
+<p>.. code:: Python</p>
+
+<pre><code>requests.post(auth_api+'/permission/'+secret_key+'/jack/admin')
+</code></pre>
+
+<p>And finally let's check if Sara still can cook:</p>
+
+<p>.. code:: Python</p>
+
+<pre><code>requests.get(auth_api+'/has_permission/'+secret_key+'/sara/cook')
+</code></pre>
+
+<hr>
+
+<p>API Methods</p>
+
+<hr>
+
+<ul>
+<li>
+<p><code>/ping</code> [GET]</p>
+
+<p>Ping API, useful for your monitoring tools</p>
+</li>
+</ul>
+
+<hr>
+
+<ul>
+<li>
+<p><code>/api/membership/{KEY}/{user}/{role}</code> [GET/POST/DELETE]</p>
+
+<p>Adding, removing and getting membership information.</p>
+</li>
+</ul>
+
+<hr>
+
+<ul>
+<li>
+<p><code>/api/permission/{KEY}/{role}/{name}</code> [GET/POST/DELETE]</p>
+
+<p>Adding, removing and getting permissions</p>
+</li>
+</ul>
+
+<hr>
+
+<ul>
+<li>
+<p><code>/api/has_permission/{KEY}/{user}/{name}</code> [GET]</p>
+
+<p>Getting user permission info</p>
+</li>
+</ul>
+
+<hr>
+
+<ul>
+<li>
+<p><code>/api/role/{KEY}/{role}</code> [GET/POST/DELETE]</p>
+
+<p>Adding, removing and getting roles</p>
+</li>
+</ul>
+
+<hr>
+
+<p>Copyright</p>
+
+<hr>
+
+<ul>
+<li>Farsheed Ashouri <code>@ &lt;mailto:rodmena@me.com&gt;</code>_</li>
+</ul>
+
+<hr>
+
+<p>Documentation</p>
+
+<hr>
+
+<p>Feel free to dig into source code.  If you think you can improve the documentation, please do so and send me a pull request.</p>
+
+<hr>
+
+<p>Unit Tests and Coverage</p>
+
+<hr>
+
+<p>I am trying to add tests as much as I can, but still there are areas that need improvement.</p>
+
+<hr>
+
+<p>To DO</p>
+
+<hr>
+
+<ul>
+<li>Add Authentication features</li>
+<li>Improve Code Coverage</li>
+</ul>
+
+      <footer class="site-footer">
+        <span class="site-footer-owner"><a href="https://github.com/ourway/auth">Auth</a> is maintained by <a href="https://github.com/ourway">ourway</a>.</span>
+
+        <span class="site-footer-credits">This page was generated by <a href="https://pages.github.com">GitHub Pages</a> using the <a href="https://github.com/jasonlong/cayman-theme">Cayman theme</a> by <a href="https://twitter.com/jasonlong">Jason Long</a>.</span>
+      </footer>
+
+    </section>
+
+  
+  </body>
+</html>
