@@ -117,7 +117,12 @@ Or, from version 0.1.2+ you can use this command:
     auth-server
 
 
-Simple! Authorization server is ready to use.  You can use it via simple curl or using mighty Requests module.  So in you remote application, you can do something like this:
+Simple! Authorization server is ready to use.  
+
+.. image:: https://raw.githubusercontent.com/ourway/auth/master/docs/API_Usage_Teminal.gif
+
+
+You can use it via simple curl or using mighty Requests module.  So in you remote application, you can do something like this:
 
 .. code:: Python
 
