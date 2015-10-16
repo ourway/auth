@@ -39,7 +39,7 @@ mongo_host = os.getenv('MONGO_HOST') or '127.0.0.1'
 _mongo_port = os.getenv('MONGO_PORT') or 27017
 mongo_port = int(_mongo_port)
 
-connect('Authorization_0x0099', host='127.0.0.1', port=27017)
+connect('Authorization_0x0199', host='127.0.0.1', port=27017)
 
 
 def handler(event):
@@ -61,8 +61,8 @@ def update_modified(sender, document):
 
 @update_modified.apply
 class AuthGroup(Document):
-    role = StringField(max_length=32, unique_with='creator', required=True)
     creator = StringField(max_length=64, required=True)
+    role = StringField(max_length=32, unique_with='creator', required=True)
     description = StringField(max_length=256)
     is_active = BooleanField(default=True)
     date_created = DateTimeField(default=datetime.datetime.now())
