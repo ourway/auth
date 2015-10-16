@@ -136,19 +136,19 @@ API Methods
 
 ----
 
-- ``/api/permission/{client}/{group}/{name}`` [GET/POST/DELETE]
+- ``/api/permission/{KEY}/{group}/{name}`` [GET/POST/DELETE]
 
  Adding, removing and getting permissions
 
 ----
 
-- ``/api/has_permission/{client}/{user}/{name}`` [GET]
+- ``/api/has_permission/{KEY}/{user}/{name}`` [GET]
 
  Getting user permission info
 
 ----
 
-- ``/api/role/{client}/{group}`` [GET/POST/DELETE]
+- ``/api/role/{KEY}/{rolename}`` [GET/POST/DELETE]
 
   Adding, removing and getting roles
 
