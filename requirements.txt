@@ -1,0 +1,6 @@
+mongoengine
+falcon
+werkzeug
+blinker
+gunicorn
+httpie
