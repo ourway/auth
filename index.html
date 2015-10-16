@@ -26,11 +26,10 @@
 
 <p>RESTful, Simple Authorization system</p>
 
-<hr>
+<h1></h1>
 
-<p>What is Auth?</p>
-
-<hr>
+<h1>
+<a id="what-is-auth" class="anchor" href="#what-is-auth" aria-hidden="true"><span class="octicon octicon-link"></span></a>What is Auth?</h1>
 
 <p>Auth is a module that makes authorization simple and also scalable and powerful.  It also has a beautiful RESTful API for use in micro-service architectures and platforms.  It is originally desinged to use in Appido, a scalable media market in Iran.</p>
 
@@ -38,38 +37,31 @@
 
 <p>I use Travis and Codecov to keep myself honest.</p>
 
-<hr>
+<h1></h1>
 
-<p>requirements</p>
-
-<hr>
+<h1>
+<a id="requirements" class="anchor" href="#requirements" aria-hidden="true"><span class="octicon octicon-link"></span></a>requirements</h1>
 
 <p>You need to access to <strong>mongodb</strong>.  If you are using a remote mongodb,  provide these environment variables:</p>
 
 <p><code>MONGO_HOST</code> and <code>MONGO_PORT</code></p>
 
-<hr>
+<h1></h1>
 
-<p>Installation</p>
-
-<hr>
-
-<p>.. code:: Bash</p>
+<h1>
+<a id="installation" class="anchor" href="#installation" aria-hidden="true"><span class="octicon octicon-link"></span></a>Installation</h1>
 
 <pre><code>pip install auth
 </code></pre>
 
-<hr>
+<h1></h1>
 
-<p>Show me an example</p>
-
-<hr>
+<h1>
+<a id="show-me-an-example" class="anchor" href="#show-me-an-example" aria-hidden="true"><span class="octicon octicon-link"></span></a>Show me an example</h1>
 
 <p>ok, lets image you have two users, <strong>Jack</strong> and <strong>Sara</strong>.  Sara can cook and Jack can dance. Both can laugh.</p>
 
 <p>You also need to choose a secret key for your application.  Because you may want to use Auth in various tools and each must have a secret key for seperating their scope.</p>
-
-<p>.. code:: Python</p>
 
 <pre><code>my_secret_key = "pleaSeDoN0tKillMyC_at"
 from auth import Authorization
@@ -78,16 +70,12 @@ cas = Authorization(my_secret_key)
 
 <p>Now, Lets add 3 groups, Cookers, Dancers and Laughers.  Remember that groups are Roles.  So when we create a group, indeed we create a role:</p>
 
-<p>.. code:: Python</p>
-
 <pre><code>cas.add_group('cookers')
 cas.add_group('dancers')
 cas.add_group('laughers')
 </code></pre>
 
 <p>Ok, great. You have 3 groups and you need to authorize them to do special things.</p>
-
-<p>.. code:: Python</p>
 
 <pre><code>cas.add_permission('cookers', 'cook')
 cas.add_permission('dancers', 'dance')
@@ -97,8 +85,6 @@ cas.add_permission('laughers', 'laugh')
 <p>Good.  You let cookers to cook and dancers to dance etc...
 The final part is to set memberships for Sara and Jack:</p>
 
-<p>.. code:: Python</p>
-
 <pre><code>cas.add_membership('sara', 'cookers')
 cas.add_membership('sara', 'laughers')
 cas.add_membership('jack', 'dancers')
@@ -107,21 +93,16 @@ cas.add_membership('jack', 'laughers')
 
 <p>That's all we need.  Now lets ensure that jack can dance:</p>
 
-<p>.. code:: Python</p>
-
 <pre><code>if cas.user_has_permission('jack', 'dance'):
     print('YES!!! Jack can dance.')
 </code></pre>
 
-<hr>
+<h1></h1>
 
-<p>RESTful API</p>
-
-<hr>
+<h1>
+<a id="restful-api" class="anchor" href="#restful-api" aria-hidden="true"><span class="octicon octicon-link"></span></a>RESTful API</h1>
 
 <p>Lets run the server on port 4000:</p>
-
-<p>.. code:: Python</p>
 
 <pre><code>from auth import api, serve
 serve('localhost', 4000, api)
@@ -129,14 +110,10 @@ serve('localhost', 4000, api)
 
 <p>Or, from version 0.1.2+ you can use this command:</p>
 
-<p>.. code:: Bash</p>
-
 <pre><code>auth-server
 </code></pre>
 
 <p>Simple! Authorization server is ready to use.  You can use it via simple curl or using mighty Requests module.  So in you remote application, you can do something like this:</p>
-
-<p>.. code:: Python</p>
 
 <pre><code>import requests
 secret_key = "pleaSeDoN0tKillMyC_at"
@@ -145,30 +122,23 @@ auth_api = "http://127.0.0.1:4000/api"
 
 <p>Lets create admin group:</p>
 
-<p>.. code:: Python</p>
-
 <pre><code>requests.post(auth_api+'/role/'+secret_key+'/admin')
 </code></pre>
 
 <p>And lets make Jack an admin:</p>
-
-<p>.. code:: Python</p>
 
 <pre><code>requests.post(auth_api+'/permission/'+secret_key+'/jack/admin')
 </code></pre>
 
 <p>And finally let's check if Sara still can cook:</p>
 
-<p>.. code:: Python</p>
-
 <pre><code>requests.get(auth_api+'/has_permission/'+secret_key+'/sara/cook')
 </code></pre>
 
-<hr>
+<h1></h1>
 
-<p>API Methods</p>
-
-<hr>
+<h1>
+<a id="api-methods" class="anchor" href="#api-methods" aria-hidden="true"><span class="octicon octicon-link"></span></a>API Methods</h1>
 
 <ul>
 <li>
@@ -218,41 +188,13 @@ auth_api = "http://127.0.0.1:4000/api"
 </li>
 </ul>
 
-<hr>
+<h1></h1>
 
-<p>Copyright</p>
-
-<hr>
+<h1>
+<a id="copyright" class="anchor" href="#copyright" aria-hidden="true"><span class="octicon octicon-link"></span></a>Copyright</h1>
 
 <ul>
 <li>Farsheed Ashouri <code>@ &lt;mailto:rodmena@me.com&gt;</code>_</li>
-</ul>
-
-<hr>
-
-<p>Documentation</p>
-
-<hr>
-
-<p>Feel free to dig into source code.  If you think you can improve the documentation, please do so and send me a pull request.</p>
-
-<hr>
-
-<p>Unit Tests and Coverage</p>
-
-<hr>
-
-<p>I am trying to add tests as much as I can, but still there are areas that need improvement.</p>
-
-<hr>
-
-<p>To DO</p>
-
-<hr>
-
-<ul>
-<li>Add Authentication features</li>
-<li>Improve Code Coverage</li>
 </ul>
 
       <footer class="site-footer">
