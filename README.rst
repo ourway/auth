@@ -184,6 +184,15 @@ Documentation
 *******************
 Feel free to dig into source code.  If you think you can improve the documentation, please do so and send me a pull request.
 
+************************
+Unit Tests and Coverage
+************************
+I am trying to add tests as much as I can, but still there are areas that need improvement.
 
 
+**********
+To DO
+**********
+- Add Authentication features
+- Improve Code Coverage
 
