@@ -14,4 +14,4 @@ before_install:
     - codecov
 
 script:
-  - coverage run tests.py
+  - nosetests
