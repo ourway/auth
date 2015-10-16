@@ -11,6 +11,7 @@ _help = '''
     | GET POST DELETE | /api/permission/{key}/{role}/{action}     |
     | GET POST DELETE | /api/membership/{key}/{user}/{role}       |
     | GET             | /api/has_permission/{key}/{user}/{action} |
+    | POST DELETE     | /api/role/{key}/{role}                    |
     ---------------------------------------------------------------
 '''
 

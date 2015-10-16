@@ -2,7 +2,7 @@
 Auth | Authorization for Humans
 ====================================
 
-RESTful, Simple Authorization system
+RESTful, Simple Authorization system with ZERO configuration.
 
 .. image:: https://badge.fury.io/py/auth.svg
     :target: https://badge.fury.io/py/auth
@@ -27,7 +27,7 @@ What is Auth?
 ***************
 Auth is a module that makes authorization simple and also scalable and powerful.  It also has a beautiful RESTful API for use in micro-service architectures and platforms.  It is originally desinged to use in Appido, a scalable media market in Iran.
 
-It supports Python2.6+
+It supports Python2.6+ and if you have a mongodb backbone, you need ZERO configurations steps.  Just type ``auth-server`` and press enter!
 
 I use Travis and Codecov to keep myself honest.
 
