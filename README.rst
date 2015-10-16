@@ -186,6 +186,19 @@ API Methods
 
 
 *******************
+Deployment
+*******************
+
+Deploying Auth module in production environment is easy:
+
+
+.. code:: Bash
+
+    gunicorn auth:api
+
+
+
+*******************
 Copyright
 *******************
  
