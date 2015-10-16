@@ -10,6 +10,8 @@ RESTful, Simple Authorization system
 .. image:: https://api.travis-ci.org/ourway/auth.svg
     :target: https://travis-ci.org/ourway/auth
 
+.. image:: https://codecov.io/github/ourway/auth/coverage.svg?branch=master
+    :target: https://codecov.io/github/ourway/auth?branch=master
 
 
 
