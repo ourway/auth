@@ -8,7 +8,6 @@ import sys
 
 MYDIR = path.abspath(os.path.dirname(__file__))
 
-
 # NOTE
 REQUIRES = ['falcon', 'mongoengine', 'blinker', 'gunicorn', 'werkzeug', 'httpie']
 
