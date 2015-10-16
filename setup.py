@@ -16,7 +16,7 @@ ext_modules = []
 
 setup(
     name='auth',
-    version='0.1.4',
+    version='0.1.5
     description='Authorization for humans',
     long_description=io.open('README.rst', 'r', encoding='utf-8').read(),
     classifiers=[
@@ -39,7 +39,7 @@ setup(
     keywords='authorizarion role auth groups membership ensure ldap',
     author='Farsheed Ashouri',
     author_email='rodmena@me.com',
-    url='https://github.com/ourway/auth',
+    url='http://ourway.github.io/auth/',
     license='Apache 2.0',
     packages=find_packages(exclude=['tests']),
     include_package_data=True,
