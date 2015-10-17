@@ -100,6 +100,17 @@ That's all we need.  Now lets ensure that jack can dance:
         print('YES!!! Jack can dance.')
 
 
+
+**********************
+Authirization Methods
+**********************
+
+use pydoc to see all methods:
+
+.. code:: Bash
+    pydoc auth.Authorization
+
+
 *******************
 RESTful API
 *******************
@@ -155,6 +166,14 @@ And finally let's check if Sara still can cook:
 *******************
 API Methods
 *******************
+
+
+.. code:: Bash
+    pydoc auth.CAS.REST.service
+
+
+
+
 - ``/ping`` [GET]
 
 
