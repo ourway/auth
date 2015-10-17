@@ -108,6 +108,7 @@ Authirization Methods
 use pydoc to see all methods:
 
 .. code:: Bash
+
     pydoc auth.Authorization
 
 
@@ -169,6 +170,7 @@ API Methods
 
 
 .. code:: Bash
+
     pydoc auth.CAS.REST.service
 
 
