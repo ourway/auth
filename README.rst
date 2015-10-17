@@ -181,25 +181,21 @@ API Methods
 
  Ping API, useful for your monitoring tools
 
-----
 
 - ``/api/membership/{KEY}/{user}/{role}`` [GET/POST/DELETE]
 
  Adding, removing and getting membership information.
 
-----
 
 - ``/api/permission/{KEY}/{role}/{name}`` [GET/POST/DELETE]
 
  Adding, removing and getting permissions
 
-----
 
 - ``/api/has_permission/{KEY}/{user}/{name}`` [GET]
 
  Getting user permission info
 
-----
 
 - ``/api/role/{KEY}/{role}`` [GET/POST/DELETE]
 
