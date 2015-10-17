@@ -9,14 +9,14 @@ import sys
 MYDIR = path.abspath(os.path.dirname(__file__))
 
 # NOTE
-REQUIRES = ['falcon', 'mongoengine', 'blinker', 'gunicorn', 'werkzeug', 'httpie']
+REQUIRES = ['falcon', 'mongoengine', 'blinker', 'werkzeug']
 
 cmdclass = {}
 ext_modules = []
 
 setup(
     name='auth',
-    version='0.2.1',
+    version='0.3.0',
     description='Authorization for humans',
     long_description=io.open('README.rst', 'r', encoding='utf-8').read(),
     classifiers=[

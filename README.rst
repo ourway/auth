@@ -185,6 +185,35 @@ API Methods
   Adding, removing and getting roles
 
 
+- ``/api/which_roles_can/{KEY}/{name}`` [GET]
+
+  For example:  Which roles can send_mail?
+
+
+
+- ``/api/which_users_can/{KEY}/{name}`` [GET]
+
+  For example:  Which users can send_mail?
+
+
+- ``/api/user_permissions/{KEY}/{user}`` [GET]
+
+  Get all permissions that a user has
+
+- ``/api/role_permissions/{KEY}/{role}`` [GET]
+
+  Get all permissions that a role has
+
+
+- ``/api/user_roles/{KEY}/{user}`` [GET]
+
+    Get roles that user assinged to
+
+- ``/api/roles/{KEY}`` [GET]
+
+    Get all available roles
+
+
 *******************
 Deployment
 *******************
