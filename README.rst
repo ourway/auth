@@ -243,6 +243,20 @@ Deploying Auth module in production environment is easy:
 
 
 
+
+*******************
+Dockerizing
+*******************
+
+It's simple:
+
+.. code:: Bash
+
+    docker build -t python/auth-server https://raw.githubusercontent.com/ourway/auth/master/Dockerfile
+    docker run --name=auth -e MONGO_HOST='192.168.99.100' -p 4000:4000 -d --restart=always --link=mongodb-server python/auth-server
+
+
+
 *******************
 Copyright
 *******************
