@@ -39,7 +39,7 @@ mongo_host = os.getenv('MONGO_HOST') or '127.0.0.1'
 _mongo_port = os.getenv('MONGO_PORT') or 27017
 mongo_port = int(_mongo_port)
 
-connect('Authorization_0x0199', host='127.0.0.1', port=27017)
+connect('Authorization_0x0199', host=mongo_host, port=mongo_port)
 
 
 def handler(event):

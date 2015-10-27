@@ -207,7 +207,6 @@ API Methods
   For example:  Which roles can send_mail?
 
 
-
 - ``/api/which_users_can/{KEY}/{name}`` [GET]
 
   For example:  Which users can send_mail?

@@ -16,7 +16,7 @@ ext_modules = []
 
 setup(
     name='auth',
-    version='0.3.1',
+    version='0.3.2',
     description='Authorization for humans',
     long_description=io.open('README.rst', 'r', encoding='utf-8').read(),
     classifiers=[
