@@ -176,14 +176,6 @@ auth comes with a helper class that makes your life easy.
     print(service)
 
 
-example:
-
-.. code:: Python
-    service.add_role(role='admin')
-    service.get_roles()
-
-
-
 *******************
 API Methods
 *******************
