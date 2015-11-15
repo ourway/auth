@@ -38,7 +38,7 @@ requirements
 You need to access to **mongodb**.  If you are using a remote mongodb,  provide these environment variables:
 
 ``MONGO_HOST`` and ``MONGO_PORT``
-   
+
 
 *******************
 Installation
@@ -129,7 +129,7 @@ Or, from version 0.1.2+ you can use this command:
     auth-server
 
 
-Simple! Authorization server is ready to use.  
+Simple! Authorization server is ready to use.
 
 .. image:: https://raw.githubusercontent.com/ourway/auth/master/docs/API_Usage_Teminal.gif
 
@@ -162,6 +162,25 @@ And finally let's check if Sara still can cook:
 
     requests.get(auth_api+'/has_permission/'+secret_key+'/sara/cook')
 
+
+
+********************
+RESTful API helpers
+********************
+auth comes with a helper class that makes your life easy.
+
+.. code:: Python
+
+    from auth import Client
+    service = Client('srv201', 'http://192.168.99.100:4000')
+    print(service)
+
+example:
+
+
+.. code:: Python
+    service.add_role(role='admin')
+    service.get_roles()
 
 
 *******************
@@ -260,7 +279,7 @@ It's simple:
 *******************
 Copyright
 *******************
- 
+
 - Farsheed Ashouri `@ <mailto:rodmena@me.com>`_
 
 
@@ -280,4 +299,3 @@ To DO
 **********
 - Add Authentication features
 - Improve Code Coverage
-

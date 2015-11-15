@@ -1,9 +1,9 @@
 
-try:
-    import eventlet
-    eventlet.monkey_patch()
-except:
-    pass
+#try:
+#    import eventlet
+#    eventlet.monkey_patch()
+#except:
+#    pass
 
 import falcon
 import json
@@ -152,4 +152,3 @@ api.add_route('/api/role/{client}/{role}', Role())  ## POST DELETE
 api.add_route('/api/roles/{client}', ListRoles())  ## GET
 api.add_route('/api/which_roles_can/{client}/{name}', WhichRolesCan())  ## GET
 api.add_route('/api/which_users_can/{client}/{name}', WhichUsersCan())  ## GET
-
