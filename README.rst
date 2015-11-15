@@ -175,12 +175,13 @@ auth comes with a helper class that makes your life easy.
     service = Client('srv201', 'http://192.168.99.100:4000')
     print(service)
 
-example:
 
+example:
 
 .. code:: Python
     service.add_role(role='admin')
     service.get_roles()
+
 
 
 *******************
