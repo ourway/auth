@@ -28,18 +28,20 @@ Using permissions:
 """
 
 
-__all__ = ['AuthMembership', 'AuthGroup', 'AuthPermission']
+__all__ = ['make_db_connection', 'AuthMembership', 'AuthGroup', 'AuthPermission']
 
-from mongoengine import *
-from mongoengine import signals
 import os
 import datetime
+from mongoengine import *
+from mongoengine import signals
 
-mongo_host = os.getenv('MONGO_HOST') or '127.0.0.1'
-_mongo_port = os.getenv('MONGO_PORT') or 27017
-mongo_port = int(_mongo_port)
 
-connect('Authorization_0x0199', host=mongo_host, port=mongo_port)
+
+def make_db_connection():
+    mongo_host = os.getenv('MONGO_HOST') or '127.0.0.1'
+    _mongo_port = os.getenv('MONGO_PORT') or 27017
+    mongo_port = int(_mongo_port)
+    connect('Authorization_0x0199', host=mongo_host, port=mongo_port)
 
 
 def handler(event):

@@ -171,7 +171,7 @@ auth comes with a helper class that makes your life easy.
 
 .. code:: Python
 
-    from auth import Client
+    from auth.client import Client
     service = Client('srv201', 'http://192.168.99.100:4000')
     print(service)
     service.get_roles()

@@ -20,6 +20,7 @@ class Authorization(object):
         @type client: String
         """
         self.client = client
+        make_db_connection()
 
     @property
     def roles(self):
