@@ -33,7 +33,7 @@ class Authorization(object):
         target_role = AuthGroup.objects(role=role, creator=self.client).first()
         if not target_role:
             return '[]'
-        targets = AuthPermission.objects(group=target_role, creator=self.client).only('name')
+        targets = AuthPermission.objects(groups=target_role, creator=self.client).only('name')
         return json.loads(targets.to_json())
 
 
@@ -44,12 +44,11 @@ class Authorization(object):
         for each in memberShipRecords:
             for group in each.groups:
                 targetPermissionRecords = AuthPermission.objects(creator=self.client,
-                                            group=group).only('name')
+                                            groups=group).only('name')
 
                 for each_permission in targetPermissionRecords:
                     results.append({'name':each_permission.name})
         return results
-
 
     def get_user_roles(self, user):
         """get permissions of a user"""
@@ -69,14 +68,20 @@ class Authorization(object):
 
     def which_roles_can(self, name):
         """Which role can SendMail? """
-        targetPermissionRecords = AuthPermission.objects(creator=self.client, name=name)
-        return [{'role':i.group.role} for i in targetPermissionRecords]
+        targetPermissionRecords = AuthPermission.objects(creator=self.client, name=name).first()
+        return [{'role': group.role} for group in targetPermissionRecords.groups]
 
     def which_users_can(self, name):
         """Which role can SendMail? """
         _roles = self.which_roles_can(name)
         result =  [self.get_role_members(i.get('role')) for i in _roles]
         return result
+
+    def get_role(self, role):
+        """Returns a role object
+        """
+        role = AuthGroup.objects(role=role, creator=self.client).first()
+        return role
 
     def add_role(self, role, description=None):
         """ Creates a new group """
@@ -140,8 +145,10 @@ class Authorization(object):
         targetGroup = AuthGroup.objects(role=role, creator=self.client).first()
         if not targetGroup:
             return False
-        new_permission = AuthPermission(group=targetGroup, name=name, creator=self.client)
-        new_permission.save()
+        # Create or update
+        permission = AuthPermission.objects(name=name).update(
+                add_to_set__groups=[targetGroup], creator=self.client, upsert=True
+        )
         return True
 
     def del_permission(self, role, name):
@@ -149,7 +156,7 @@ class Authorization(object):
         if not self.has_permission(role, name):
             return True
         targetGroup = AuthGroup.objects(role=role, creator=self.client).first()
-        target = AuthPermission.objects(group=targetGroup, name=name, creator=self.client).first()
+        target = AuthPermission.objects(groups=targetGroup, name=name, creator=self.client).first()
         if not target:
             return True
         target.delete()
@@ -160,7 +167,7 @@ class Authorization(object):
         targetGroup = AuthGroup.objects(role=role, creator=self.client).first()
         if not targetGroup:
             return False
-        target = AuthPermission.objects(group=targetGroup, name=name, creator=self.client).first()
+        target = AuthPermission.objects(groups=targetGroup, name=name, creator=self.client).first()
         if target:
             return True
         return  False
