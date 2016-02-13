@@ -7,8 +7,6 @@ from auth import Authorization
 from auth.CAS.models.db import AuthGroup, AuthPermission, AuthMembership
 
 # CONFTEST
-#connect('test', host='mongomock://localhost', alias='testdb')
-#conn = get_connection('testdb')
 secret_key = 'OnePunchManSaitama'
 
 @pytest.fixture
