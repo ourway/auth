@@ -70,6 +70,12 @@ class AuthGroup(Document):
     date_created = DateTimeField(default=datetime.datetime.now())
     modified = DateTimeField()
 
+    def __repr__(self):
+        return '{}: <{}>'.format(
+            self.__class__.__name__,
+            self.role
+        )
+
 
 @update_modified.apply
 class AuthMembership(Document):
@@ -80,6 +86,11 @@ class AuthMembership(Document):
     date_created = DateTimeField(default=datetime.datetime.now())
     modified = DateTimeField()
 
+    def __repr__(self):
+        return '{}: <{}>'.format(
+            self.__class__.__name__,
+            self.user
+        )
 
 '''
 AuthPermission:
@@ -93,8 +104,14 @@ existance of a record means there is permission.
 class AuthPermission(Document):
     name = StringField(max_length=64, unique_with='creator', required=True)
     creator = StringField(max_length=64, required=True)
-    group = ReferenceField(AuthGroup, required=True)
+    groups = ListField(ReferenceField(AuthGroup, required=True))
     is_active = BooleanField(default=True)
     date_created = DateTimeField(default=datetime.datetime.now())
     modified = DateTimeField()
+
+    def __repr__(self):
+        return '{}: <{}>'.format(
+            self.__class__.__name__,
+            self.name
+        )
 
