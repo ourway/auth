@@ -102,7 +102,7 @@ That's all we need.  Now lets ensure that jack can dance:
 
 
 **********************
-Authirization Methods
+Authorization Methods
 **********************
 
 use pydoc to see all methods:
