@@ -66,9 +66,9 @@ Now, Lets add 3 groups, Cookers, Dancers and Laughers.  Remember that groups are
 
 .. code:: Python
 
-    cas.add_group('cookers')
-    cas.add_group('dancers')
-    cas.add_group('laughers')
+    cas.add_role('cookers')
+    cas.add_role('dancers')
+    cas.add_role('laughers')
 
 
 Ok, great. You have 3 groups and you need to authorize them to do special things.
