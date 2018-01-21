@@ -7,7 +7,6 @@ try:
 except ImportError:
     pass
 
-
 from auth.CAS.models.db import *
 from mongoengine.errors import NotUniqueError
 
