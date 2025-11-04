@@ -17,9 +17,10 @@ def test_connect_get():
         mock_response.content = b'{"test": "data"}'
         mock_get.return_value = mock_response
 
-        result = connect("http://example.com", "get")
+        test_headers = {"Authorization": "Bearer test"}
+        result = connect("http://example.com", "get", headers=test_headers)
         assert result == mock_response
-        mock_get.assert_called_once_with("http://example.com")
+        mock_get.assert_called_once_with("http://example.com", headers=test_headers)
 
 
 def test_connect_post():
@@ -29,9 +30,10 @@ def test_connect_post():
         mock_response.content = b'{"test": "data"}'
         mock_post.return_value = mock_response
 
-        result = connect("http://example.com", "post")
+        test_headers = {"Authorization": "Bearer test"}
+        result = connect("http://example.com", "post", headers=test_headers)
         assert result == mock_response
-        mock_post.assert_called_once_with("http://example.com")
+        mock_post.assert_called_once_with("http://example.com", headers=test_headers)
 
 
 def test_connect_delete():
@@ -41,9 +43,10 @@ def test_connect_delete():
         mock_response.content = b'{"test": "data"}'
         mock_delete.return_value = mock_response
 
-        result = connect("http://example.com", "delete")
+        test_headers = {"Authorization": "Bearer test"}
+        result = connect("http://example.com", "delete", headers=test_headers)
         assert result == mock_response
-        mock_delete.assert_called_once_with("http://example.com")
+        mock_delete.assert_called_once_with("http://example.com", headers=test_headers)
 
 
 def test_connect_connection_error():
@@ -61,11 +64,11 @@ def test_connection_factory():
         service_url = "http://example.com"
 
     # Create a mock function through factory
-    func = connection_factory(MockClass, "/api/test/{client}/{user}", "get")
+    func = connection_factory(MockClass, "/api/test/{user}", "get")
 
     # Check that the function has correct docstring
     assert "This function will call" in func.__doc__
-    assert "/api/test/{client}/{user}" in func.__doc__
+    assert "/api/test/{user}" in func.__doc__
     assert "GET" in func.__doc__
 
 
@@ -76,7 +79,7 @@ def test_connection_factory_missing_args():
         api_key = "test_key"
         service_url = "http://example.com"
 
-    func = connection_factory(MockClass, "/api/test/{client}/{user}/{group}", "get")
+    func = connection_factory(MockClass, "/api/test/{user}/{group}", "get")
 
     with pytest.raises(AssertionError, match="I need"):
         func(user="test_user")  # Missing 'group' argument
@@ -95,12 +98,14 @@ def test_connection_factory_full_functionality():
         mock_response.content = b'{"result": true}'
         mock_connect.return_value = mock_response
 
-        func = connection_factory(MockClass, "/api/test/{client}/{user}", "get")
+        func = connection_factory(MockClass, "/api/test/{user}", "get")
         result = func(user="test_user")
 
         # Check the URL was constructed correctly
-        expected_url = "http://example.com/api/test/test_key/test_user"
-        mock_connect.assert_called_with(expected_url, "get")
+        expected_url = "http://example.com/api/test/test_user"
+        mock_connect.assert_called_with(
+            expected_url, "get", headers={"Authorization": "Bearer test_key"}
+        )
 
         # Check the result was parsed from JSON
         assert result == {"result": True}

@@ -58,7 +58,9 @@ def test_ping(client):
 
 def test_add_role(client):
     """Test adding a role"""
-    response = client.post(f"/api/role/{SECRET_KEY}/admin")
+    response = client.post(
+        "/api/role/admin", headers={"Authorization": f"Bearer {SECRET_KEY}"}
+    )
     assert response.status_code == 200
     assert response.get_json() == {"result": True}
 
@@ -66,9 +68,11 @@ def test_add_role(client):
 def test_list_roles(client):
     """Test listing roles"""
     # First add a role
-    client.post(f"/api/role/{SECRET_KEY}/admin")
+    client.post("/api/role/admin", headers={"Authorization": f"Bearer {SECRET_KEY}"})
 
-    response = client.get(f"/api/roles/{SECRET_KEY}")
+    response = client.get(
+        "/api/roles", headers={"Authorization": f"Bearer {SECRET_KEY}"}
+    )
     assert response.status_code == 200
     data = response.get_json()
     assert "result" in data
@@ -80,9 +84,11 @@ def test_list_roles(client):
 def test_add_permission(client):
     """Test adding permission to role"""
     # Add role first
-    client.post(f"/api/role/{SECRET_KEY}/admin")
+    client.post("/api/role/admin", headers={"Authorization": f"Bearer {SECRET_KEY}"})
 
-    response = client.post(f"/api/permission/{SECRET_KEY}/admin/read")
+    response = client.post(
+        "/api/permission/admin/read", headers={"Authorization": f"Bearer {SECRET_KEY}"}
+    )
     assert response.status_code == 200
     assert response.get_json() == {"result": True}
 
@@ -90,10 +96,14 @@ def test_add_permission(client):
 def test_check_permission(client):
     """Test checking permission"""
     # Setup
-    client.post(f"/api/role/{SECRET_KEY}/admin")
-    client.post(f"/api/permission/{SECRET_KEY}/admin/read")
+    client.post("/api/role/admin", headers={"Authorization": f"Bearer {SECRET_KEY}"})
+    client.post(
+        "/api/permission/admin/read", headers={"Authorization": f"Bearer {SECRET_KEY}"}
+    )
 
-    response = client.get(f"/api/permission/{SECRET_KEY}/admin/read")
+    response = client.get(
+        "/api/permission/admin/read", headers={"Authorization": f"Bearer {SECRET_KEY}"}
+    )
     assert response.status_code == 200
     assert response.get_json() == {"result": True}
 
@@ -101,9 +111,11 @@ def test_check_permission(client):
 def test_add_membership(client):
     """Test adding user to role"""
     # Add role first
-    client.post(f"/api/role/{SECRET_KEY}/admin")
+    client.post("/api/role/admin", headers={"Authorization": f"Bearer {SECRET_KEY}"})
 
-    response = client.post(f"/api/membership/{SECRET_KEY}/john/admin")
+    response = client.post(
+        "/api/membership/john/admin", headers={"Authorization": f"Bearer {SECRET_KEY}"}
+    )
     assert response.status_code == 200
     assert response.get_json() == {"result": True}
 
@@ -111,10 +123,14 @@ def test_add_membership(client):
 def test_check_membership(client):
     """Test checking membership"""
     # Setup
-    client.post(f"/api/role/{SECRET_KEY}/admin")
-    client.post(f"/api/membership/{SECRET_KEY}/john/admin")
+    client.post("/api/role/admin", headers={"Authorization": f"Bearer {SECRET_KEY}"})
+    client.post(
+        "/api/membership/john/admin", headers={"Authorization": f"Bearer {SECRET_KEY}"}
+    )
 
-    response = client.get(f"/api/membership/{SECRET_KEY}/john/admin")
+    response = client.get(
+        "/api/membership/john/admin", headers={"Authorization": f"Bearer {SECRET_KEY}"}
+    )
     assert response.status_code == 200
     assert response.get_json() == {"result": True}
 
@@ -122,11 +138,18 @@ def test_check_membership(client):
 def test_check_user_permission(client):
     """Test checking user permission"""
     # Setup
-    client.post(f"/api/role/{SECRET_KEY}/admin")
-    client.post(f"/api/permission/{SECRET_KEY}/admin/read")
-    client.post(f"/api/membership/{SECRET_KEY}/john/admin")
+    client.post("/api/role/admin", headers={"Authorization": f"Bearer {SECRET_KEY}"})
+    client.post(
+        "/api/permission/admin/read", headers={"Authorization": f"Bearer {SECRET_KEY}"}
+    )
+    client.post(
+        "/api/membership/john/admin", headers={"Authorization": f"Bearer {SECRET_KEY}"}
+    )
 
-    response = client.get(f"/api/has_permission/{SECRET_KEY}/john/read")
+    response = client.get(
+        "/api/has_permission/john/read",
+        headers={"Authorization": f"Bearer {SECRET_KEY}"},
+    )
     assert response.status_code == 200
     assert response.get_json() == {"result": True}
 
@@ -134,12 +157,20 @@ def test_check_user_permission(client):
 def test_get_user_permissions(client):
     """Test getting user permissions"""
     # Setup
-    client.post(f"/api/role/{SECRET_KEY}/admin")
-    client.post(f"/api/permission/{SECRET_KEY}/admin/read")
-    client.post(f"/api/permission/{SECRET_KEY}/admin/write")
-    client.post(f"/api/membership/{SECRET_KEY}/john/admin")
+    client.post("/api/role/admin", headers={"Authorization": f"Bearer {SECRET_KEY}"})
+    client.post(
+        "/api/permission/admin/read", headers={"Authorization": f"Bearer {SECRET_KEY}"}
+    )
+    client.post(
+        "/api/permission/admin/write", headers={"Authorization": f"Bearer {SECRET_KEY}"}
+    )
+    client.post(
+        "/api/membership/john/admin", headers={"Authorization": f"Bearer {SECRET_KEY}"}
+    )
 
-    response = client.get(f"/api/user_permissions/{SECRET_KEY}/john")
+    response = client.get(
+        "/api/user_permissions/john", headers={"Authorization": f"Bearer {SECRET_KEY}"}
+    )
     assert response.status_code == 200
     data = response.get_json()
     assert "results" in data
@@ -151,11 +182,17 @@ def test_get_user_permissions(client):
 def test_get_role_permissions(client):
     """Test getting role permissions"""
     # Setup
-    client.post(f"/api/role/{SECRET_KEY}/admin")
-    client.post(f"/api/permission/{SECRET_KEY}/admin/read")
-    client.post(f"/api/permission/{SECRET_KEY}/admin/write")
+    client.post("/api/role/admin", headers={"Authorization": f"Bearer {SECRET_KEY}"})
+    client.post(
+        "/api/permission/admin/read", headers={"Authorization": f"Bearer {SECRET_KEY}"}
+    )
+    client.post(
+        "/api/permission/admin/write", headers={"Authorization": f"Bearer {SECRET_KEY}"}
+    )
 
-    response = client.get(f"/api/role_permissions/{SECRET_KEY}/admin")
+    response = client.get(
+        "/api/role_permissions/admin", headers={"Authorization": f"Bearer {SECRET_KEY}"}
+    )
     assert response.status_code == 200
     data = response.get_json()
     assert "results" in data
@@ -167,12 +204,18 @@ def test_get_role_permissions(client):
 def test_get_user_roles(client):
     """Test getting user roles"""
     # Setup
-    client.post(f"/api/role/{SECRET_KEY}/admin")
-    client.post(f"/api/role/{SECRET_KEY}/user")
-    client.post(f"/api/membership/{SECRET_KEY}/john/admin")
-    client.post(f"/api/membership/{SECRET_KEY}/john/user")
+    client.post("/api/role/admin", headers={"Authorization": f"Bearer {SECRET_KEY}"})
+    client.post("/api/role/user", headers={"Authorization": f"Bearer {SECRET_KEY}"})
+    client.post(
+        "/api/membership/john/admin", headers={"Authorization": f"Bearer {SECRET_KEY}"}
+    )
+    client.post(
+        "/api/membership/john/user", headers={"Authorization": f"Bearer {SECRET_KEY}"}
+    )
 
-    response = client.get(f"/api/user_roles/{SECRET_KEY}/john")
+    response = client.get(
+        "/api/user_roles/john", headers={"Authorization": f"Bearer {SECRET_KEY}"}
+    )
     assert response.status_code == 200
     data = response.get_json()
     assert "result" in data
@@ -184,11 +227,17 @@ def test_get_user_roles(client):
 def test_get_role_members(client):
     """Test getting role members"""
     # Setup
-    client.post(f"/api/role/{SECRET_KEY}/admin")
-    client.post(f"/api/membership/{SECRET_KEY}/john/admin")
-    client.post(f"/api/membership/{SECRET_KEY}/jane/admin")
+    client.post("/api/role/admin", headers={"Authorization": f"Bearer {SECRET_KEY}"})
+    client.post(
+        "/api/membership/john/admin", headers={"Authorization": f"Bearer {SECRET_KEY}"}
+    )
+    client.post(
+        "/api/membership/jane/admin", headers={"Authorization": f"Bearer {SECRET_KEY}"}
+    )
 
-    response = client.get(f"/api/members/{SECRET_KEY}/admin")
+    response = client.get(
+        "/api/members/admin", headers={"Authorization": f"Bearer {SECRET_KEY}"}
+    )
     assert response.status_code == 200
     data = response.get_json()
     assert "result" in data
@@ -201,12 +250,18 @@ def test_get_role_members(client):
 def test_which_roles_can(client):
     """Test which roles can perform action"""
     # Setup
-    client.post(f"/api/role/{SECRET_KEY}/admin")
-    client.post(f"/api/role/{SECRET_KEY}/user")
-    client.post(f"/api/permission/{SECRET_KEY}/admin/read")
-    client.post(f"/api/permission/{SECRET_KEY}/user/read")
+    client.post("/api/role/admin", headers={"Authorization": f"Bearer {SECRET_KEY}"})
+    client.post("/api/role/user", headers={"Authorization": f"Bearer {SECRET_KEY}"})
+    client.post(
+        "/api/permission/admin/read", headers={"Authorization": f"Bearer {SECRET_KEY}"}
+    )
+    client.post(
+        "/api/permission/user/read", headers={"Authorization": f"Bearer {SECRET_KEY}"}
+    )
 
-    response = client.get(f"/api/which_roles_can/{SECRET_KEY}/read")
+    response = client.get(
+        "/api/which_roles_can/read", headers={"Authorization": f"Bearer {SECRET_KEY}"}
+    )
     assert response.status_code == 200
     data = response.get_json()
     assert "result" in data
@@ -218,14 +273,24 @@ def test_which_roles_can(client):
 def test_which_users_can(client):
     """Test which users can perform action"""
     # Setup
-    client.post(f"/api/role/{SECRET_KEY}/admin")
-    client.post(f"/api/role/{SECRET_KEY}/user")
-    client.post(f"/api/permission/{SECRET_KEY}/admin/read")
-    client.post(f"/api/permission/{SECRET_KEY}/user/read")
-    client.post(f"/api/membership/{SECRET_KEY}/john/admin")
-    client.post(f"/api/membership/{SECRET_KEY}/jane/user")
+    client.post("/api/role/admin", headers={"Authorization": f"Bearer {SECRET_KEY}"})
+    client.post("/api/role/user", headers={"Authorization": f"Bearer {SECRET_KEY}"})
+    client.post(
+        "/api/permission/admin/read", headers={"Authorization": f"Bearer {SECRET_KEY}"}
+    )
+    client.post(
+        "/api/permission/user/read", headers={"Authorization": f"Bearer {SECRET_KEY}"}
+    )
+    client.post(
+        "/api/membership/john/admin", headers={"Authorization": f"Bearer {SECRET_KEY}"}
+    )
+    client.post(
+        "/api/membership/jane/user", headers={"Authorization": f"Bearer {SECRET_KEY}"}
+    )
 
-    response = client.get(f"/api/which_users_can/{SECRET_KEY}/read")
+    response = client.get(
+        "/api/which_users_can/read", headers={"Authorization": f"Bearer {SECRET_KEY}"}
+    )
     assert response.status_code == 200
     data = response.get_json()
     assert "result" in data
@@ -238,60 +303,82 @@ def test_which_users_can(client):
 def test_delete_membership(client):
     """Test removing user from role"""
     # Setup
-    client.post(f"/api/role/{SECRET_KEY}/admin")
-    client.post(f"/api/membership/{SECRET_KEY}/john/admin")
+    client.post("/api/role/admin", headers={"Authorization": f"Bearer {SECRET_KEY}"})
+    client.post(
+        "/api/membership/john/admin", headers={"Authorization": f"Bearer {SECRET_KEY}"}
+    )
 
     # Check membership exists
-    response = client.get(f"/api/membership/{SECRET_KEY}/john/admin")
+    response = client.get(
+        "/api/membership/john/admin", headers={"Authorization": f"Bearer {SECRET_KEY}"}
+    )
     assert response.get_json() == {"result": True}
 
     # Remove membership
-    response = client.delete(f"/api/membership/{SECRET_KEY}/john/admin")
+    response = client.delete(
+        "/api/membership/john/admin", headers={"Authorization": f"Bearer {SECRET_KEY}"}
+    )
     assert response.status_code == 200
     assert response.get_json() == {"result": True}
 
     # Check membership removed
-    response = client.get(f"/api/membership/{SECRET_KEY}/john/admin")
+    response = client.get(
+        "/api/membership/john/admin", headers={"Authorization": f"Bearer {SECRET_KEY}"}
+    )
     assert response.get_json() == {"result": False}
 
 
 def test_delete_permission(client):
     """Test removing permission from role"""
     # Setup
-    client.post(f"/api/role/{SECRET_KEY}/admin")
-    client.post(f"/api/permission/{SECRET_KEY}/admin/read")
+    client.post("/api/role/admin", headers={"Authorization": f"Bearer {SECRET_KEY}"})
+    client.post(
+        "/api/permission/admin/read", headers={"Authorization": f"Bearer {SECRET_KEY}"}
+    )
 
     # Check permission exists
-    response = client.get(f"/api/permission/{SECRET_KEY}/admin/read")
+    response = client.get(
+        "/api/permission/admin/read", headers={"Authorization": f"Bearer {SECRET_KEY}"}
+    )
     assert response.get_json() == {"result": True}
 
     # Remove permission
-    response = client.delete(f"/api/permission/{SECRET_KEY}/admin/read")
+    response = client.delete(
+        "/api/permission/admin/read", headers={"Authorization": f"Bearer {SECRET_KEY}"}
+    )
     assert response.status_code == 200
     assert response.get_json() == {"result": True}
 
     # Check permission removed
-    response = client.get(f"/api/permission/{SECRET_KEY}/admin/read")
+    response = client.get(
+        "/api/permission/admin/read", headers={"Authorization": f"Bearer {SECRET_KEY}"}
+    )
     assert response.get_json() == {"result": False}
 
 
 def test_delete_role(client):
     """Test deleting role"""
     # Setup
-    client.post(f"/api/role/{SECRET_KEY}/admin")
+    client.post("/api/role/admin", headers={"Authorization": f"Bearer {SECRET_KEY}"})
 
     # Check role exists
-    response = client.get(f"/api/roles/{SECRET_KEY}")
+    response = client.get(
+        "/api/roles", headers={"Authorization": f"Bearer {SECRET_KEY}"}
+    )
     roles = [item["role"] for item in response.get_json()["result"]]
     assert "admin" in roles
 
     # Delete role
-    response = client.delete(f"/api/role/{SECRET_KEY}/admin")
+    response = client.delete(
+        "/api/role/admin", headers={"Authorization": f"Bearer {SECRET_KEY}"}
+    )
     assert response.status_code == 200
     assert response.get_json() == {"result": True}
 
     # Check role removed
-    response = client.get(f"/api/roles/{SECRET_KEY}")
+    response = client.get(
+        "/api/roles", headers={"Authorization": f"Bearer {SECRET_KEY}"}
+    )
     roles = [item["role"] for item in response.get_json()["result"]]
     assert "admin" not in roles
 
@@ -299,11 +386,15 @@ def test_delete_role(client):
 def test_duplicate_role(client):
     """Test adding duplicate role"""
     # Add role first time
-    response = client.post(f"/api/role/{SECRET_KEY}/admin")
+    response = client.post(
+        "/api/role/admin", headers={"Authorization": f"Bearer {SECRET_KEY}"}
+    )
     assert response.get_json() == {"result": True}
 
     # Try to add same role again - should return True for compatibility
-    response = client.post(f"/api/role/{SECRET_KEY}/admin")
+    response = client.post(
+        "/api/role/admin", headers={"Authorization": f"Bearer {SECRET_KEY}"}
+    )
     assert response.get_json() == {
         "result": True
     }  # Changed from False to True for compatibility
@@ -312,15 +403,23 @@ def test_duplicate_role(client):
 def test_nonexistent_operations(client):
     """Test operations on non-existent entities"""
     # Check non-existent permission
-    response = client.get(f"/api/permission/{SECRET_KEY}/nonexistent/read")
+    response = client.get(
+        "/api/permission/nonexistent/read",
+        headers={"Authorization": f"Bearer {SECRET_KEY}"},
+    )
     assert response.get_json() == {"result": False}
 
     # Delete non-existent permission
-    response = client.delete(f"/api/permission/{SECRET_KEY}/nonexistent/read")
+    response = client.delete(
+        "/api/permission/nonexistent/read",
+        headers={"Authorization": f"Bearer {SECRET_KEY}"},
+    )
     assert response.get_json() == {"result": True}
 
     # Delete non-existent role
-    response = client.delete(f"/api/role/{SECRET_KEY}/nonexistent")
+    response = client.delete(
+        "/api/role/nonexistent", headers={"Authorization": f"Bearer {SECRET_KEY}"}
+    )
     assert response.get_json() == {"result": False}
 
 
@@ -330,21 +429,35 @@ def test_empty_results(client):
     fresh_key = str(uuid.uuid4())
 
     # Empty roles
-    response = client.get(f"/api/roles/{fresh_key}")
+    response = client.get(
+        "/api/roles", headers={"Authorization": f"Bearer {fresh_key}"}
+    )
     assert response.get_json() == {"result": []}
 
     # Empty permissions
-    response = client.get(f"/api/role_permissions/{fresh_key}/nonexistent")
+    response = client.get(
+        "/api/role_permissions/nonexistent",
+        headers={"Authorization": f"Bearer {fresh_key}"},
+    )
     assert response.get_json() == {"results": []}
 
     # Empty user permissions
-    response = client.get(f"/api/user_permissions/{fresh_key}/nonexistent")
+    response = client.get(
+        "/api/user_permissions/nonexistent",
+        headers={"Authorization": f"Bearer {fresh_key}"},
+    )
     assert response.get_json() == {"results": []}
 
     # Empty which roles can
-    response = client.get(f"/api/which_roles_can/{fresh_key}/nonexistent")
+    response = client.get(
+        "/api/which_roles_can/nonexistent",
+        headers={"Authorization": f"Bearer {fresh_key}"},
+    )
     assert response.get_json() == {"result": []}
 
     # Empty which users can
-    response = client.get(f"/api/which_users_can/{fresh_key}/nonexistent")
+    response = client.get(
+        "/api/which_users_can/nonexistent",
+        headers={"Authorization": f"Bearer {fresh_key}"},
+    )
     assert response.get_json() == {"result": []}

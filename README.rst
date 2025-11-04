@@ -16,14 +16,19 @@ RESTful, Simple Authorization system with ZERO configuration.
 .. image:: https://codecov.io/github/ourway/auth/coverage.svg?branch=master
     :target: https://codecov.io/github/ourway/auth?branch=master
 
-.. note:: **IMPORTANT: Version 0.9.1 is a BREAKING CHANGE**
+.. note:: **IMPORTANT: Version 0.9.2 is a BREAKING CHANGE**
 
-   This version (0.9.1) replaces MongoDB with SQLite3 as the default database backend.
-   If you need MongoDB support, please use the previous version:
+   This version (0.9.2) moves the client secret key from URL path parameters to the Authorization header for improved security.
+   All API endpoints now require the client key to be passed as a Bearer token in the Authorization header.
+   
+   **Before:** ``/api/membership/{KEY}/{user}/{group}``
+   **After:** ``/api/membership/{user}/{group}`` with header ``Authorization: Bearer {KEY}``
+   
+   If you need the previous version with URL-based keys:
    
    .. code:: Bash
    
-       pip install auth==0.5.3
+       pip install auth==0.9.1
 
 ***************
 What is Auth?
@@ -132,19 +137,19 @@ Let's create admin role:
 
 .. code:: Python
 
-    requests.post(auth_api+'/role/'+secret_key+'/admin')
+    requests.post(auth_api+'/role/admin', headers={"Authorization": f"Bearer {secret_key}"})
 
 And let's add a permission to the admin role:
 
 .. code:: Python
 
-    requests.post(auth_api+'/permission/'+secret_key+'/admin/manage')
+    requests.post(auth_api+'/permission/admin/manage', headers={"Authorization": f"Bearer {secret_key}"})
 
 And finally let's check if an admin can manage:
 
 .. code:: Python
 
-    response = requests.get(auth_api+'/has_permission/'+secret_key+'/admin/manage')
+    response = requests.get(auth_api+'/has_permission/admin/manage', headers={"Authorization": f"Bearer {secret_key}"})
     print(response.json())
 
 ********************
@@ -170,49 +175,49 @@ API Methods
 
     pydoc auth.CAS.REST.service
 
-.. note:: **Important:** All API endpoints require a valid UUID4 as the ``{KEY}`` parameter. Client keys must be valid UUID4 format.
+.. note:: **Important:** All API endpoints require a valid UUID4 Bearer token in the 'Authorization' header.
 
 - ``/ping`` [GET]
 
  Ping API, useful for your monitoring tools
 
-- ``/api/membership/{KEY}/{user}/{group}`` [GET/POST/DELETE]
+- ``/api/membership/{user}/{group}`` [GET/POST/DELETE]
 
  Adding, removing and getting membership information.
 
-- ``/api/permission/{KEY}/{group}/{name}`` [GET/POST/DELETE]
+- ``/api/permission/{group}/{name}`` [GET/POST/DELETE]
 
  Adding, removing and getting permissions
 
-- ``/api/has_permission/{KEY}/{user}/{name}`` [GET]
+- ``/api/has_permission/{user}/{name}`` [GET]
 
  Getting user permission info
 
-- ``/api/role/{KEY}/{role}`` [GET/POST/DELETE]
+- ``/api/role/{role}`` [GET/POST/DELETE]
 
   Adding, removing and getting roles
 
-- ``/api/which_roles_can/{KEY}/{name}`` [GET]
+- ``/api/which_roles_can/{name}`` [GET]
 
   For example:  Which roles can send_mail?
 
-- ``/api/which_users_can/{KEY}/{name}`` [GET]
+- ``/api/which_users_can/{name}`` [GET]
 
   For example:  Which users can send_mail?
 
-- ``/api/user_permissions/{KEY}/{user}`` [GET]
+- ``/api/user_permissions/{user}`` [GET]
 
   Get all permissions that a user has
 
-- ``/api/role_permissions/{KEY}/{role}`` [GET]
+- ``/api/role_permissions/{role}`` [GET]
 
   Get all permissions that a role has
 
-- ``/api/user_roles/{KEY}/{user}`` [GET]
+- ``/api/user_roles/{user}`` [GET]
 
     Get roles that user assigned to
 
-- ``/api/roles/{KEY}`` [GET]
+- ``/api/roles`` [GET]
 
     Get all available roles
 

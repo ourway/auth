@@ -8,30 +8,30 @@ from requests.exceptions import ConnectionError
 
 services = {
     "/ping": ["get"],
-    "/api/membership/{client}/{user}/{group}": ["post", "delete", "get"],
-    "/api/permission/{client}/{group}/{name}": ["post", "delete", "get"],
-    "/api/has_permission/{client}/{user}/{name}": ["get"],
-    "/api/user_permissions/{client}/{user}": ["get"],
-    "/api/role_permissions/{client}/{role}": ["get"],
-    "/api/user_roles/{client}/{user}": ["get"],
-    "/api/members/{client}/{role}": ["get"],
-    "/api/role/{client}/{role}": ["post", "delete"],
-    "/api/roles/{client}": ["get"],
-    "/api/which_roles_can/{client}/{name}": ["get"],
-    "/api/which_users_can/{client}/{name}": ["get"],
+    "/api/membership/{user}/{group}": ["post", "delete", "get"],
+    "/api/permission/{group}/{name}": ["post", "delete", "get"],
+    "/api/has_permission/{user}/{name}": ["get"],
+    "/api/user_permissions/{user}": ["get"],
+    "/api/role_permissions/{role}": ["get"],
+    "/api/user_roles/{user}": ["get"],
+    "/api/members/{role}": ["get"],
+    "/api/role/{role}": ["post", "delete"],
+    "/api/roles": ["get"],
+    "/api/which_roles_can/{name}": ["get"],
+    "/api/which_users_can/{name}": ["get"],
 }
 
 translate = {"get": "get", "post": "add", "delete": "remove"}
 
 
-def connect(url, method="get"):
+def connect(url, method="get", headers=None):
     func = requests.get
     if method == "post":
         func = requests.post
     elif method == "delete":
         func = requests.delete
     try:
-        r = func(url)
+        r = func(url, headers=headers)
         return r
     except ConnectionError:
         raise ConnectionError("Service Down") from None
@@ -40,14 +40,19 @@ def connect(url, method="get"):
 def connection_factory(cls, url, method):
     def closure(*args, **kw):
         attrs = re.findall(re.compile(r"{([\w]+)"), url)
-        kw["client"] = cls.api_key
+        # kw["client"] is NO LONGER added here
         try:
             assert set(attrs) == set(kw.keys())
         except AssertionError:
-            attrs.remove("client")
+            # attrs.remove("client") is NO LONGER needed
             raise AssertionError("I need %s." % set(attrs)) from None
+
         link = cls.service_url + url.format(**kw)
-        r = connect(link, method)
+
+        # Create auth header
+        headers = {"Authorization": f"Bearer {cls.api_key}"}
+
+        r = connect(link, method, headers=headers)
         return json.loads(r.content.decode())
 
     closure.__doc__ = 'This function will call "%s" on server with method "%s"' % (
@@ -63,7 +68,7 @@ class Client(object):
     def __new__(cls, api_key, service_url):
         cls.api_key = api_key
         cls.service_url = service_url
-        pattern = re.compile(r"/api/([\w]+)/.*")
+        pattern = re.compile(r"/api/([\w]+)")
         for url in services:
             match = re.findall(pattern, url)
             if match and services[url]:
