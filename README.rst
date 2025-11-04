@@ -56,11 +56,12 @@ Show me an example
 *******************
 Let's imagine you have two users, **Jack** and **Sara**. Sara can cook and Jack can dance. Both can laugh.
 
-You also need to choose a secret key for your application. Because you may want to use Auth in various tools and each must have a secret key for separating their scope.
+You also need to choose a secret key for your application. The client key **must be a valid UUID4** for new API usage. Each application instance should have its own unique key for proper scope separation.
 
 .. code:: Python
 
-    my_secret_key = "pleaSeDoN0tKillMyC_at"
+    import uuid
+    my_secret_key = str(uuid.uuid4())  # Generate a valid UUID4
     from auth import Authorization
     cas = Authorization(my_secret_key)
 
@@ -68,9 +69,9 @@ Now, let's add 3 groups: Cookers, Dancers and Laughers. Remember that groups are
 
 .. code:: Python
 
-    cas.add_group('cookers')
-    cas.add_group('dancers')
-    cas.add_group('laughers')
+    cas.add_role('cookers')
+    cas.add_role('dancers')
+    cas.add_role('laughers')
 
 Great! You have 3 groups and you need to authorize them to do special things.
 
@@ -123,39 +124,43 @@ You can use it via simple curl or using the mighty Requests module. So in your r
 .. code:: Python
 
     import requests
-    secret_key = "pleaSeDoN0tKillMyC_at"
+    import uuid
+    secret_key = str(uuid.uuid4())  # Client key must be a valid UUID4
     auth_api = "http://127.0.0.1:4000/api"
 
-Let's create admin group:
+Let's create admin role:
 
 .. code:: Python
 
     requests.post(auth_api+'/role/'+secret_key+'/admin')
 
-And let's make Jack an admin:
+And let's add a permission to the admin role:
 
 .. code:: Python
 
-    requests.post(auth_api+'/permission/'+secret_key+'/jack/admin')
+    requests.post(auth_api+'/permission/'+secret_key+'/admin/manage')
 
-And finally let's check if Sara still can cook:
+And finally let's check if an admin can manage:
 
 .. code:: Python
 
-    requests.get(auth_api+'/has_permission/'+secret_key+'/sara/cook')
+    response = requests.get(auth_api+'/has_permission/'+secret_key+'/admin/manage')
+    print(response.json())
 
 ********************
 RESTful API helpers
 ********************
 Auth comes with a helper class that makes your life easy.
+Note: The client key must be a valid UUID4.
 
 .. code:: Python
 
+    import uuid
     from auth.client import Client
-    service = Client('srv201', 'http://192.168.99.100:4000')
+    service = Client(str(uuid.uuid4()), 'http://192.168.99.100:4000')  # Use a valid UUID4
     print(service)
-    service.get_roles()
     service.add_role(role='admin')
+    service.get_roles()
 
 *******************
 API Methods
@@ -164,6 +169,8 @@ API Methods
 .. code:: Bash
 
     pydoc auth.CAS.REST.service
+
+.. note:: **Important:** All API endpoints require a valid UUID4 as the ``{KEY}`` parameter. Client keys must be valid UUID4 format.
 
 - ``/ping`` [GET]
 
@@ -345,6 +352,35 @@ Architecture
     style J fill:#fff3e0
     style K fill:#ffebee
 
+**********************************
+Remote Access with reTunnel
+**********************************
+
+To securely expose your local Auth server to the internet without complex networking setup, we recommend using `reTunnel <https://retunnel.com>`_.
+
+**Installation:**
+
+.. code:: Bash
+
+    pip install retunnel
+
+**Usage:**
+
+To serve your local Auth server running on port 4000:
+
+.. code:: Bash
+
+    retunnel http 4000
+
+This will provide you with a secure public URL that forwards requests to your local Auth server.
+
+**Benefits of using reTunnel:**
+- No need to configure firewalls or expose ports directly
+- Secure encrypted tunnel
+- Easy to use with a simple command
+- No complex networking setup required
+- Perfect for testing and development
+
 **********
 To DO
 **********
@@ -360,4 +396,4 @@ Comprehensive test suite with pytest covering all functionality:
 
 .. code:: Bash
 
-    pytest test_fastapi.py
+    pytest

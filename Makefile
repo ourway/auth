@@ -1,4 +1,4 @@
-.PHONY: help install format lint type-check test test-cov clean start-server list-keys
+.PHONY: help install format lint type-check test test-cov clean start-server list-keys start-remote start-remote-docker
 
 # Default target
 help: ## Show this help message
@@ -55,6 +55,8 @@ build-docker: ## Build the auth server Docker image
 # Start server with Docker
 start-docker: ## Build and run the auth server in Docker
 	$(MAKE) build-docker
+	docker stop auth-server-container || true
+	docker rm auth-server-container || true
 	docker run -p 4000:4000 --name auth-server-container auth-server
 
 # Stop Docker container
@@ -67,6 +69,18 @@ list-keys: ## List available API keys or example data
 	@echo "This would list available API keys, users, or roles if implemented"
 	@echo "Available operations:"
 	@echo "  - Add custom command implementations as needed"
+
+# Start server with reTunnel (remote access)
+start-remote: ## Start the auth server with reTunnel for remote access
+	pip install retunnel
+	uvicorn auth.main:app --host 0.0.0.0 --port 4000 --workers 2 & \
+	sleep 3 && \
+	retunnel http 4000
+
+# Start Docker container with reTunnel
+start-remote-docker: ## Build and run the auth server in Docker with reTunnel
+	docker build -t auth-server .
+	docker run -p 4000:4000 -e RE_TUNNEL=true --name auth-server-container auth-server
 
 # Fix lint issues
 lint-fix: ## Fix lint issues automatically
