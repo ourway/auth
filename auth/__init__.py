@@ -1,4 +1,4 @@
-__author__ = "Farsheed Ashouri"
+__author__ = "Farshid Ashouri"
 from typing import Optional
 
 from auth.database import SessionLocal

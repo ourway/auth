@@ -1,10 +1,10 @@
 """
-FastAPI server command
+Flask server command
 """
 
 import multiprocessing
 
-import uvicorn
+from waitress import serve
 
 from auth.main import app
 
@@ -31,11 +31,13 @@ _help = """
 def main(port=4000, host="0.0.0.0"):
     print(
         "\n\n        Python Auth Server ------------\n\t"
-        "by: Farsheed Ashouri (@rodmena)\n"
+        "by: Farshid Ashouri (@RODMENA LIMITED)\n"
     )
     print(_help)
 
-    uvicorn.run("auth.main:app", host=host, port=port, workers=CPUs * 2)
+    # Limit workers to maximum of 4
+    worker_count = min(CPUs * 2, 4)
+    serve(app, host=host, port=port, threads=worker_count)
 
 
 if __name__ == "__main__":

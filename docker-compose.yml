@@ -1,0 +1,21 @@
+version: '3.8'
+
+services:
+  # Main auth service
+  auth:
+    build: .
+    container_name: auth-server
+    ports:
+      - "4000:4000"
+    volumes:
+      - auth-data-volume:/home/app/.auth.sqlite3  # Persistent volume for database
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:4000/ping"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 40s
+
+volumes:
+  auth-data-volume:

@@ -3,6 +3,7 @@ SQLAlchemy database models and session management
 """
 
 import os
+import sqlite3
 from typing import TYPE_CHECKING
 
 from sqlalchemy import (
@@ -14,6 +15,7 @@ from sqlalchemy import (
     String,
     Table,
     create_engine,
+    text,
 )
 from sqlalchemy.orm import Session, declarative_base, relationship, sessionmaker
 
@@ -32,13 +34,20 @@ from sqlalchemy.sql import func
 default_db_path = os.path.expanduser("~/.auth.sqlite3")
 DB_PATH = os.environ.get("AUTH_DB_PATH", default_db_path)
 
-# Create engine with connection pooling
+# Create engine with connection pooling and SQLite optimizations
 engine = create_engine(
     f"sqlite:///{DB_PATH}",
     pool_pre_ping=True,
     pool_recycle=300,  # Recycle connections after 5 minutes
-    connect_args={"check_same_thread": False},
+    pool_size=20,  # Connection pool size
+    max_overflow=30,  # Maximum overflow connections
+    connect_args={
+        "check_same_thread": False,
+        "timeout": 30,  # Connection timeout in seconds
+        "detect_types": sqlite3.PARSE_DECLTYPES | sqlite3.PARSE_COLNAMES,
+    },
 )
+
 
 # Create session factory
 SessionLocal = sessionmaker(autocommit=False, autoflush=False, bind=engine)
@@ -140,8 +149,42 @@ class AuthPermission(Base):
 
 
 def create_tables():
-    """Create all tables"""
-    Base.metadata.create_all(bind=engine)
+    """Create all tables if they don't exist and apply SQLite optimizations"""
+    import sqlite3
+
+    from sqlalchemy.exc import OperationalError
+
+    # Apply SQLite optimizations
+    try:
+        with engine.connect() as conn:
+            # Enable WAL mode for better concurrency
+            conn.execute(text("PRAGMA journal_mode=WAL"))
+            # Enable synchronous NORMAL for better performance
+            conn.execute(text("PRAGMA synchronous=NORMAL"))
+            # Increase cache size (64MB)
+            conn.execute(
+                text("PRAGMA cache_size=-65536")
+            )  # Negative value indicates KB
+            # Enable foreign key constraints
+            conn.execute(text("PRAGMA foreign_keys=ON"))
+            # Optimize query planner
+            conn.execute(text("PRAGMA optimize"))
+            conn.commit()
+    except (OperationalError, sqlite3.OperationalError):
+        # It's ok if optimizations fail due to concurrent access
+        pass
+
+    # Create tables
+    try:
+        Base.metadata.create_all(bind=engine, checkfirst=True)
+    except (OperationalError, sqlite3.OperationalError) as e:
+        # Check if it's a table exists error (can happen with multiple workers)
+        if (
+            "already exists" not in str(e).lower()
+            and "such table" not in str(e).lower()
+        ):
+            raise
+        # Otherwise, ignore the error as tables already exist
 
 
 @contextmanager

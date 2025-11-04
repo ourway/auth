@@ -10,7 +10,7 @@ readme = {file = "README.rst", content-type = "text/x-rst"}
 requires-python = ">=3.7"
 license = {text = "Apache-2.0"}
 authors = [
-    {name = "Farsheed Ashouri", email = "rodmena@me.com"}
+    {name = "Farshid Ashouri", email = "farsheed.ashouri@gmail.com"}
 ]
 keywords = ["authorization", "role", "auth", "groups", "membership", "ensure", "ldap"]
 classifiers = [
@@ -32,12 +32,14 @@ classifiers = [
     "Programming Language :: Python :: 3.10",
     "Programming Language :: Python :: 3.11",
     "Programming Language :: Python :: 3.12",
+    "Programming Language :: Python :: 3.13",
+    "Programming Language :: Python :: 3.14",
 ]
 dependencies = [
-    "fastapi>=0.68.0",
+    "flask>=2.0.0",
+    "flask-cors>=3.0.0",
     "sqlalchemy>=1.4.0",
-    "pydantic>=1.8.0",
-    "uvicorn>=0.15.0",
+    "waitress>=2.0.0",
 ]
 
 [project.optional-dependencies]
@@ -159,7 +161,7 @@ show_error_context = true
 namespace_packages = true
 
 [[tool.mypy.overrides]]
-module = ["mongoengine.*", "requests.*", "requests.exceptions.*", "falcon.*"]
+module = ["mongoengine.*", "requests.*", "requests.exceptions.*"]
 ignore_missing_imports = true
 
 [[tool.mypy.overrides]]

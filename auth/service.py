@@ -26,7 +26,9 @@ class AuthorizationService:
 
     def __init__(self, db: Session, client: str, validate_client: bool = True):
         if validate_client and not validate_client_key(client):
-            raise ValueError(f"Invalid client key: {client}. Client key must be a valid UUID4.")
+            raise ValueError(
+                f"Invalid client key: {client}. Client key must be a valid UUID4."
+            )
         self.db = db
         self.client = client
         self.validate_client = validate_client

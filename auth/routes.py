@@ -1,249 +1,194 @@
 """
-FastAPI routes for authorization service
+Flask routes for authorization service
 """
 
-from fastapi import APIRouter, Depends
+from flask import jsonify, request
 from sqlalchemy.orm import Session
 
-from auth.database import get_db
-from auth.schemas import (
-    BooleanResponse,
-    MembersResponse,
-    PermissionsResponse,
-    RolesResponse,
-    WhichRolesCanResponse,
-    WhichUsersCanResponse,
-)
+from auth.database import SessionLocal
 from auth.service import AuthorizationService
 
-router = APIRouter()
 
+def register_routes(app):
+    """Register all routes with the Flask app"""
 
-def get_auth_service(client: str, db: Session = Depends(get_db)):
-    """Dependency to get authorization service"""
-    return AuthorizationService(db, client, validate_client=True)
+    @app.route("/ping", methods=["GET"])
+    def ping():
+        """Health check endpoint"""
+        return jsonify({"message": "PONG"})
 
+    @app.route("/api/membership/<client>/<user>/<group>", methods=["GET"])
+    def check_membership(client, user, group):
+        """Check if user is member of a group"""
+        db = SessionLocal()
+        try:
+            auth_service = AuthorizationService(db, client, validate_client=True)
+            result = auth_service.has_membership(user, group)
+            return jsonify({"result": result})
+        finally:
+            db.close()
 
-@router.get("/ping", response_model=dict)
-async def ping():
-    """Health check endpoint"""
-    return {"message": "PONG"}
+    @app.route("/api/membership/<client>/<user>/<group>", methods=["POST"])
+    def add_membership(client, user, group):
+        """Add user to a group"""
+        db = SessionLocal()
+        try:
+            auth_service = AuthorizationService(db, client, validate_client=True)
+            result = auth_service.add_membership(user, group)
+            return jsonify({"result": result})
+        finally:
+            db.close()
 
+    @app.route("/api/membership/<client>/<user>/<group>", methods=["DELETE"])
+    def remove_membership(client, user, group):
+        """Remove user from a group"""
+        db = SessionLocal()
+        try:
+            auth_service = AuthorizationService(db, client, validate_client=True)
+            result = auth_service.del_membership(user, group)
+            return jsonify({"result": result})
+        finally:
+            db.close()
 
-@router.get("/api/membership/{client}/{user}/{group}", response_model=BooleanResponse)
-async def check_membership(
-    client: str,
-    user: str,
-    group: str,
-    auth_service: AuthorizationService = Depends(get_auth_service),
-):
-    """Check if user is member of a group"""
-    result = auth_service.has_membership(user, group)
-    return BooleanResponse(result=result)
+    @app.route("/api/permission/<client>/<group>/<name>", methods=["GET"])
+    def check_permission(client, group, name):
+        """Check if group has permission"""
+        db = SessionLocal()
+        try:
+            auth_service = AuthorizationService(db, client, validate_client=True)
+            result = auth_service.has_permission(group, name)
+            return jsonify({"result": result})
+        finally:
+            db.close()
 
+    @app.route("/api/permission/<client>/<group>/<name>", methods=["POST"])
+    def add_permission(client, group, name):
+        """Add permission to a group"""
+        db = SessionLocal()
+        try:
+            auth_service = AuthorizationService(db, client, validate_client=True)
+            result = auth_service.add_permission(group, name)
+            return jsonify({"result": result})
+        finally:
+            db.close()
 
-@router.post("/api/membership/{client}/{user}/{group}", response_model=BooleanResponse)
-async def add_membership(
-    client: str,
-    user: str,
-    group: str,
-    auth_service: AuthorizationService = Depends(get_auth_service),
-):
-    """Add user to a group"""
-    result = auth_service.add_membership(user, group)
-    return BooleanResponse(result=result)
+    @app.route("/api/permission/<client>/<group>/<name>", methods=["DELETE"])
+    def remove_permission(client, group, name):
+        """Remove permission from a group"""
+        db = SessionLocal()
+        try:
+            auth_service = AuthorizationService(db, client, validate_client=True)
+            result = auth_service.del_permission(group, name)
+            return jsonify({"result": result})
+        finally:
+            db.close()
 
+    @app.route("/api/has_permission/<client>/<user>/<name>", methods=["GET"])
+    def check_user_permission(client, user, name):
+        """Check if user has permission"""
+        db = SessionLocal()
+        try:
+            auth_service = AuthorizationService(db, client, validate_client=True)
+            result = auth_service.user_has_permission(user, name)
+            return jsonify({"result": result})
+        finally:
+            db.close()
 
-@router.delete(
-    "/api/membership/{client}/{user}/{group}", response_model=BooleanResponse
-)
-async def remove_membership(
-    client: str,
-    user: str,
-    group: str,
-    auth_service: AuthorizationService = Depends(get_auth_service),
-):
-    """Remove user from a group"""
-    result = auth_service.del_membership(user, group)
-    return BooleanResponse(result=result)
+    @app.route("/api/user_permissions/<client>/<user>", methods=["GET"])
+    def get_user_permissions(client, user):
+        """Get all permissions for a user"""
+        db = SessionLocal()
+        try:
+            auth_service = AuthorizationService(db, client, validate_client=True)
+            permissions = auth_service.get_user_permissions(user)
+            return jsonify({"results": permissions})
+        finally:
+            db.close()
 
+    @app.route("/api/role_permissions/<client>/<role>", methods=["GET"])
+    def get_role_permissions(client, role):
+        """Get all permissions for a role"""
+        db = SessionLocal()
+        try:
+            auth_service = AuthorizationService(db, client, validate_client=True)
+            permissions = auth_service.get_permissions(role)
+            return jsonify({"results": permissions})
+        finally:
+            db.close()
 
-@router.get("/api/permission/{client}/{group}/{name}", response_model=BooleanResponse)
-async def check_permission(
-    client: str,
-    group: str,
-    name: str,
-    auth_service: AuthorizationService = Depends(get_auth_service),
-):
-    """Check if group has permission"""
-    result = auth_service.has_permission(group, name)
-    return BooleanResponse(result=result)
+    @app.route("/api/user_roles/<client>/<user>", methods=["GET"])
+    def get_user_roles(client, user):
+        """Get all roles for a user"""
+        db = SessionLocal()
+        try:
+            auth_service = AuthorizationService(db, client, validate_client=True)
+            roles = auth_service.get_user_roles(user)
+            return jsonify({"result": roles})
+        finally:
+            db.close()
 
+    @app.route("/api/members/<client>/<role>", methods=["GET"])
+    def get_role_members(client, role):
+        """Get all members of a role"""
+        db = SessionLocal()
+        try:
+            auth_service = AuthorizationService(db, client, validate_client=True)
+            members = auth_service.get_role_members(role)
+            return jsonify({"result": members})
+        finally:
+            db.close()
 
-@router.post("/api/permission/{client}/{group}/{name}", response_model=BooleanResponse)
-async def add_permission(
-    client: str,
-    group: str,
-    name: str,
-    auth_service: AuthorizationService = Depends(get_auth_service),
-):
-    """Add permission to a group"""
-    result = auth_service.add_permission(group, name)
-    return BooleanResponse(result=result)
+    @app.route("/api/roles/<client>", methods=["GET"])
+    def list_roles(client):
+        """List all roles"""
+        db = SessionLocal()
+        try:
+            auth_service = AuthorizationService(db, client, validate_client=True)
+            roles = auth_service.get_roles()
+            return jsonify({"result": roles})
+        finally:
+            db.close()
 
+    @app.route("/api/which_roles_can/<client>/<name>", methods=["GET"])
+    def which_roles_can(client, name):
+        """Get roles that can perform an action"""
+        db = SessionLocal()
+        try:
+            auth_service = AuthorizationService(db, client, validate_client=True)
+            roles = auth_service.which_roles_can(name)
+            return jsonify({"result": roles})
+        finally:
+            db.close()
 
-@router.delete(
-    "/api/permission/{client}/{group}/{name}", response_model=BooleanResponse
-)
-async def remove_permission(
-    client: str,
-    group: str,
-    name: str,
-    auth_service: AuthorizationService = Depends(get_auth_service),
-):
-    """Remove permission from a group"""
-    result = auth_service.del_permission(group, name)
-    return BooleanResponse(result=result)
+    @app.route("/api/which_users_can/<client>/<name>", methods=["GET"])
+    def which_users_can(client, name):
+        """Get users that can perform an action"""
+        db = SessionLocal()
+        try:
+            auth_service = AuthorizationService(db, client, validate_client=True)
+            users = auth_service.which_users_can(name)
+            return jsonify({"result": users})
+        finally:
+            db.close()
 
+    @app.route("/api/role/<client>/<role>", methods=["POST"])
+    def create_role(client, role):
+        """Create a new role"""
+        db = SessionLocal()
+        try:
+            auth_service = AuthorizationService(db, client, validate_client=True)
+            result = auth_service.add_role(role)
+            return jsonify({"result": result})
+        finally:
+            db.close()
 
-@router.get(
-    "/api/has_permission/{client}/{user}/{name}", response_model=BooleanResponse
-)
-async def check_user_permission(
-    client: str,
-    user: str,
-    name: str,
-    auth_service: AuthorizationService = Depends(get_auth_service),
-):
-    """Check if user has permission"""
-    result = auth_service.user_has_permission(user, name)
-    return BooleanResponse(result=result)
-
-
-@router.get("/api/user_permissions/{client}/{user}", response_model=PermissionsResponse)
-async def get_user_permissions(
-    client: str,
-    user: str,
-    auth_service: AuthorizationService = Depends(get_auth_service),
-):
-    """Get all permissions for a user"""
-    permissions = auth_service.get_user_permissions(user)
-    # Convert dict entries to PermissionResponse objects
-    from auth.schemas import PermissionResponse
-
-    permission_responses = [PermissionResponse(**perm) for perm in permissions]
-    return PermissionsResponse(results=permission_responses)
-
-
-@router.get("/api/role_permissions/{client}/{role}", response_model=PermissionsResponse)
-async def get_role_permissions(
-    client: str,
-    role: str,
-    auth_service: AuthorizationService = Depends(get_auth_service),
-):
-    """Get all permissions for a role"""
-    permissions = auth_service.get_permissions(role)
-    # Convert dict entries to PermissionResponse objects
-    from auth.schemas import PermissionResponse
-
-    permission_responses = [PermissionResponse(**perm) for perm in permissions]
-    return PermissionsResponse(results=permission_responses)
-
-
-@router.get("/api/user_roles/{client}/{user}", response_model=MembersResponse)
-async def get_user_roles(
-    client: str,
-    user: str,
-    auth_service: AuthorizationService = Depends(get_auth_service),
-):
-    """Get all roles for a user"""
-    roles = auth_service.get_user_roles(user)
-    # Convert dict entries to MembershipResponse objects
-    from auth.schemas import MembershipResponse
-
-    role_responses = [MembershipResponse(**role) for role in roles]
-    return MembersResponse(result=role_responses)
-
-
-@router.get("/api/members/{client}/{role}", response_model=MembersResponse)
-async def get_role_members(
-    client: str,
-    role: str,
-    auth_service: AuthorizationService = Depends(get_auth_service),
-):
-    """Get all members of a role"""
-    members = auth_service.get_role_members(role)
-    # Convert dict entries to MembershipResponse objects
-    from auth.schemas import MembershipResponse
-
-    member_responses = [MembershipResponse(**member) for member in members]
-    return MembersResponse(result=member_responses)
-
-
-@router.get("/api/roles/{client}", response_model=RolesResponse)
-async def list_roles(
-    client: str, auth_service: AuthorizationService = Depends(get_auth_service)
-):
-    """List all roles"""
-    roles = auth_service.get_roles()
-    # Convert dict entries to RoleResponse objects
-    from auth.schemas import RoleResponse
-
-    role_responses = [RoleResponse(**role) for role in roles]
-    return RolesResponse(result=role_responses)
-
-
-@router.get(
-    "/api/which_roles_can/{client}/{name}", response_model=WhichRolesCanResponse
-)
-async def which_roles_can(
-    client: str,
-    name: str,
-    auth_service: AuthorizationService = Depends(get_auth_service),
-):
-    """Get roles that can perform an action"""
-    roles = auth_service.which_roles_can(name)
-    # Convert dict entries to RoleResponse objects
-    from auth.schemas import RoleResponse
-
-    role_responses = [RoleResponse(**role) for role in roles]
-    return WhichRolesCanResponse(result=role_responses)
-
-
-@router.get(
-    "/api/which_users_can/{client}/{name}", response_model=WhichUsersCanResponse
-)
-async def which_users_can(
-    client: str,
-    name: str,
-    auth_service: AuthorizationService = Depends(get_auth_service),
-):
-    """Get users that can perform an action"""
-    users = auth_service.which_users_can(name)
-    # Convert dict entries to MembershipResponse objects
-    from auth.schemas import MembershipResponse
-
-    user_responses = [MembershipResponse(**user) for user in users]
-    return WhichUsersCanResponse(result=user_responses)
-
-
-@router.post("/api/role/{client}/{role}", response_model=BooleanResponse)
-async def create_role(
-    client: str,
-    role: str,
-    auth_service: AuthorizationService = Depends(get_auth_service),
-):
-    """Create a new role"""
-    result = auth_service.add_role(role)
-    return BooleanResponse(result=result)
-
-
-@router.delete("/api/role/{client}/{role}", response_model=BooleanResponse)
-async def delete_role(
-    client: str,
-    role: str,
-    auth_service: AuthorizationService = Depends(get_auth_service),
-):
-    """Delete a role"""
-    result = auth_service.del_role(role)
-    return BooleanResponse(result=result)
+    @app.route("/api/role/<client>/<role>", methods=["DELETE"])
+    def delete_role(client, role):
+        """Delete a role"""
+        db = SessionLocal()
+        try:
+            auth_service = AuthorizationService(db, client, validate_client=True)
+            result = auth_service.del_role(role)
+            return jsonify({"result": result})
+        finally:
+            db.close()

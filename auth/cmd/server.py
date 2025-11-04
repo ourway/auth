@@ -27,7 +27,7 @@ _help = """
 def main(port=4000):
     print(
         "\n\n        Python Auth Server ------------\n\t"
-        "by: Farsheed Ashouri (@rodmena)\n"
+        "by: Farshid Ashouri (@RODMENA LIMITED)\n"
     )
     print(_help)
     serve(port=port)

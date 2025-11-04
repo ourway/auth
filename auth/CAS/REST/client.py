@@ -1,4 +1,4 @@
-__author__ = "Farsheed Ashouri"
+__author__ = "Farshid Ashouri"
 
 import json
 import re
@@ -68,8 +68,18 @@ class Client(object):
         for url in services:
             match = re.findall(pattern, url)
             if match and services[url]:
+                # Handle /api/... URLs
                 for method in services[url]:
                     new_func_name = "%s_%s" % (translate[method], match[0])
+                    setattr(cls, new_func_name, connection_factory(cls, url, method))
+            elif services[url]:
+                # Handle other URLs like /ping by using the endpoint name
+                # Extract the endpoint name from URL (e.g., "/ping" -> "ping")
+                endpoint_name = url.strip("/").replace(
+                    "-", "_"
+                )  # e.g., "/ping" -> "ping", "/some-endpoint" -> "some_endpoint"
+                for method in services[url]:
+                    new_func_name = "%s_%s" % (translate[method], endpoint_name)
                     setattr(cls, new_func_name, connection_factory(cls, url, method))
         return super(Client, cls).__new__(cls)
 

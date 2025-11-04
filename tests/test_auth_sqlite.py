@@ -1,14 +1,14 @@
 import os
 
+# CONFTEST
+import uuid
+
 import pytest
 from sqlalchemy import create_engine
 from sqlalchemy.orm import sessionmaker
 
 from auth import Authorization
 from auth.database import Base
-
-# CONFTEST
-import uuid
 
 # Generate a valid UUID4 for tests
 secret_key = str(uuid.uuid4())

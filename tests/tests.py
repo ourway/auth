@@ -1,9 +1,9 @@
+# CONFTEST
+import uuid
+
 import pytest
 
 from auth import Authorization
-
-# CONFTEST
-import uuid
 
 # Generate a valid UUID4 for tests
 secret_key = str(uuid.uuid4())

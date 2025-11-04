@@ -30,7 +30,7 @@ What is Auth?
 ***************
 Auth is a modern Python module that makes authorization simple, scalable, and powerful. It provides a beautiful RESTful API for use in micro-service architectures and platforms. 
 
-Built with FastAPI, SQLAlchemy, and Pydantic, it offers type-safe APIs and modern database support with SQLite3 as the default backend.
+Built with Flask, SQLAlchemy, and modern Python tools, it offers robust APIs and modern database support with SQLite3 as the default backend.
 
 It supports Python 3.7+ and requires ZERO configuration steps. Just type ``auth-server`` and press enter!
 
@@ -176,11 +176,11 @@ API Methods
 
  Ping API, useful for your monitoring tools
 
-- ``/api/membership/{KEY}/{user}/{role}`` [GET/POST/DELETE]
+- ``/api/membership/{KEY}/{user}/{group}`` [GET/POST/DELETE]
 
  Adding, removing and getting membership information.
 
-- ``/api/permission/{KEY}/{role}/{name}`` [GET/POST/DELETE]
+- ``/api/permission/{KEY}/{group}/{name}`` [GET/POST/DELETE]
 
  Adding, removing and getting permissions
 
@@ -223,7 +223,7 @@ Use Cases
 **Microservices Architecture**
 - Centralized authorization service for multiple microservices
 - Consistent permission management across your entire platform
-- Easy integration with FastAPI-based services
+- Easy integration with Flask-based services
 
 **Multi-tenant Applications**
 - Separate authorization scopes using different secret keys
@@ -263,13 +263,14 @@ Deploying Auth module in production environment is easy:
 
 .. code:: Bash
 
-    uvicorn auth.main:app --host 0.0.0.0 --port 4000
+    python -c "from auth.main import app; app.run(host='0.0.0.0', port=4000, threaded=True, debug=False)"
 
-For production use with multiple workers:
+For production use with multiple workers using waitress:
 
 .. code:: Bash
 
-    gunicorn -w 4 -k uvicorn.workers.UvicornWorker auth.main:app
+    pip install waitress
+    waitress-serve --host=0.0.0.0 --port=4000 --threads=4 auth.main:app
 
 *******************
 Dockerizing
@@ -286,7 +287,7 @@ It's simple:
 Copyright
 *******************
 
-- Farsheed Ashouri `@ <mailto:rodmena@me.com>`_
+- Farshid Ashouri `@RODMENA LIMITED <mailto:farsheed.ashouri@gmail.com>`_
 
 *******************
 Documentation
@@ -308,9 +309,9 @@ Architecture
 
         subgraph "Auth Service"
             subgraph "API Layer"
-                D["FastAPI Routes"]
+                D["Flask Routes"]
                 E["Request Validation"]
-                F["Response Models"]
+                F["Response Handling"]
             end
 
             subgraph "Service Layer"
