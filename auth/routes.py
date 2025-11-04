@@ -2,8 +2,7 @@
 Flask routes for authorization service
 """
 
-from flask import jsonify, request
-from sqlalchemy.orm import Session
+from flask import jsonify
 
 from auth.database import SessionLocal
 from auth.service import AuthorizationService

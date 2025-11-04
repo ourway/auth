@@ -4,7 +4,8 @@ SQLAlchemy database models and session management
 
 import os
 import sqlite3
-from typing import TYPE_CHECKING
+from contextlib import contextmanager
+from typing import TYPE_CHECKING, Generator
 
 from sqlalchemy import (
     Boolean,
@@ -20,15 +21,12 @@ from sqlalchemy import (
 from sqlalchemy.orm import Session, declarative_base, relationship, sessionmaker
 
 if TYPE_CHECKING:
-    from sqlalchemy.orm import DeclarativeMeta
+    pass
+
+from sqlalchemy.sql import func
 
 # Create base class for SQLAlchemy models
 Base = declarative_base()
-
-from contextlib import contextmanager
-from typing import Generator
-
-from sqlalchemy.sql import func
 
 # Default database path - can be overridden by AUTH_DB_PATH environment variable
 default_db_path = os.path.expanduser("~/.auth.sqlite3")
@@ -39,8 +37,8 @@ engine = create_engine(
     f"sqlite:///{DB_PATH}",
     pool_pre_ping=True,
     pool_recycle=300,  # Recycle connections after 5 minutes
-    pool_size=20,  # Connection pool size
-    max_overflow=30,  # Maximum overflow connections
+    pool_size=1,  # Connection pool size
+    max_overflow=0,  # Maximum overflow connections
     connect_args={
         "check_same_thread": False,
         "timeout": 30,  # Connection timeout in seconds
@@ -160,7 +158,7 @@ def create_tables():
             # Enable WAL mode for better concurrency
             conn.execute(text("PRAGMA journal_mode=WAL"))
             # Enable synchronous NORMAL for better performance
-            conn.execute(text("PRAGMA synchronous=NORMAL"))
+            conn.execute(text("PRAGMA synchronous=ON"))
             # Increase cache size (64MB)
             conn.execute(
                 text("PRAGMA cache_size=-65536")

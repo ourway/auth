@@ -2,11 +2,15 @@
 
 ## AuthGroup, AuthPermission, AuthMembership
 import json
-from typing import Any, Dict, List, Union
 
 from mongoengine.errors import NotUniqueError
 
-from auth.CAS.models.db import *
+from auth.CAS.models.db import (
+    AuthGroup,
+    AuthMembership,
+    AuthPermission,
+    make_db_connection,
+)
 
 
 class Authorization(object):
@@ -164,7 +168,7 @@ class Authorization(object):
         if not targetGroup:
             return False
         # Create or update
-        permission = AuthPermission.objects(name=name).update(
+        AuthPermission.objects(name=name).update(
             add_to_set__groups=[targetGroup], creator=self.client, upsert=True
         )
         return True

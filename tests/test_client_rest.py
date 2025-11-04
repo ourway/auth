@@ -1,5 +1,4 @@
-import json
-from unittest.mock import MagicMock, Mock, patch
+from unittest.mock import Mock, patch
 
 import pytest
 from requests.exceptions import ConnectionError
@@ -8,8 +7,6 @@ from auth.CAS.REST.client import (
     Client,
     connect,
     connection_factory,
-    services,
-    translate,
 )
 
 

@@ -4,6 +4,7 @@ Flask test suite using Flask test client
 
 import os
 import tempfile
+import uuid
 
 import pytest
 from sqlalchemy import create_engine
@@ -24,7 +25,7 @@ def test_db():
     test_engine = create_engine(
         f"sqlite:///{db_path}", connect_args={"check_same_thread": False}
     )
-    TestingSessionLocal = sessionmaker(
+    sessionmaker(
         autocommit=False, autoflush=False, bind=test_engine
     )
 
@@ -46,8 +47,6 @@ def client(test_db):
     return test_db.test_client()
 
 
-# Test data
-import uuid
 
 # Generate a valid UUID4 for tests
 SECRET_KEY = str(uuid.uuid4())

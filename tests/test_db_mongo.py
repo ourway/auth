@@ -1,8 +1,5 @@
 import os
-from unittest.mock import Mock, patch
-
-import pytest
-from mongoengine.errors import NotUniqueError
+from unittest.mock import patch
 
 from auth.CAS.models.db import (
     AuthGroup,

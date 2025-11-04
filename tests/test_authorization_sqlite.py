@@ -1,7 +1,4 @@
-import sqlite3
-from unittest.mock import MagicMock, Mock, patch
-
-import pytest
+from unittest.mock import Mock, patch
 
 from auth.CAS.authorization_sqlite import Authorization
 
@@ -269,10 +266,9 @@ def test_which_users_can(
 
     auth = Authorization("test_client")
 
-    with (
-        patch.object(auth, "which_roles_can") as mock_which_roles,
-        patch.object(auth, "get_role_members") as mock_get_members,
-    ):
+    with patch.object(auth, "which_roles_can") as mock_which_roles, patch.object(
+        auth, "get_role_members"
+    ) as mock_get_members:
 
         mock_which_roles.return_value = [{"role": "admin"}, {"role": "editor"}]
         mock_get_members.side_effect = [

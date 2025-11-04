@@ -1,8 +1,5 @@
 from unittest.mock import patch
 
-import pytest
-
-from auth.CAS.authorization_sqlite import Authorization
 from auth.CAS.REST.service import app
 
 # Create a test client for the Flask app

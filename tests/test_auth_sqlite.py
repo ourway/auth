@@ -1,4 +1,4 @@
-import os
+
 
 # CONFTEST
 import uuid
@@ -60,7 +60,7 @@ def member(request):
 
 def test_authorization_add_role(cas, role):
     result = cas.add_role(role)
-    assert result == True
+    assert result
     # Check if role is in the list of roles (now includes description)
     roles = cas.roles
     role_dicts = [r for r in roles if r["role"] == role]
@@ -87,17 +87,17 @@ def test_authorization_add_permission_to_role(cas, role, permissions):
         assert len(permission_dicts) == 1
 
     if role == "admin" or role == "owner":
-        assert cas.has_permission(role, "read") == True
-        assert cas.has_permission(role, "write") == True
-        assert cas.has_permission(role, "execute") == True
+        assert cas.has_permission(role, "read")
+        assert cas.has_permission(role, "write")
+        assert cas.has_permission(role, "execute")
     elif role == "group":
-        assert cas.has_permission(role, "read") == True
-        assert cas.has_permission(role, "write") == False
-        assert cas.has_permission(role, "execute") == True
+        assert cas.has_permission(role, "read")
+        assert not cas.has_permission(role, "write")
+        assert cas.has_permission(role, "execute")
     else:
-        assert cas.has_permission(role, "read") == True
-        assert cas.has_permission(role, "write") == False
-        assert cas.has_permission(role, "execute") == False
+        assert cas.has_permission(role, "read")
+        assert not cas.has_permission(role, "write")
+        assert not cas.has_permission(role, "execute")
 
 
 def test_authorization_role_can(cas, role):
@@ -151,17 +151,17 @@ def test_authorization_add_member(cas, member):
     assert cas.has_membership(member, association[member])
 
     if cas.has_membership(member, "admin") or cas.has_membership(member, "owner"):
-        assert cas.user_has_permission(member, "write") == True
-        assert cas.user_has_permission(member, "read") == True
-        assert cas.user_has_permission(member, "execute") == True
+        assert cas.user_has_permission(member, "write")
+        assert cas.user_has_permission(member, "read")
+        assert cas.user_has_permission(member, "execute")
     elif cas.has_membership(member, "group"):
-        assert cas.user_has_permission(member, "write") == False
-        assert cas.user_has_permission(member, "read") == True
-        assert cas.user_has_permission(member, "execute") == True
+        assert not cas.user_has_permission(member, "write")
+        assert cas.user_has_permission(member, "read")
+        assert cas.user_has_permission(member, "execute")
     else:
-        assert cas.user_has_permission(member, "write") == False
-        assert cas.user_has_permission(member, "read") == True
-        assert cas.user_has_permission(member, "execute") == False
+        assert not cas.user_has_permission(member, "write")
+        assert cas.user_has_permission(member, "read")
+        assert not cas.user_has_permission(member, "execute")
 
     if member == "howard":
         # Howard should not be able to write
@@ -185,10 +185,10 @@ def test_authorization_add_member(cas, member):
 def test_authorization_delete_member(cas):
     cas.add_role("other")
     cas.add_membership("josh", "other")
-    assert cas.has_membership("josh", "other") == True
+    assert cas.has_membership("josh", "other")
 
     cas.del_membership("josh", "other")
-    assert cas.has_membership("josh", "other") == False
+    assert not cas.has_membership("josh", "other")
 
 
 def test_authorization_delete_role(cas):
@@ -247,17 +247,17 @@ def test_authorization_duplicate_role(cas):
     result1 = cas.add_role("duplicate_role")
     result2 = cas.add_role("duplicate_role")
 
-    assert result1 == True
-    assert result2 == True  # Should return True for compatibility
+    assert result1
+    assert result2  # Should return True for compatibility
 
 
 def test_authorization_nonexistent_role(cas):
     # Operations on non-existent roles should handle gracefully
-    assert cas.has_permission("nonexistent", "read") == False
-    assert (
-        cas.del_permission("nonexistent", "read") == True
-    )  # Should return True for non-existent
-    assert cas.del_role("nonexistent") == False  # Should return False for non-existent
+    assert not cas.has_permission("nonexistent", "read")
+    # Verify del_permission returns True for non-existent (as the function handles this case)
+    result = cas.del_permission("nonexistent", "read")
+    assert result  # Should return True for non-existent
+    assert not cas.del_role("nonexistent")  # Should return False for non-existent
 
 
 def test_authorization_empty_results():

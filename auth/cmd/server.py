@@ -1,6 +1,5 @@
 import multiprocessing
 
-from auth import api
 from auth.server import main as serve
 
 CPUs = multiprocessing.cpu_count()

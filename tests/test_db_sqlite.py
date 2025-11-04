@@ -1,9 +1,6 @@
 import os
 import sqlite3
-import tempfile
-from unittest.mock import Mock, patch
-
-import pytest
+from unittest.mock import patch
 
 from auth.CAS.models.db_sqlite import (
     AuthGroup,
@@ -191,8 +188,8 @@ def test_auth_group_delete():
     assert result is not None
 
     # Delete the group (soft delete)
-    result = auth_group.delete("test_creator", "admin")
-    assert result is True
+    delete_result = auth_group.delete("test_creator", "admin")
+    assert delete_result is True
 
     # Verify it's no longer active
     result = auth_group.get_by_role("test_creator", "admin")
@@ -231,6 +228,7 @@ def test_auth_membership_add_group():
     auth_group.create("test_creator", "admin")
     membership_id = auth_membership.create_or_get("test_creator", "user1")
     group_data = auth_group.get_by_role("test_creator", "admin")
+    assert group_data is not None
 
     # Add group to membership
     result = auth_membership.add_group(membership_id, group_data["id"])
@@ -257,6 +255,8 @@ def test_auth_membership_get_groups():
     # Get group IDs
     admin_group = auth_group.get_by_role("test_creator", "admin")
     user_group = auth_group.get_by_role("test_creator", "user")
+    assert admin_group is not None
+    assert user_group is not None
 
     # Add groups to membership
     auth_membership.add_group(membership_id, admin_group["id"])
@@ -279,7 +279,7 @@ def test_auth_membership_get_by_user():
     auth_membership = AuthMembership(conn)
 
     # Create a membership
-    membership_id = auth_membership.create_or_get("test_creator", "user1")
+    auth_membership.create_or_get("test_creator", "user1")
 
     # Get the membership
     result = auth_membership.get_by_user("test_creator", "user1")
@@ -305,6 +305,7 @@ def test_auth_membership_remove_group():
     auth_group.create("test_creator", "admin")
     membership_id = auth_membership.create_or_get("test_creator", "user1")
     group_data = auth_group.get_by_role("test_creator", "admin")
+    assert group_data is not None
 
     # Add group to membership
     auth_membership.add_group(membership_id, group_data["id"])
@@ -354,6 +355,7 @@ def test_auth_permission_add_group():
     auth_group.create("test_creator", "admin")
     permission_id = auth_permission.create_or_get("test_creator", "read")
     group_data = auth_group.get_by_role("test_creator", "admin")
+    assert group_data is not None
 
     # Add group to permission
     result = auth_permission.add_group(permission_id, group_data["id"])
@@ -402,6 +404,8 @@ def test_auth_permission_get_groups():
     # Get group IDs
     admin_group = auth_group.get_by_role("test_creator", "admin")
     user_group = auth_group.get_by_role("test_creator", "user")
+    assert admin_group is not None
+    assert user_group is not None
 
     # Add groups to permission
     auth_permission.add_group(permission_id, admin_group["id"])
@@ -433,6 +437,9 @@ def test_auth_permission_get_all_by_group():
     group_data = auth_group.get_by_role("test_creator", "admin")
     read_perm = auth_permission.get_by_name("test_creator", "read")
     write_perm = auth_permission.get_by_name("test_creator", "write")
+    assert group_data is not None
+    assert read_perm is not None
+    assert write_perm is not None
 
     # Add group to permissions
     auth_permission.add_group(read_perm["id"], group_data["id"])
@@ -459,6 +466,7 @@ def test_auth_permission_remove_group():
     auth_group.create("test_creator", "admin")
     permission_id = auth_permission.create_or_get("test_creator", "read")
     group_data = auth_group.get_by_role("test_creator", "admin")
+    assert group_data is not None
 
     # Add group to permission
     auth_permission.add_group(permission_id, group_data["id"])
@@ -491,8 +499,8 @@ def test_auth_permission_delete():
     assert result is not None
 
     # Delete the permission (soft delete)
-    result = auth_permission.delete("test_creator", "read")
-    assert result is True
+    delete_result = auth_permission.delete("test_creator", "read")
+    assert delete_result is True
 
     # Verify it's no longer active
     result = auth_permission.get_by_name("test_creator", "read")
