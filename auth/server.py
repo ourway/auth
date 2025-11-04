@@ -1,8 +1,12 @@
+"""
+FastAPI server command
+"""
 
-from auth import api, serve
+import uvicorn
 import multiprocessing
-CPUs = multiprocessing.cpu_count()
+from auth.main import app
 
+CPUs = multiprocessing.cpu_count()
 
 _help = '''
     ---------------------------------------------------------------
@@ -22,12 +26,17 @@ _help = '''
 '''
 
 
-
-def main(port=4000):
+def main(port=4000, host="0.0.0.0"):
     print('\n\n        Python Auth Server ------------\n\t'
           'by: Farsheed Ashouri (@rodmena)\n')
     print(_help)
-    serve('0.0.0.0', port, api, processes=CPUs*2)
+    
+    uvicorn.run(
+        "auth.main:app",
+        host=host,
+        port=port,
+        workers=CPUs * 2
+    )
 
 
 if __name__ == '__main__':

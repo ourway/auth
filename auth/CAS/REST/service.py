@@ -12,7 +12,7 @@ try:
 except ImportError:
     pass
 
-from auth.CAS.authorization import Authorization
+from auth.CAS.authorization_sqlite import Authorization
 
 
 class AuthComponent(object):
@@ -59,7 +59,7 @@ class AuthComponent(object):
         if isinstance(resp.body, dict):
             try:
                 resp.body = json.dumps(resp.body)
-            except(nameError):
+            except Exception:
                 resp.status = falcon.HTTP_500
 
 
@@ -76,7 +76,7 @@ def stringify(req, resp):
     if isinstance(resp.body, dict):
         try:
             resp.body = json.dumps(resp.body)
-        except(nameError):
+        except Exception:
             resp.status = falcon.HTTP_500
 
 

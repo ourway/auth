@@ -110,7 +110,7 @@ class Authorization(object):
         if not target:
             target = AuthMembership(user=user, creator=self.client)
 
-        if not role in [i.role for i in target.groups]:
+        if role not in [i.role for i in target.groups]:
             target.groups.append(targetGroup)
             target.save()
         return True

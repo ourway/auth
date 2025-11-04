@@ -1,10 +1,6 @@
 import pytest
-import mongoengine
-from mongoengine import connect
-from mongoengine.connection import get_connection
 
 from auth import Authorization
-from auth.CAS.models.db import AuthGroup, AuthPermission, AuthMembership
 
 # CONFTEST
 secret_key = 'OnePunchManSaitama'

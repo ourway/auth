@@ -1,4 +1,4 @@
-mongoengine
-falcon
-werkzeug
-blinker
+fastapi
+sqlalchemy
+pydantic
+uvicorn
