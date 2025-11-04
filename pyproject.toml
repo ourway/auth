@@ -4,10 +4,10 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "auth"
-version = "0.9.1"
+version = "0.9.2"
 description = "Authorization for humans"
 readme = {file = "README.rst", content-type = "text/x-rst"}
-requires-python = ">=3.7"
+requires-python = ">=3.9"
 license = {text = "Apache-2.0"}
 authors = [
     {name = "Farshid Ashouri", email = "farsheed.ashouri@gmail.com"}
@@ -26,8 +26,6 @@ classifiers = [
     "Programming Language :: Python",
     "Programming Language :: Python :: Implementation :: CPython",
     "Programming Language :: Python :: 3",
-    "Programming Language :: Python :: 3.7",
-    "Programming Language :: Python :: 3.8",
     "Programming Language :: Python :: 3.9",
     "Programming Language :: Python :: 3.10",
     "Programming Language :: Python :: 3.11",

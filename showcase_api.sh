@@ -26,11 +26,11 @@ make_request() {
     echo "  $method $endpoint"
     
     if [ "$method" = "GET" ]; then
-        response=$(curl -s -o response.json -w "%{http_code}" -X GET "$SERVER_URL$endpoint")
+        response=$(curl -s -o response.json -w "%{http_code}" -X GET -H "Authorization: Bearer $CLIENT_KEY" "$SERVER_URL$endpoint")
     elif [ "$method" = "POST" ]; then
-        response=$(curl -s -o response.json -w "%{http_code}" -X POST -H "Content-Type: application/json" -d "$data" "$SERVER_URL$endpoint")
+        response=$(curl -s -o response.json -w "%{http_code}" -X POST -H "Content-Type: application/json" -H "Authorization: Bearer $CLIENT_KEY" -d "$data" "$SERVER_URL$endpoint")
     elif [ "$method" = "DELETE" ]; then
-        response=$(curl -s -o response.json -w "%{http_code}" -X DELETE "$SERVER_URL$endpoint")
+        response=$(curl -s -o response.json -w "%{http_code}" -X DELETE -H "Authorization: Bearer $CLIENT_KEY" "$SERVER_URL$endpoint")
     else
         echo "  ERROR: Unsupported method $method"
         return 1
@@ -60,63 +60,63 @@ echo "1. Checking if server is running..."
 make_request GET "/ping" "" 200
 
 echo "2. Creating roles..."
-make_request POST "/api/role/$CLIENT_KEY/admin" '{}' 200
-make_request POST "/api/role/$CLIENT_KEY/editor" '{}' 200
-make_request POST "/api/role/$CLIENT_KEY/viewer" '{}' 200
+make_request POST "/api/role/admin" '{}' 200
+make_request POST "/api/role/editor" '{}' 200
+make_request POST "/api/role/viewer" '{}' 200
 
 echo "3. Adding permissions to roles..."
-make_request POST "/api/permission/$CLIENT_KEY/admin/write" '{}' 200
-make_request POST "/api/permission/$CLIENT_KEY/admin/read" '{}' 200
-make_request POST "/api/permission/$CLIENT_KEY/editor/write" '{}' 200
-make_request POST "/api/permission/$CLIENT_KEY/viewer/read" '{}' 200
+make_request POST "/api/permission/admin/write" '{}' 200
+make_request POST "/api/permission/admin/read" '{}' 200
+make_request POST "/api/permission/editor/write" '{}' 200
+make_request POST "/api/permission/viewer/read" '{}' 200
 
 echo "4. Creating user memberships..."
-make_request POST "/api/membership/$CLIENT_KEY/john/admin" '{}' 200
-make_request POST "/api/membership/$CLIENT_KEY/jane/editor" '{}' 200
-make_request POST "/api/membership/$CLIENT_KEY/bob/viewer" '{}' 200
+make_request POST "/api/membership/john/admin" '{}' 200
+make_request POST "/api/membership/jane/editor" '{}' 200
+make_request POST "/api/membership/bob/viewer" '{}' 200
 
 echo "5. Checking user permissions..."
-make_request GET "/api/has_permission/$CLIENT_KEY/john/write" "" 200
-make_request GET "/api/has_permission/$CLIENT_KEY/jane/write" "" 200
-make_request GET "/api/has_permission/$CLIENT_KEY/bob/write" "" 200
+make_request GET "/api/has_permission/john/write" "" 200
+make_request GET "/api/has_permission/jane/write" "" 200
+make_request GET "/api/has_permission/bob/write" "" 200
 
 echo "6. Getting user permissions..."
-make_request GET "/api/user_permissions/$CLIENT_KEY/john" "" 200
-make_request GET "/api/user_permissions/$CLIENT_KEY/jane" "" 200
+make_request GET "/api/user_permissions/john" "" 200
+make_request GET "/api/user_permissions/jane" "" 200
 
 echo "7. Getting user roles..."
-make_request GET "/api/user_roles/$CLIENT_KEY/john" "" 200
-make_request GET "/api/user_roles/$CLIENT_KEY/jane" "" 200
+make_request GET "/api/user_roles/john" "" 200
+make_request GET "/api/user_roles/jane" "" 200
 
 echo "8. Getting role permissions..."
-make_request GET "/api/role_permissions/$CLIENT_KEY/admin" "" 200
-make_request GET "/api/role_permissions/$CLIENT_KEY/editor" "" 200
+make_request GET "/api/role_permissions/admin" "" 200
+make_request GET "/api/role_permissions/editor" "" 200
 
 echo "9. Getting role members..."
-make_request GET "/api/members/$CLIENT_KEY/admin" "" 200
-make_request GET "/api/members/$CLIENT_KEY/editor" "" 200
+make_request GET "/api/members/admin" "" 200
+make_request GET "/api/members/editor" "" 200
 
 echo "10. Listing all roles..."
-make_request GET "/api/roles/$CLIENT_KEY" "" 200
+make_request GET "/api/roles" "" 200
 
 echo "11. Finding which roles can perform actions..."
-make_request GET "/api/which_roles_can/$CLIENT_KEY/write" "" 200
-make_request GET "/api/which_roles_can/$CLIENT_KEY/read" "" 200
+make_request GET "/api/which_roles_can/write" "" 200
+make_request GET "/api/which_roles_can/read" "" 200
 
 echo "12. Finding which users can perform actions..."
-make_request GET "/api/which_users_can/$CLIENT_KEY/write" "" 200
-make_request GET "/api/which_users_can/$CLIENT_KEY/read" "" 200
+make_request GET "/api/which_users_can/write" "" 200
+make_request GET "/api/which_users_can/read" "" 200
 
 echo "13. Testing permission removal..."
-make_request DELETE "/api/permission/$CLIENT_KEY/editor/write" "" 200
+make_request DELETE "/api/permission/editor/write" "" 200
 
 echo "14. Testing membership removal..."
-make_request DELETE "/api/membership/$CLIENT_KEY/jane/editor" "" 200
+make_request DELETE "/api/membership/jane/editor" "" 200
 # Re-add for demonstration purposes
-make_request POST "/api/membership/$CLIENT_KEY/jane/editor" '{}' 200
+make_request POST "/api/membership/jane/editor" '{}' 200
 
 echo "15. Testing role removal..."
-make_request DELETE "/api/role/$CLIENT_KEY/viewer" "" 200
+make_request DELETE "/api/role/viewer" "" 200
 
 echo "========================================="
 echo "API Showcase Completed Successfully!"
@@ -137,17 +137,17 @@ rm -f response.json
 # Provide summary of the API operations tested
 echo "API Operations Tested:"
 echo "  GET    /ping"
-echo "  GET    /api/roles/{client}"
-echo "  POST   /api/role/{client}/{role}"
-echo "  DELETE /api/role/{client}/{role}"
-echo "  GET    /api/has_permission/{client}/{user}/{name}"
-echo "  GET    /api/user_permissions/{client}/{user}"
-echo "  GET    /api/user_roles/{client}/{user}"
-echo "  GET    /api/role_permissions/{client}/{role}"
-echo "  GET    /api/members/{client}/{role}"
-echo "  GET    /api/which_roles_can/{client}/{name}"
-echo "  GET    /api/which_users_can/{client}/{name}"
-echo "  POST   /api/permission/{client}/{role}/{name}"
-echo "  DELETE /api/permission/{client}/{role}/{name}"
-echo "  POST   /api/membership/{client}/{user}/{role}"
-echo "  DELETE /api/membership/{client}/{user}/{role}"
+echo "  GET    /api/roles"
+echo "  POST   /api/role/{role}"
+echo "  DELETE /api/role/{role}"
+echo "  GET    /api/has_permission/{user}/{name}"
+echo "  GET    /api/user_permissions/{user}"
+echo "  GET    /api/user_roles/{user}"
+echo "  GET    /api/role_permissions/{role}"
+echo "  GET    /api/members/{role}"
+echo "  GET    /api/which_roles_can/{name}"
+echo "  GET    /api/which_users_can/{name}"
+echo "  POST   /api/permission/{role}/{name}"
+echo "  DELETE /api/permission/{role}/{name}"
+echo "  POST   /api/membership/{user}/{role}"
+echo "  DELETE /api/membership/{user}/{role}"
