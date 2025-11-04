@@ -1,10 +1,12 @@
-
-from auth import api, serve
 import multiprocessing
+
+from auth import api
+from auth.server import main as serve
+
 CPUs = multiprocessing.cpu_count()
 
 
-_help = '''
+_help = """
     ---------------------------------------------------------------
     | GET             | /ping                                     |
     | GET POST DELETE | /api/permission/{key}/{role}/{action}     |
@@ -19,16 +21,17 @@ _help = '''
     | GET             | /api/which_users_can/{key}/{action}       |
     | POST DELETE     | /api/role/{key}/{role}                    |
     ---------------------------------------------------------------
-'''
-
+"""
 
 
 def main(port=4000):
-    print('\n\n        Python Auth Server ------------\n\t'
-          'by: Farsheed Ashouri (@rodmena)\n')
+    print(
+        "\n\n        Python Auth Server ------------\n\t"
+        "by: Farsheed Ashouri (@rodmena)\n"
+    )
     print(_help)
-    serve('0.0.0.0', port, api, processes=CPUs*2)
+    serve(port=port)
 
 
-if __name__ == '__main__':
+if __name__ == "__main__":
     main()

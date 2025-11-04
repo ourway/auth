@@ -15,7 +15,7 @@ create_tables()
 app = FastAPI(
     title="Auth API",
     description="Authorization service with FastAPI and SQLAlchemy",
-    version="0.9.1"
+    version="0.9.1",
 )
 
 # Add CORS middleware

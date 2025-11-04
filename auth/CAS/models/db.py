@@ -27,25 +27,37 @@ Using permissions:
         }
 """
 
+__all__ = ["make_db_connection", "AuthMembership", "AuthGroup", "AuthPermission"]
 
-__all__ = ['make_db_connection', 'AuthMembership', 'AuthGroup', 'AuthPermission']
-
-import os
 import datetime
-from mongoengine import *
-from mongoengine import signals
+import os
+from typing import TYPE_CHECKING
 
+from mongoengine import (
+    BooleanField,
+    DateTimeField,
+    Document,
+    ListField,
+    ReferenceField,
+    StringField,
+    connect,
+    signals,
+)
+
+if TYPE_CHECKING:
+    from mongoengine import BaseDocument
 
 
 def make_db_connection():
-    mongo_host = os.getenv('MONGO_HOST') or '127.0.0.1'
-    _mongo_port = os.getenv('MONGO_PORT') or 27017
+    mongo_host = os.getenv("MONGO_HOST") or "127.0.0.1"
+    _mongo_port = os.getenv("MONGO_PORT") or 27017
     mongo_port = int(_mongo_port)
-    connect('Authorization_0x0199', host=mongo_host, port=mongo_port)
+    connect("Authorization_0x0199", host=mongo_host, port=mongo_port)
 
 
 def handler(event):
     """Signal decorator to allow use of callback functions as class decorators."""
+
     def decorator(fn):
         def apply(cls):
             event.connect(fn, sender=cls)
@@ -53,6 +65,7 @@ def handler(event):
 
         fn.apply = apply
         return fn
+
     return decorator
 
 
@@ -64,22 +77,19 @@ def update_modified(sender, document):
 @update_modified.apply
 class AuthGroup(Document):
     creator = StringField(max_length=64, required=True)
-    role = StringField(max_length=32, unique_with='creator', required=True)
+    role = StringField(max_length=32, unique_with="creator", required=True)
     description = StringField(max_length=256)
     is_active = BooleanField(default=True)
     date_created = DateTimeField(default=datetime.datetime.now())
     modified = DateTimeField()
 
     def __repr__(self):
-        return '{}: <{}>'.format(
-            self.__class__.__name__,
-            self.role
-        )
+        return "{}: <{}>".format(self.__class__.__name__, self.role)
 
 
 @update_modified.apply
 class AuthMembership(Document):
-    user = StringField(max_length=64, unique_with='creator', required=True)
+    user = StringField(max_length=64, unique_with="creator", required=True)
     creator = StringField(max_length=64, required=True)
     groups = ListField(ReferenceField(AuthGroup))
     is_active = BooleanField(default=True)
@@ -87,22 +97,20 @@ class AuthMembership(Document):
     modified = DateTimeField()
 
     def __repr__(self):
-        return '{}: <{}>'.format(
-            self.__class__.__name__,
-            self.user
-        )
+        return "{}: <{}>".format(self.__class__.__name__, self.user)
 
-'''
+
+"""
 AuthPermission:
     name: can_read_asset_09a8sd08asd09as8d0as
     group: reference to group
 existance of a record means there is permission.
-'''
+"""
 
 
 @update_modified.apply
 class AuthPermission(Document):
-    name = StringField(max_length=64, unique_with='creator', required=True)
+    name = StringField(max_length=64, unique_with="creator", required=True)
     creator = StringField(max_length=64, required=True)
     groups = ListField(ReferenceField(AuthGroup, required=True))
     is_active = BooleanField(default=True)
@@ -110,8 +118,4 @@ class AuthPermission(Document):
     modified = DateTimeField()
 
     def __repr__(self):
-        return '{}: <{}>'.format(
-            self.__class__.__name__,
-            self.name
-        )
-
+        return "{}: <{}>".format(self.__class__.__name__, self.name)

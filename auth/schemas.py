@@ -2,8 +2,9 @@
 Pydantic models for FastAPI request/response schemas
 """
 
-from pydantic import BaseModel, ConfigDict
 from typing import List, Optional
+
+from pydantic import BaseModel, ConfigDict
 
 
 class RoleCreate(BaseModel):
@@ -14,7 +15,7 @@ class RoleCreate(BaseModel):
 class RoleResponse(BaseModel):
     role: str
     description: Optional[str] = None
-    
+
     model_config = ConfigDict(from_attributes=True)
 
 
@@ -24,7 +25,7 @@ class PermissionCreate(BaseModel):
 
 class PermissionResponse(BaseModel):
     name: str
-    
+
     model_config = ConfigDict(from_attributes=True)
 
 
@@ -36,7 +37,7 @@ class MembershipCreate(BaseModel):
 class MembershipResponse(BaseModel):
     user: str
     role: str
-    
+
     model_config = ConfigDict(from_attributes=True)
 
 

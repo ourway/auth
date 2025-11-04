@@ -286,14 +286,64 @@ Documentation
 *******************
 Feel free to dig into source code. If you think you can improve the documentation, please do so and send me a pull request.
 
-************************
-Unit Tests and Coverage
-************************
-Comprehensive test suite with pytest covering all functionality:
+*******************
+Architecture
+*******************
 
-.. code:: Bash
+.. code-block:: mermaid
 
-    pytest test_fastapi.py
+    graph TB
+        subgraph "Client Applications"
+            A["Application 1"]
+            B["Application 2"]
+            C["Application N"]
+        end
+
+        subgraph "Auth Service"
+            subgraph "API Layer"
+                D["FastAPI Routes"]
+                E["Request Validation"]
+                F["Response Models"]
+            end
+
+            subgraph "Service Layer"
+                G["AuthorizationService"]
+                H["Permission Logic"]
+                I["Membership Logic"]
+            end
+
+            subgraph "Data Layer"
+                J["SQLAlchemy ORM"]
+                K["SQLite Database"]
+                L["Table Models"]
+            end
+        end
+
+        subgraph "External Systems"
+            M["Microservices"]
+            N["API Gateway"]
+            O["Monitoring Tools"]
+        end
+
+        A --> D
+        B --> D
+        C --> D
+        D --> G
+        E --> G
+        F --> G
+        G --> H
+        G --> I
+        G --> J
+        J --> K
+        J --> L
+        D --> M
+        D --> N
+        D --> O
+
+    style D fill:#e1f5fe
+    style G fill:#e8f5e8
+    style J fill:#fff3e0
+    style K fill:#ffebee
 
 **********
 To DO
@@ -302,3 +352,12 @@ To DO
 - Improve Code Coverage
 - Add support for additional database backends (PostgreSQL, MySQL)
 - Add OpenAPI documentation enhancements
+
+************************
+Unit Tests and Coverage
+************************
+Comprehensive test suite with pytest covering all functionality:
+
+.. code:: Bash
+
+    pytest test_fastapi.py
