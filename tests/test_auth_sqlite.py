@@ -1,5 +1,3 @@
-
-
 # CONFTEST
 import uuid
 

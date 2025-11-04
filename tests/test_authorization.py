@@ -25,6 +25,8 @@ def test_roles_property(mock_make_db_connection):
         mock_query.only.return_value.to_json.return_value = '[{"role": "admin"}]'
         mock_auth_group.objects.return_value = mock_query
 
+        auth = Authorization("test_client")
+        auth.roles
         mock_auth_group.objects.assert_called_with(creator="test_client")
         mock_query.only.assert_called_with("role")
 
@@ -34,9 +36,10 @@ def test_get_permissions(mock_make_db_connection):
     """Test get_permissions method"""
     auth = Authorization("test_client")
 
-    with patch("auth.CAS.authorization.AuthGroup") as mock_auth_group, patch(
-        "auth.CAS.authorization.AuthPermission"
-    ) as mock_auth_permission:
+    with (
+        patch("auth.CAS.authorization.AuthGroup") as mock_auth_group,
+        patch("auth.CAS.authorization.AuthPermission") as mock_auth_permission,
+    ):
         mock_group = Mock()
         mock_group_query = Mock()
         mock_group_query.first.return_value = mock_group
@@ -110,9 +113,10 @@ def test_get_role_members(mock_make_db_connection):
     """Test get_role_members method"""
     auth = Authorization("test_client")
 
-    with patch("auth.CAS.authorization.AuthGroup") as mock_auth_group, patch(
-        "auth.CAS.authorization.AuthMembership"
-    ) as mock_auth_membership:
+    with (
+        patch("auth.CAS.authorization.AuthGroup") as mock_auth_group,
+        patch("auth.CAS.authorization.AuthMembership") as mock_auth_membership,
+    ):
         mock_group_query = Mock()
         mock_group_query.only.return_value = [Mock(role="admin", id=1)]
         mock_auth_group.objects.return_value = mock_group_query
@@ -153,9 +157,10 @@ def test_which_users_can(mock_make_db_connection):
     """Test which_users_can method"""
     auth = Authorization("test_client")
 
-    with patch.object(auth, "which_roles_can") as mock_which_roles, patch.object(
-        auth, "get_role_members"
-    ) as mock_get_members:
+    with (
+        patch.object(auth, "which_roles_can") as mock_which_roles,
+        patch.object(auth, "get_role_members") as mock_get_members,
+    ):
 
         mock_which_roles.return_value = [{"role": "admin"}]
         mock_get_members.return_value = [{"user": "user1"}]
@@ -251,9 +256,10 @@ def test_add_membership_new_user(mock_make_db_connection):
     """Test add_membership for a new user"""
     auth = Authorization("test_client")
 
-    with patch("auth.CAS.authorization.AuthGroup") as mock_auth_group, patch(
-        "auth.CAS.authorization.AuthMembership"
-    ) as mock_auth_membership:
+    with (
+        patch("auth.CAS.authorization.AuthGroup") as mock_auth_group,
+        patch("auth.CAS.authorization.AuthMembership") as mock_auth_membership,
+    ):
 
         # Mock group exists
         mock_group = Mock()
@@ -283,9 +289,10 @@ def test_add_membership_existing_user(mock_make_db_connection):
     """Test add_membership for an existing user"""
     auth = Authorization("test_client")
 
-    with patch("auth.CAS.authorization.AuthGroup") as mock_auth_group, patch(
-        "auth.CAS.authorization.AuthMembership"
-    ) as mock_auth_membership:
+    with (
+        patch("auth.CAS.authorization.AuthGroup") as mock_auth_group,
+        patch("auth.CAS.authorization.AuthMembership") as mock_auth_membership,
+    ):
 
         # Mock group exists
         mock_group = Mock()
@@ -310,9 +317,11 @@ def test_del_membership_success(mock_make_db_connection):
     """Test del_membership method success"""
     auth = Authorization("test_client")
 
-    with patch.object(auth, "has_membership") as mock_has_membership, patch(
-        "auth.CAS.authorization.AuthMembership"
-    ) as mock_auth_membership, patch("auth.CAS.authorization.AuthGroup") as mock_auth_group:
+    with (
+        patch.object(auth, "has_membership") as mock_has_membership,
+        patch("auth.CAS.authorization.AuthMembership") as mock_auth_membership,
+        patch("auth.CAS.authorization.AuthGroup") as mock_auth_group,
+    ):
 
         mock_has_membership.return_value = True
         mock_group = Mock()
@@ -383,11 +392,11 @@ def test_add_permission_success(mock_make_db_connection):
     """Test add_permission method success"""
     auth = Authorization("test_client")
 
-    with patch.object(auth, "has_permission") as mock_has_permission, patch(
-        "auth.CAS.authorization.AuthGroup"
-    ) as mock_auth_group, patch(
-        "auth.CAS.authorization.AuthPermission"
-    ) as mock_auth_permission:
+    with (
+        patch.object(auth, "has_permission") as mock_has_permission,
+        patch("auth.CAS.authorization.AuthGroup") as mock_auth_group,
+        patch("auth.CAS.authorization.AuthPermission") as mock_auth_permission,
+    ):
 
         mock_has_permission.return_value = False  # Permission doesn't exist yet
         mock_group = Mock()
@@ -422,11 +431,11 @@ def test_del_permission_success(mock_make_db_connection):
     """Test del_permission method success"""
     auth = Authorization("test_client")
 
-    with patch.object(auth, "has_permission") as mock_has_permission, patch(
-        "auth.CAS.authorization.AuthGroup"
-    ) as mock_auth_group, patch(
-        "auth.CAS.authorization.AuthPermission"
-    ) as mock_auth_permission:
+    with (
+        patch.object(auth, "has_permission") as mock_has_permission,
+        patch("auth.CAS.authorization.AuthGroup") as mock_auth_group,
+        patch("auth.CAS.authorization.AuthPermission") as mock_auth_permission,
+    ):
 
         mock_has_permission.return_value = True
         mock_group = Mock()
@@ -451,9 +460,10 @@ def test_has_permission_success(mock_make_db_connection):
     """Test has_permission method success"""
     auth = Authorization("test_client")
 
-    with patch("auth.CAS.authorization.AuthGroup") as mock_auth_group, patch(
-        "auth.CAS.authorization.AuthPermission"
-    ) as mock_auth_permission:
+    with (
+        patch("auth.CAS.authorization.AuthGroup") as mock_auth_group,
+        patch("auth.CAS.authorization.AuthPermission") as mock_auth_permission,
+    ):
 
         mock_group = Mock()
         mock_group_query = Mock()

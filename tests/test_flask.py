@@ -25,9 +25,7 @@ def test_db():
     test_engine = create_engine(
         f"sqlite:///{db_path}", connect_args={"check_same_thread": False}
     )
-    sessionmaker(
-        autocommit=False, autoflush=False, bind=test_engine
-    )
+    sessionmaker(autocommit=False, autoflush=False, bind=test_engine)
 
     # Create tables
     Base.metadata.create_all(bind=test_engine)
@@ -45,7 +43,6 @@ def test_db():
 @pytest.fixture
 def client(test_db):
     return test_db.test_client()
-
 
 
 # Generate a valid UUID4 for tests

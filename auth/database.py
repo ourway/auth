@@ -15,6 +15,7 @@ from sqlalchemy import (
     Integer,
     String,
     Table,
+    UniqueConstraint,
     create_engine,
     text,
 )
@@ -39,6 +40,7 @@ engine = create_engine(
     pool_recycle=300,  # Recycle connections after 5 minutes
     pool_size=1,  # Connection pool size
     max_overflow=0,  # Maximum overflow connections
+    isolation_level="SERIALIZABLE",  # Set serializable isolation level (highest for SQLite)
     connect_args={
         "check_same_thread": False,
         "timeout": 30,  # Connection timeout in seconds
@@ -92,6 +94,7 @@ class AuthGroup(Base):
     )
 
     __table_args__ = (
+        UniqueConstraint("creator", "role", name="uq_auth_group_creator_role"),
         {
             "sqlite_autoincrement": True,
         },
@@ -116,6 +119,7 @@ class AuthMembership(Base):
     )
 
     __table_args__ = (
+        UniqueConstraint("creator", "user", name="uq_auth_membership_creator_user"),
         {
             "sqlite_autoincrement": True,
         },
@@ -140,6 +144,7 @@ class AuthPermission(Base):
     )
 
     __table_args__ = (
+        UniqueConstraint("creator", "name", name="uq_auth_permission_creator_name"),
         {
             "sqlite_autoincrement": True,
         },
