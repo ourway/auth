@@ -1,8 +1,7 @@
-__author__ = "Farsheed Ashouri"
+__author__ = "Farshid Ashouri"
 
 import json
 import re
-from typing import Any, Dict, Union
 
 import requests
 from requests.exceptions import ConnectionError
@@ -35,7 +34,7 @@ def connect(url, method="get"):
         r = func(url)
         return r
     except ConnectionError:
-        raise ConnectionError("Service Down")
+        raise ConnectionError("Service Down") from None
 
 
 def connection_factory(cls, url, method):
@@ -46,7 +45,7 @@ def connection_factory(cls, url, method):
             assert set(attrs) == set(kw.keys())
         except AssertionError:
             attrs.remove("client")
-            raise AssertionError("I need %s." % set(attrs))
+            raise AssertionError("I need %s." % set(attrs)) from None
         link = cls.service_url + url.format(**kw)
         r = connect(link, method)
         return json.loads(r.content.decode())
@@ -68,8 +67,18 @@ class Client(object):
         for url in services:
             match = re.findall(pattern, url)
             if match and services[url]:
+                # Handle /api/... URLs
                 for method in services[url]:
                     new_func_name = "%s_%s" % (translate[method], match[0])
+                    setattr(cls, new_func_name, connection_factory(cls, url, method))
+            elif services[url]:
+                # Handle other URLs like /ping by using the endpoint name
+                # Extract the endpoint name from URL (e.g., "/ping" -> "ping")
+                endpoint_name = url.strip("/").replace(
+                    "-", "_"
+                )  # e.g., "/ping" -> "ping", "/some-endpoint" -> "some_endpoint"
+                for method in services[url]:
+                    new_func_name = "%s_%s" % (translate[method], endpoint_name)
                     setattr(cls, new_func_name, connection_factory(cls, url, method))
         return super(Client, cls).__new__(cls)
 
@@ -77,7 +86,8 @@ class Client(object):
         output = ["Methods:"]
         for i in dir(self):
             if i.startswith("get") or i.startswith("add") or i.startswith("remove"):
-                output.append("  %s: %s" % (i, getattr(getattr(self, i), "__doc__")))
+                method = getattr(self, i)
+                output.append("  %s: %s" % (i, method.__doc__))
         return "\n".join(output)
 
 

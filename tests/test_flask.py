@@ -1,17 +1,17 @@
 """
-FastAPI test suite using TestClient
+Flask test suite using Flask test client
 """
 
 import os
 import tempfile
+import uuid
 
 import pytest
-from fastapi.testclient import TestClient
 from sqlalchemy import create_engine
 from sqlalchemy.orm import sessionmaker
 
-from auth.database import Base, get_db
-from auth.main import app
+from auth.database import Base
+from auth.main import create_app
 
 
 # Test database setup
@@ -21,41 +21,29 @@ def test_db():
     with tempfile.NamedTemporaryFile(suffix=".db", delete=False) as tmp:
         db_path = tmp.name
 
-    # Override the default database path
+    # Create test app with temporary database
     test_engine = create_engine(
         f"sqlite:///{db_path}", connect_args={"check_same_thread": False}
     )
-    TestingSessionLocal = sessionmaker(
-        autocommit=False, autoflush=False, bind=test_engine
-    )
+    sessionmaker(autocommit=False, autoflush=False, bind=test_engine)
 
     # Create tables
     Base.metadata.create_all(bind=test_engine)
 
-    # Override the dependency
-    def override_get_db():
-        try:
-            db = TestingSessionLocal()
-            yield db
-        finally:
-            db.close()
+    # Create app with test database
+    app = create_app()
+    app.config["TESTING"] = True
 
-    app.dependency_overrides[get_db] = override_get_db
-
-    yield db_path
+    yield app
 
     # Cleanup
     os.unlink(db_path)
-    app.dependency_overrides.clear()
 
 
 @pytest.fixture
 def client(test_db):
-    return TestClient(app)
+    return test_db.test_client()
 
-
-# Test data
-import uuid
 
 # Generate a valid UUID4 for tests
 SECRET_KEY = str(uuid.uuid4())
@@ -65,14 +53,14 @@ def test_ping(client):
     """Test health check endpoint"""
     response = client.get("/ping")
     assert response.status_code == 200
-    assert response.json() == {"message": "PONG"}
+    assert response.get_json() == {"message": "PONG"}
 
 
 def test_add_role(client):
     """Test adding a role"""
     response = client.post(f"/api/role/{SECRET_KEY}/admin")
     assert response.status_code == 200
-    assert response.json() == {"result": True}
+    assert response.get_json() == {"result": True}
 
 
 def test_list_roles(client):
@@ -82,7 +70,7 @@ def test_list_roles(client):
 
     response = client.get(f"/api/roles/{SECRET_KEY}")
     assert response.status_code == 200
-    data = response.json()
+    data = response.get_json()
     assert "result" in data
     # Check for role in the list of dictionaries
     roles = [item["role"] for item in data["result"]]
@@ -96,7 +84,7 @@ def test_add_permission(client):
 
     response = client.post(f"/api/permission/{SECRET_KEY}/admin/read")
     assert response.status_code == 200
-    assert response.json() == {"result": True}
+    assert response.get_json() == {"result": True}
 
 
 def test_check_permission(client):
@@ -107,7 +95,7 @@ def test_check_permission(client):
 
     response = client.get(f"/api/permission/{SECRET_KEY}/admin/read")
     assert response.status_code == 200
-    assert response.json() == {"result": True}
+    assert response.get_json() == {"result": True}
 
 
 def test_add_membership(client):
@@ -117,7 +105,7 @@ def test_add_membership(client):
 
     response = client.post(f"/api/membership/{SECRET_KEY}/john/admin")
     assert response.status_code == 200
-    assert response.json() == {"result": True}
+    assert response.get_json() == {"result": True}
 
 
 def test_check_membership(client):
@@ -128,7 +116,7 @@ def test_check_membership(client):
 
     response = client.get(f"/api/membership/{SECRET_KEY}/john/admin")
     assert response.status_code == 200
-    assert response.json() == {"result": True}
+    assert response.get_json() == {"result": True}
 
 
 def test_check_user_permission(client):
@@ -140,7 +128,7 @@ def test_check_user_permission(client):
 
     response = client.get(f"/api/has_permission/{SECRET_KEY}/john/read")
     assert response.status_code == 200
-    assert response.json() == {"result": True}
+    assert response.get_json() == {"result": True}
 
 
 def test_get_user_permissions(client):
@@ -153,7 +141,7 @@ def test_get_user_permissions(client):
 
     response = client.get(f"/api/user_permissions/{SECRET_KEY}/john")
     assert response.status_code == 200
-    data = response.json()
+    data = response.get_json()
     assert "results" in data
     permissions = [p["name"] for p in data["results"]]
     assert "read" in permissions
@@ -169,7 +157,7 @@ def test_get_role_permissions(client):
 
     response = client.get(f"/api/role_permissions/{SECRET_KEY}/admin")
     assert response.status_code == 200
-    data = response.json()
+    data = response.get_json()
     assert "results" in data
     permissions = [p["name"] for p in data["results"]]
     assert "read" in permissions
@@ -186,7 +174,7 @@ def test_get_user_roles(client):
 
     response = client.get(f"/api/user_roles/{SECRET_KEY}/john")
     assert response.status_code == 200
-    data = response.json()
+    data = response.get_json()
     assert "result" in data
     # Check for user in the list of membership dictionaries
     users = [item["user"] for item in data["result"]]
@@ -202,7 +190,7 @@ def test_get_role_members(client):
 
     response = client.get(f"/api/members/{SECRET_KEY}/admin")
     assert response.status_code == 200
-    data = response.json()
+    data = response.get_json()
     assert "result" in data
     # Check for users in the list of membership dictionaries
     users = [item["user"] for item in data["result"]]
@@ -220,7 +208,7 @@ def test_which_roles_can(client):
 
     response = client.get(f"/api/which_roles_can/{SECRET_KEY}/read")
     assert response.status_code == 200
-    data = response.json()
+    data = response.get_json()
     assert "result" in data
     roles = [r["role"] for r in data["result"]]
     assert "admin" in roles
@@ -239,7 +227,7 @@ def test_which_users_can(client):
 
     response = client.get(f"/api/which_users_can/{SECRET_KEY}/read")
     assert response.status_code == 200
-    data = response.json()
+    data = response.get_json()
     assert "result" in data
     # Check for users in the list of membership dictionaries
     users = [item["user"] for item in data["result"]]
@@ -255,16 +243,16 @@ def test_delete_membership(client):
 
     # Check membership exists
     response = client.get(f"/api/membership/{SECRET_KEY}/john/admin")
-    assert response.json() == {"result": True}
+    assert response.get_json() == {"result": True}
 
     # Remove membership
     response = client.delete(f"/api/membership/{SECRET_KEY}/john/admin")
     assert response.status_code == 200
-    assert response.json() == {"result": True}
+    assert response.get_json() == {"result": True}
 
     # Check membership removed
     response = client.get(f"/api/membership/{SECRET_KEY}/john/admin")
-    assert response.json() == {"result": False}
+    assert response.get_json() == {"result": False}
 
 
 def test_delete_permission(client):
@@ -275,16 +263,16 @@ def test_delete_permission(client):
 
     # Check permission exists
     response = client.get(f"/api/permission/{SECRET_KEY}/admin/read")
-    assert response.json() == {"result": True}
+    assert response.get_json() == {"result": True}
 
     # Remove permission
     response = client.delete(f"/api/permission/{SECRET_KEY}/admin/read")
     assert response.status_code == 200
-    assert response.json() == {"result": True}
+    assert response.get_json() == {"result": True}
 
     # Check permission removed
     response = client.get(f"/api/permission/{SECRET_KEY}/admin/read")
-    assert response.json() == {"result": False}
+    assert response.get_json() == {"result": False}
 
 
 def test_delete_role(client):
@@ -294,17 +282,17 @@ def test_delete_role(client):
 
     # Check role exists
     response = client.get(f"/api/roles/{SECRET_KEY}")
-    roles = [item["role"] for item in response.json()["result"]]
+    roles = [item["role"] for item in response.get_json()["result"]]
     assert "admin" in roles
 
     # Delete role
     response = client.delete(f"/api/role/{SECRET_KEY}/admin")
     assert response.status_code == 200
-    assert response.json() == {"result": True}
+    assert response.get_json() == {"result": True}
 
     # Check role removed
     response = client.get(f"/api/roles/{SECRET_KEY}")
-    roles = [item["role"] for item in response.json()["result"]]
+    roles = [item["role"] for item in response.get_json()["result"]]
     assert "admin" not in roles
 
 
@@ -312,11 +300,11 @@ def test_duplicate_role(client):
     """Test adding duplicate role"""
     # Add role first time
     response = client.post(f"/api/role/{SECRET_KEY}/admin")
-    assert response.json() == {"result": True}
+    assert response.get_json() == {"result": True}
 
     # Try to add same role again - should return True for compatibility
     response = client.post(f"/api/role/{SECRET_KEY}/admin")
-    assert response.json() == {
+    assert response.get_json() == {
         "result": True
     }  # Changed from False to True for compatibility
 
@@ -325,35 +313,38 @@ def test_nonexistent_operations(client):
     """Test operations on non-existent entities"""
     # Check non-existent permission
     response = client.get(f"/api/permission/{SECRET_KEY}/nonexistent/read")
-    assert response.json() == {"result": False}
+    assert response.get_json() == {"result": False}
 
     # Delete non-existent permission
     response = client.delete(f"/api/permission/{SECRET_KEY}/nonexistent/read")
-    assert response.json() == {"result": True}
+    assert response.get_json() == {"result": True}
 
     # Delete non-existent role
     response = client.delete(f"/api/role/{SECRET_KEY}/nonexistent")
-    assert response.json() == {"result": False}
+    assert response.get_json() == {"result": False}
 
 
 def test_empty_results(client):
     """Test empty results for various endpoints"""
+    # Use a fresh client key that hasn't been used
+    fresh_key = str(uuid.uuid4())
+
     # Empty roles
-    response = client.get(f"/api/roles/{SECRET_KEY}")
-    assert response.json() == {"result": []}
+    response = client.get(f"/api/roles/{fresh_key}")
+    assert response.get_json() == {"result": []}
 
     # Empty permissions
-    response = client.get(f"/api/role_permissions/{SECRET_KEY}/nonexistent")
-    assert response.json() == {"results": []}
+    response = client.get(f"/api/role_permissions/{fresh_key}/nonexistent")
+    assert response.get_json() == {"results": []}
 
     # Empty user permissions
-    response = client.get(f"/api/user_permissions/{SECRET_KEY}/nonexistent")
-    assert response.json() == {"results": []}
+    response = client.get(f"/api/user_permissions/{fresh_key}/nonexistent")
+    assert response.get_json() == {"results": []}
 
     # Empty which roles can
-    response = client.get(f"/api/which_roles_can/{SECRET_KEY}/nonexistent")
-    assert response.json() == {"result": []}
+    response = client.get(f"/api/which_roles_can/{fresh_key}/nonexistent")
+    assert response.get_json() == {"result": []}
 
     # Empty which users can
-    response = client.get(f"/api/which_users_can/{SECRET_KEY}/nonexistent")
-    assert response.json() == {"result": []}
+    response = client.get(f"/api/which_users_can/{fresh_key}/nonexistent")
+    assert response.get_json() == {"result": []}

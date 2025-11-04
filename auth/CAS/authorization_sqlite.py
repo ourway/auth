@@ -85,10 +85,7 @@ class Authorization(object):
     def which_users_can(self, name):
         """Which users can perform action?"""
         roles = self.which_roles_can(name)
-        result = []
-        for role_dict in roles:
-            members = self.get_role_members(role_dict["role"])
-            result.extend(members)
+        result = [self.get_role_members(role_dict["role"]) for role_dict in roles]
         return result
 
     def get_role(self, role):

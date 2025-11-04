@@ -1,6 +1,6 @@
 FROM python:3.11-slim
 
-LABEL maintainer="Farsheed Ashouri"
+LABEL maintainer="Farshid A."
 LABEL description="Authorization service for humans"
 
 WORKDIR /app
@@ -13,7 +13,7 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
     build-essential \
     && pip install --no-cache-dir --upgrade pip \
     && pip install --no-cache-dir -r requirements.txt \
-    && pip install --no-cache-dir gunicorn uvicorn[standard] \
+    && pip install --no-cache-dir waitress \
     && apt-get purge -y build-essential \
     && apt-get autoremove -y \
     && rm -rf /var/lib/apt/lists/*
@@ -30,6 +30,6 @@ USER app
 
 EXPOSE 4000
 
-# Use uvicorn for FastAPI applications
-CMD ["uvicorn", "auth.main:app", "--host", "0.0.0.0", "--port", "4000", "--workers", "2"]
+# Use waitress for Flask applications
+CMD ["waitress-serve", "--host=0.0.0.0", "--port=4000", "--threads=4", "auth.main:app"]
 

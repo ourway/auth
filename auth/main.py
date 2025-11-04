@@ -1,31 +1,35 @@
 """
-FastAPI application setup
+Flask application setup
 """
 
-from fastapi import FastAPI
-from fastapi.middleware.cors import CORSMiddleware
+from flask import Flask
+from flask_cors import CORS
 
 from auth.database import create_tables
-from auth.routes import router
 
-# Create tables on startup
-create_tables()
 
-# Create FastAPI app
-app = FastAPI(
-    title="Auth API",
-    description="Authorization service with FastAPI and SQLAlchemy",
-    version="0.9.1",
-)
+def create_app():
+    # Create Flask app
+    app = Flask(__name__)
 
-# Add CORS middleware
-app.add_middleware(
-    CORSMiddleware,
-    allow_origins=["*"],
-    allow_credentials=True,
-    allow_methods=["*"],
-    allow_headers=["*"],
-)
+    # Enable CORS
+    CORS(app)
 
-# Include routes
-app.include_router(router)
+    # Create tables on startup
+    with app.app_context():
+        create_tables()
+
+    # Import and register routes
+    from auth.routes import register_routes
+
+    register_routes(app)
+
+    return app
+
+
+# Create the app instance
+app = create_app()
+
+
+if __name__ == "__main__":
+    app.run()

@@ -275,7 +275,7 @@ It's simple:
 Copyright
 *******************
 
-- Farsheed Ashouri `@ <mailto:rodmena@me.com>`_
+- Farshid Ashouri `@RODMENA LIMITED <mailto:farsheed.ashouri@gmail.com>`_
 
 
 *******************

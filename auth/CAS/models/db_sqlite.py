@@ -16,8 +16,12 @@ def make_db_connection():
     db_path = os.getenv("AUTH_DB_PATH") or "auth.db"
     conn = sqlite3.connect(db_path, check_same_thread=False)
     conn.row_factory = sqlite3.Row
+    _create_tables(conn)
+    return conn
 
-    # Create tables if they don't exist
+
+def _create_tables(conn):
+    """Create all necessary tables in the database"""
     cursor = conn.cursor()
 
     # AuthGroup table
@@ -93,6 +97,13 @@ def make_db_connection():
     )
 
     conn.commit()
+
+
+def make_test_db_connection():
+    """Create an in-memory SQLite3 database connection with tables for testing"""
+    conn = sqlite3.connect(":memory:", check_same_thread=False)
+    conn.row_factory = sqlite3.Row
+    _create_tables(conn)
     return conn
 
 
@@ -111,12 +122,34 @@ class BaseModel:
     def _fetch_one(self, query: str, params: tuple = ()):
         """Fetch single row"""
         cursor = self._execute(query, params)
-        return cursor.fetchone()
+        row = cursor.fetchone()
+        if row is None:
+            return None
+        # Convert Row object to dictionary if possible
+        if hasattr(row, "keys"):
+            return dict(row)
+        else:
+            # For compatibility when row_factory is not set (e.g., in tests)
+            # Get column names from cursor description
+            columns = [description[0] for description in cursor.description]
+            return dict(zip(columns, row))
 
     def _fetch_all(self, query: str, params: tuple = ()):
         """Fetch all rows"""
         cursor = self._execute(query, params)
-        return cursor.fetchall()
+        rows = cursor.fetchall()
+        # Convert Row objects to dictionaries if possible
+        if not rows:
+            return []
+
+        # Check if the first row has keys method (i.e., is a Row object)
+        if len(rows) > 0 and hasattr(rows[0], "keys"):
+            return [dict(row) for row in rows]
+        else:
+            # For compatibility when row_factory is not set (e.g., in tests)
+            # Get column names from cursor description
+            columns = [description[0] for description in cursor.description]
+            return [dict(zip(columns, row)) for row in rows]
 
     def _update_modified(self, table: str, record_id: int):
         """Update modified timestamp"""

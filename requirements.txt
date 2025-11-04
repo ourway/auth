@@ -1,4 +1,8 @@
-fastapi
+flask
+flask-cors
 sqlalchemy
-pydantic
-uvicorn
+requests
+mongoengine
+pytest
+pytest-cov
+waitress

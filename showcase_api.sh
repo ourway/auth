@@ -12,7 +12,7 @@ echo
 
 # Configuration
 SERVER_URL="http://localhost:4000"
-CLIENT_KEY="test-client-$(uuidgen | cut -d'-' -f1)"
+CLIENT_KEY="$(uuidgen)"
 echo "Using client key: $CLIENT_KEY"
 echo
 

@@ -45,7 +45,7 @@ from mongoengine import (
 )
 
 if TYPE_CHECKING:
-    from mongoengine import BaseDocument
+    pass
 
 
 def make_db_connection():

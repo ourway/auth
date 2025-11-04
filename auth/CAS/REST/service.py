@@ -1,201 +1,141 @@
-# try:
-#    import eventlet
-#    eventlet.monkey_patch()
-# except:
-#    pass
-
-import json
-from typing import Any, Dict
-
-import falcon
+from flask import Flask, jsonify
 
 from auth.CAS.authorization_sqlite import Authorization
 
-
-class AuthComponent(object):
-    def process_request(self, req, resp):
-        """Process the request before routing it.
-
-        Args:
-            req: Request object that will eventually be
-                routed to an on_* responder method.
-            resp: Response object that will be routed to
-                the on_* responder.
-        """
-
-    def process_resource(self, req, resp, resource, params):
-        """Process the request after routing.
-
-        Note:
-            This method is only called when the request matches
-            a route to a resource.
-
-        Args:
-            req: Request object that will be passed to the
-                routed responder.
-            resp: Response object that will be passed to the
-                responder.
-            resource: Resource object to which the request was
-                routed.
-            params: A dict-like object representing any additional
-                params derived from the route's URI template fields,
-                that will be passed to the resource's responder
-                method as keyword arguments.
-        """
-
-    def process_response(self, req, resp, resource):
-        """Post-processing of the response (after routing).
-
-        Args:
-            req: Request object.
-            resp: Response object.
-            resource: Resource object to which the request was
-                routed. May be None if no route was found
-                for the request.
-        """
-        if isinstance(resp.body, dict):
-            try:
-                resp.body = json.dumps(resp.body)
-            except Exception:
-                resp.status = falcon.HTTP_500
+app = Flask(__name__)
 
 
-def stringify(req, resp):
-    """
-    dumps all valid jsons
-    This is the latest after hook
-    """
-    if isinstance(resp.body, dict):
-        try:
-            resp.body = json.dumps(resp.body)
-        except Exception:
-            resp.status = falcon.HTTP_500
+@app.route("/ping", methods=["GET"])
+def ping():
+    """Handles GET requests"""
+    return jsonify({"message": "PONG"})
 
 
-class Ping:
-    def on_get(self, req, resp):
-        """Handles GET requests"""
-        resp.body = {"message": "PONG"}
+@app.route("/api/membership/<client>/<user>/<group>", methods=["GET"])
+def get_membership(client, user, group):
+    cas = Authorization(client)
+    result = False
+    if cas.has_membership(user, group):
+        result = True
+    return jsonify({"result": result})
 
 
-class Membership:
-    def on_get(self, req, resp, client, user, group):
-        cas = Authorization(client)
-        resp.body = {"result": False}
-        if cas.has_membership(user, group):
-            resp.body = {"result": True}
-
-    def on_post(self, req, resp, client, user, group):
-        cas = Authorization(client)
-        resp.body = {"result": False}
-        if cas.add_membership(user, group):
-            resp.body = {"result": True}
-
-    def on_delete(self, req, resp, client, user, group):
-        cas = Authorization(client)
-        resp.body = {"result": False}
-        if cas.del_membership(user, group):
-            resp.body = {"result": True}
+@app.route("/api/membership/<client>/<user>/<group>", methods=["POST"])
+def add_membership(client, user, group):
+    cas = Authorization(client)
+    result = False
+    if cas.add_membership(user, group):
+        result = True
+    return jsonify({"result": result})
 
 
-class Permission:
-    def on_get(self, req, resp, client, group, name):
-        cas = Authorization(client)
-        resp.body = {"result": False}
-        if cas.has_permission(group, name):
-            resp.body = {"result": True}
-
-    def on_post(self, req, resp, client, group, name):
-        cas = Authorization(client)
-        resp.body = {"result": False}
-        if cas.add_permission(group, name):
-            resp.body = {"result": True}
-
-    def on_delete(self, req, resp, client, group, name):
-        cas = Authorization(client)
-        resp.body = {"result": False}
-        if cas.del_permission(group, name):
-            resp.body = {"result": True}
+@app.route("/api/membership/<client>/<user>/<group>", methods=["DELETE"])
+def delete_membership(client, user, group):
+    cas = Authorization(client)
+    result = False
+    if cas.del_membership(user, group):
+        result = True
+    return jsonify({"result": result})
 
 
-class UserPermission:
-    def on_get(self, req, resp, client, user, name):
-        cas = Authorization(client)
-        resp.body = {"result": False}
-        if cas.user_has_permission(user, name):
-            resp.body = {"result": True}
+@app.route("/api/permission/<client>/<group>/<name>", methods=["GET"])
+def get_permission(client, group, name):
+    cas = Authorization(client)
+    result = False
+    if cas.has_permission(group, name):
+        result = True
+    return jsonify({"result": result})
 
 
-class GetUserPermissions:
-    def on_get(self, req, resp, client, user):
-        cas = Authorization(client)
-        resp.body = {"results": cas.get_user_permissions(user)}
+@app.route("/api/permission/<client>/<group>/<name>", methods=["POST"])
+def add_permission(client, group, name):
+    cas = Authorization(client)
+    result = False
+    if cas.add_permission(group, name):
+        result = True
+    return jsonify({"result": result})
 
 
-class GetRolePermissions:
-    def on_get(self, req, resp, client, role):
-        cas = Authorization(client)
-        resp.body = {"results": cas.get_permissions(role)}
+@app.route("/api/permission/<client>/<group>/<name>", methods=["DELETE"])
+def delete_permission(client, group, name):
+    cas = Authorization(client)
+    result = False
+    if cas.del_permission(group, name):
+        result = True
+    return jsonify({"result": result})
 
 
-class GetRoleMembers:
-    def on_get(self, req, resp, client, role):
-        cas = Authorization(client)
-        resp.body = {"result": cas.get_role_members(role)}
+@app.route("/api/has_permission/<client>/<user>/<name>", methods=["GET"])
+def user_has_permission(client, user, name):
+    cas = Authorization(client)
+    result = False
+    if cas.user_has_permission(user, name):
+        result = True
+    return jsonify({"result": result})
 
 
-class GetUserRoles:
-    def on_get(self, req, resp, client, user):
-        cas = Authorization(client)
-        resp.body = {"result": cas.get_user_roles(user)}
+@app.route("/api/user_permissions/<client>/<user>", methods=["GET"])
+def get_user_permissions(client, user):
+    cas = Authorization(client)
+    results = cas.get_user_permissions(user)
+    return jsonify({"results": results})
 
 
-class ListRoles:
-    def on_get(self, req, resp, client):
-        cas = Authorization(client)
-        resp.body = {"result": cas.roles}
+@app.route("/api/role_permissions/<client>/<role>", methods=["GET"])
+def get_role_permissions(client, role):
+    cas = Authorization(client)
+    results = cas.get_permissions(role)
+    return jsonify({"results": results})
 
 
-class WhichRolesCan:
-    def on_get(self, req, resp, client, name):
-        cas = Authorization(client)
-        resp.body = {"result": cas.which_roles_can(name)}
+@app.route("/api/user_roles/<client>/<user>", methods=["GET"])
+def get_user_roles(client, user):
+    cas = Authorization(client)
+    result = cas.get_user_roles(user)
+    return jsonify({"result": result})
 
 
-class WhichUsersCan:
-    def on_get(self, req, resp, client, name):
-        cas = Authorization(client)
-        resp.body = {"result": cas.which_users_can(name)}
+@app.route("/api/members/<client>/<role>", methods=["GET"])
+def get_role_members(client, role):
+    cas = Authorization(client)
+    result = cas.get_role_members(role)
+    return jsonify({"result": result})
 
 
-class Role:
-    def on_post(self, req, resp, client, role):
-        cas = Authorization(client)
-        resp.body = {"result": False}
-        if cas.add_role(role):
-            resp.body = {"result": True}
-
-    def on_delete(self, req, resp, client, group):
-        cas = Authorization(client)
-        resp.body = {"result": False}
-        if cas.del_role(group):
-            resp.body = {"result": True}
+@app.route("/api/roles/<client>", methods=["GET"])
+def list_roles(client):
+    cas = Authorization(client)
+    result = cas.roles
+    return jsonify({"result": result})
 
 
-api = falcon.API(middleware=[AuthComponent()])
-api.add_route("/ping", Ping())
-api.add_route(
-    "/api/membership/{client}/{user}/{group}", Membership()
-)  ## POST DELETE GET
-api.add_route(
-    "/api/permission/{client}/{group}/{name}", Permission()
-)  ## POST DELETE GET
-api.add_route("/api/has_permission/{client}/{user}/{name}", UserPermission())  ## GET
-api.add_route("/api/user_permissions/{client}/{user}", GetUserPermissions())  ## GET
-api.add_route("/api/role_permissions/{client}/{role}", GetRolePermissions())  ## GET
-api.add_route("/api/user_roles/{client}/{user}", GetUserRoles())  ## GET
-api.add_route("/api/members/{client}/{role}", GetRoleMembers())  ## GET
-api.add_route("/api/role/{client}/{role}", Role())  ## POST DELETE
-api.add_route("/api/roles/{client}", ListRoles())  ## GET
-api.add_route("/api/which_roles_can/{client}/{name}", WhichRolesCan())  ## GET
-api.add_route("/api/which_users_can/{client}/{name}", WhichUsersCan())  ## GET
+@app.route("/api/which_roles_can/<client>/<name>", methods=["GET"])
+def which_roles_can(client, name):
+    cas = Authorization(client)
+    result = cas.which_roles_can(name)
+    return jsonify({"result": result})
+
+
+@app.route("/api/which_users_can/<client>/<name>", methods=["GET"])
+def which_users_can(client, name):
+    cas = Authorization(client)
+    result = cas.which_users_can(name)
+    return jsonify({"result": result})
+
+
+@app.route("/api/role/<client>/<role>", methods=["POST"])
+def add_role(client, role):
+    cas = Authorization(client)
+    result = False
+    if cas.add_role(role):
+        result = True
+    return jsonify({"result": result})
+
+
+@app.route("/api/role/<client>/<group>", methods=["DELETE"])
+def delete_role(client, group):
+    cas = Authorization(client)
+    result = False
+    if cas.del_role(group):
+        result = True
+    return jsonify({"result": result})

@@ -1,1 +1,1 @@
-__author__ = "Farsheed Ashouri"
+__author__ = "Farshid Ashouri"
