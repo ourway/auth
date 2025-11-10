@@ -50,16 +50,16 @@ if config.database_type.value == "postgresql":
     )
 else:
     # SQLite-specific engine configuration
+    # Increase pool size for better concurrent access (though SQLite has limitations)
     engine = create_engine(
         config.database_url,
         pool_pre_ping=True,
         pool_recycle=300,  # Recycle connections after 5 minutes
-        pool_size=1,  # Connection pool size
-        max_overflow=0,  # Maximum overflow connections
-        isolation_level="SERIALIZABLE",  # Set serializable isolation level (highest for SQLite)
+        pool_size=5,  # Increased pool size for SQLite to handle more concurrent requests
+        max_overflow=10,  # Allow some overflow connections
         connect_args={
             "check_same_thread": False,
-            "timeout": 30,  # Connection timeout in seconds
+            "timeout": 60,  # Increased timeout to 60 seconds
             "detect_types": sqlite3.PARSE_DECLTYPES | sqlite3.PARSE_COLNAMES,
         },
     )

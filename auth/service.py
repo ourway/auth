@@ -174,9 +174,24 @@ class AuthorizationService:
             # For compatibility with old tests, return True if role already exists
             return True
 
-        new_group = AuthGroup(creator=self.client, role=role, description=description)
-        self.db.add(new_group)
-        self.db.commit()
+        try:
+            new_group = AuthGroup(creator=self.client, role=role, description=description)
+            self.db.add(new_group)
+            self.db.commit()
+        except Exception:
+            self.db.rollback()
+            # Refresh session state after rollback
+            self.db.expunge_all()
+            # Check if the role was created by another transaction
+            existing = (
+                self.db.query(AuthGroup)
+                .filter(AuthGroup.creator == self.client, AuthGroup.role == role)
+                .first()
+            )
+            if existing:
+                return True  # Role already exists
+            return False  # Failed to create role
+        
         return True
 
     def del_role(self, role: str) -> bool:
@@ -216,9 +231,22 @@ class AuthorizationService:
         )
 
         if not membership:
-            membership = AuthMembership(creator=self.client, user=user)
-            self.db.add(membership)
-            self.db.flush()  # Get the ID
+            try:
+                membership = AuthMembership(creator=self.client, user=user)
+                self.db.add(membership)
+                self.db.flush()  # Get the ID
+            except Exception:
+                self.db.rollback()
+                # Refresh session state after rollback
+                self.db.expunge_all()
+                # Try to get the membership again in case it was created by another transaction
+                membership = (
+                    self.db.query(AuthMembership)
+                    .filter(AuthMembership.creator == self.client, AuthMembership.user == user)
+                    .first()
+                )
+                if not membership:
+                    return False
 
         # Check if user is already in the group
         if group not in membership.groups:
@@ -310,6 +338,8 @@ class AuthorizationService:
                 # If there was an exception (likely IntegrityError due to duplicate),
                 # rollback and get the existing permission
                 self.db.rollback()
+                # Refresh the session state after rollback
+                self.db.expunge_all()
                 permission = (
                     self.db.query(AuthPermission)
                     .filter(

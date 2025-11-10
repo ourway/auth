@@ -4,8 +4,10 @@ Flask routes for authorization service
 
 from flask import abort, jsonify, request
 
+from contextlib import contextmanager
+
 from auth.audit import AuditAction, log_audit_event
-from auth.database import SessionLocal
+from auth.database import SessionLocal, get_db
 from auth.response_format import (
     APIResponse,
     format_permission_response,
@@ -21,6 +23,23 @@ from auth.validation import (
     validate_user_name,
     validate_user_role_combination,
 )
+
+
+from functools import wraps
+
+def with_db_session(route_func):
+    """
+    Decorator to provide a database session to route functions
+    """
+    @wraps(route_func)  # Preserve function metadata to avoid Flask endpoint conflicts
+    def wrapper(*args, **kwargs):
+        with get_db() as db:
+            try:
+                return route_func(db, *args, **kwargs)
+            except Exception as e:
+                db.rollback()  # Rollback any failed transactions
+                raise e
+    return wrapper
 
 
 def _get_auth_service(db):
@@ -84,41 +103,41 @@ def register_routes(app, limiter=None):
             )
             return APIResponse.bad_request(error_msg)
 
-        db = SessionLocal()
-        try:
-            auth_service = _get_auth_service(db)  # Use helper
-            result = auth_service.has_membership(user, group)
+        from auth.database import get_db
+        with get_db() as db:
+            try:
+                auth_service = _get_auth_service(db)  # Use helper
+                result = auth_service.has_membership(user, group)
 
-            # Extract client ID from authorization header for logging
-            auth_header = request.headers.get("Authorization", "")
-            client_id = (
-                auth_header.replace("Bearer ", "")
-                if auth_header.startswith("Bearer ")
-                else "unknown"
-            )
+                # Extract client ID from authorization header for logging
+                auth_header = request.headers.get("Authorization", "")
+                client_id = (
+                    auth_header.replace("Bearer ", "")
+                    if auth_header.startswith("Bearer ")
+                    else "unknown"
+                )
 
-            log_audit_event(
-                client_id=client_id,
-                user=user,
-                action=AuditAction.CHECK_MEMBERSHIP,
-                resource=f"{user}:{group}",
-                details={"result": result},
-                ip_address=request.remote_addr,
-                user_agent=request.headers.get("User-Agent", ""),
-                success=True,
-            )
+                log_audit_event(
+                    client_id=client_id,
+                    user=user,
+                    action=AuditAction.CHECK_MEMBERSHIP,
+                    resource=f"{user}:{group}",
+                    details={"result": result},
+                    ip_address=request.remote_addr,
+                    user_agent=request.headers.get("User-Agent", ""),
+                    success=True,
+                )
 
-            return APIResponse.success(
-                data=format_permission_response(result),
-                message=f"Membership check for user '{user}' and group '{group}' completed",
-            )
-        except Exception as e:
-            return handle_exception(e)
-        finally:
-            db.close()
+                return APIResponse.success(
+                    data=format_permission_response(result),
+                    message=f"Membership check for user '{user}' and group '{group}' completed",
+                )
+            except Exception as e:
+                return handle_exception(e)
 
     @app.route("/api/membership/<user>/<group>", methods=["POST"])
-    def add_membership(user, group):
+    @with_db_session
+    def add_membership(db, user, group):
         """Add user to a group"""
         # Validate input parameters
         is_valid, error_msg = validate_user_role_combination(user, group)
@@ -138,36 +157,33 @@ def register_routes(app, limiter=None):
             )
             abort(400, description=error_msg)
 
-        db = SessionLocal()
-        try:
-            auth_service = _get_auth_service(db)  # Use helper
-            result = auth_service.add_membership(user, group)
+        auth_service = _get_auth_service(db)  # Use helper
+        result = auth_service.add_membership(user, group)
 
-            # Extract client ID from authorization header for logging
-            auth_header = request.headers.get("Authorization", "")
-            client_id = (
-                auth_header.replace("Bearer ", "")
-                if auth_header.startswith("Bearer ")
-                else "unknown"
-            )
+        # Extract client ID from authorization header for logging
+        auth_header = request.headers.get("Authorization", "")
+        client_id = (
+            auth_header.replace("Bearer ", "")
+            if auth_header.startswith("Bearer ")
+            else "unknown"
+        )
 
-            log_audit_event(
-                client_id=client_id,
-                user=user,
-                action=AuditAction.ADD_MEMBERSHIP,
-                resource=f"{user}:{group}",
-                details={"result": result},
-                ip_address=request.remote_addr,
-                user_agent=request.headers.get("User-Agent", ""),
-                success=result,
-            )
+        log_audit_event(
+            client_id=client_id,
+            user=user,
+            action=AuditAction.ADD_MEMBERSHIP,
+            resource=f"{user}:{group}",
+            details={"result": result},
+            ip_address=request.remote_addr,
+            user_agent=request.headers.get("User-Agent", ""),
+            success=result,
+        )
 
-            return jsonify({"result": result})
-        finally:
-            db.close()
+        return jsonify({"result": result})
 
     @app.route("/api/membership/<user>/<group>", methods=["DELETE"])
-    def remove_membership(user, group):
+    @with_db_session
+    def remove_membership(db, user, group):
         """Remove user from a group"""
         # Validate input parameters
         is_valid, error_msg = validate_user_role_combination(user, group)
@@ -187,33 +203,29 @@ def register_routes(app, limiter=None):
             )
             abort(400, description=error_msg)
 
-        db = SessionLocal()
-        try:
-            auth_service = _get_auth_service(db)  # Use helper
-            result = auth_service.del_membership(user, group)
+        auth_service = _get_auth_service(db)  # Use helper
+        result = auth_service.del_membership(user, group)
 
-            # Extract client ID from authorization header for logging
-            auth_header = request.headers.get("Authorization", "")
-            client_id = (
-                auth_header.replace("Bearer ", "")
-                if auth_header.startswith("Bearer ")
-                else "unknown"
-            )
+        # Extract client ID from authorization header for logging
+        auth_header = request.headers.get("Authorization", "")
+        client_id = (
+            auth_header.replace("Bearer ", "")
+            if auth_header.startswith("Bearer ")
+            else "unknown"
+        )
 
-            log_audit_event(
-                client_id=client_id,
-                user=user,
-                action=AuditAction.REMOVE_MEMBERSHIP,
-                resource=f"{user}:{group}",
-                details={"result": result},
-                ip_address=request.remote_addr,
-                user_agent=request.headers.get("User-Agent", ""),
-                success=result,
-            )
+        log_audit_event(
+            client_id=client_id,
+            user=user,
+            action=AuditAction.REMOVE_MEMBERSHIP,
+            resource=f"{user}:{group}",
+            details={"result": result},
+            ip_address=request.remote_addr,
+            user_agent=request.headers.get("User-Agent", ""),
+            success=result,
+        )
 
-            return jsonify({"result": result})
-        finally:
-            db.close()
+        return jsonify({"result": result})
 
     @app.route("/api/permission/<group>/<name>", methods=["GET"])
     def check_permission(group, name):
@@ -280,7 +292,8 @@ def register_routes(app, limiter=None):
             db.close()
 
     @app.route("/api/permission/<group>/<name>", methods=["POST"])
-    def add_permission(group, name):
+    @with_db_session
+    def add_permission(db, group, name):
         """Add permission to a group"""
         # Validate input parameters
         if not validate_role_name(group):
@@ -315,36 +328,33 @@ def register_routes(app, limiter=None):
             )
             abort(400, description=f"Invalid permission name: {name}")
 
-        db = SessionLocal()
-        try:
-            auth_service = _get_auth_service(db)  # Use helper
-            result = auth_service.add_permission(group, name)
+        auth_service = _get_auth_service(db)  # Use helper
+        result = auth_service.add_permission(group, name)
 
-            # Extract client ID from authorization header for logging
-            auth_header = request.headers.get("Authorization", "")
-            client_id = (
-                auth_header.replace("Bearer ", "")
-                if auth_header.startswith("Bearer ")
-                else "unknown"
-            )
+        # Extract client ID from authorization header for logging
+        auth_header = request.headers.get("Authorization", "")
+        client_id = (
+            auth_header.replace("Bearer ", "")
+            if auth_header.startswith("Bearer ")
+            else "unknown"
+        )
 
-            log_audit_event(
-                client_id=client_id,
-                user=None,
-                action=AuditAction.ADD_PERMISSION,
-                resource=f"{group}:{name}",
-                details={"result": result},
-                ip_address=request.remote_addr,
-                user_agent=request.headers.get("User-Agent", ""),
-                success=result,
-            )
+        log_audit_event(
+            client_id=client_id,
+            user=None,
+            action=AuditAction.ADD_PERMISSION,
+            resource=f"{group}:{name}",
+            details={"result": result},
+            ip_address=request.remote_addr,
+            user_agent=request.headers.get("User-Agent", ""),
+            success=result,
+        )
 
-            return jsonify({"result": result})
-        finally:
-            db.close()
+        return jsonify({"result": result})
 
     @app.route("/api/permission/<group>/<name>", methods=["DELETE"])
-    def remove_permission(group, name):
+    @with_db_session
+    def remove_permission(db, group, name):
         """Remove permission from a group"""
         # Validate input parameters
         if not validate_role_name(group):
@@ -379,36 +389,33 @@ def register_routes(app, limiter=None):
             )
             abort(400, description=f"Invalid permission name: {name}")
 
-        db = SessionLocal()
-        try:
-            auth_service = _get_auth_service(db)  # Use helper
-            result = auth_service.del_permission(group, name)
+        auth_service = _get_auth_service(db)  # Use helper
+        result = auth_service.del_permission(group, name)
 
-            # Extract client ID from authorization header for logging
-            auth_header = request.headers.get("Authorization", "")
-            client_id = (
-                auth_header.replace("Bearer ", "")
-                if auth_header.startswith("Bearer ")
-                else "unknown"
-            )
+        # Extract client ID from authorization header for logging
+        auth_header = request.headers.get("Authorization", "")
+        client_id = (
+            auth_header.replace("Bearer ", "")
+            if auth_header.startswith("Bearer ")
+            else "unknown"
+        )
 
-            log_audit_event(
-                client_id=client_id,
-                user=None,
-                action=AuditAction.REMOVE_PERMISSION,
-                resource=f"{group}:{name}",
-                details={"result": result},
-                ip_address=request.remote_addr,
-                user_agent=request.headers.get("User-Agent", ""),
-                success=result,
-            )
+        log_audit_event(
+            client_id=client_id,
+            user=None,
+            action=AuditAction.REMOVE_PERMISSION,
+            resource=f"{group}:{name}",
+            details={"result": result},
+            ip_address=request.remote_addr,
+            user_agent=request.headers.get("User-Agent", ""),
+            success=result,
+        )
 
-            return jsonify({"result": result})
-        finally:
-            db.close()
+        return jsonify({"result": result})
 
     @app.route("/api/has_permission/<user>/<name>", methods=["GET"])
-    def check_user_permission(user, name):
+    @with_db_session
+    def check_user_permission(db, user, name):
         """Check if user has permission"""
         # Validate input parameters
         if not validate_user_name(user):
@@ -443,38 +450,32 @@ def register_routes(app, limiter=None):
             )
             return APIResponse.bad_request(f"Invalid permission name: {name}")
 
-        db = SessionLocal()
-        try:
-            auth_service = _get_auth_service(db)  # Use helper
-            result = auth_service.user_has_permission(user, name)
+        auth_service = _get_auth_service(db)  # Use helper
+        result = auth_service.user_has_permission(user, name)
 
-            # Extract client ID from authorization header for logging
-            auth_header = request.headers.get("Authorization", "")
-            client_id = (
-                auth_header.replace("Bearer ", "")
-                if auth_header.startswith("Bearer ")
-                else "unknown"
-            )
+        # Extract client ID from authorization header for logging
+        auth_header = request.headers.get("Authorization", "")
+        client_id = (
+            auth_header.replace("Bearer ", "")
+            if auth_header.startswith("Bearer ")
+            else "unknown"
+        )
 
-            log_audit_event(
-                client_id=client_id,
-                user=user,
-                action=AuditAction.CHECK_PERMISSION,
-                resource=f"{user}:{name}",
-                details={"result": result},
-                ip_address=request.remote_addr,
-                user_agent=request.headers.get("User-Agent", ""),
-                success=True,
-            )
+        log_audit_event(
+            client_id=client_id,
+            user=user,
+            action=AuditAction.CHECK_PERMISSION,
+            resource=f"{user}:{name}",
+            details={"result": result},
+            ip_address=request.remote_addr,
+            user_agent=request.headers.get("User-Agent", ""),
+            success=True,
+        )
 
-            return APIResponse.success(
-                data=format_permission_response(result),
-                message=f"Permission check for user '{user}' and permission '{name}' completed",
-            )
-        except Exception as e:
-            return handle_exception(e)
-        finally:
-            db.close()
+        return APIResponse.success(
+            data=format_permission_response(result),
+            message=f"Permission check for user '{user}' and permission '{name}' completed",
+        )
 
     @app.route("/api/user_permissions/<user>", methods=["GET"])
     def get_user_permissions(user):
@@ -805,7 +806,8 @@ def register_routes(app, limiter=None):
             db.close()
 
     @app.route("/api/role/<role>", methods=["POST"])
-    def create_role(role):
+    @with_db_session
+    def create_role(db, role):
         """Create a new role"""
         # Validate input parameters
         if not validate_role_name(role):
@@ -824,36 +826,33 @@ def register_routes(app, limiter=None):
             )
             abort(400, description=f"Invalid role name: {role}")
 
-        db = SessionLocal()
-        try:
-            auth_service = _get_auth_service(db)  # Use helper
-            result = auth_service.add_role(role)
+        auth_service = _get_auth_service(db)  # Use helper
+        result = auth_service.add_role(role)
 
-            # Extract client ID from authorization header for logging
-            auth_header = request.headers.get("Authorization", "")
-            client_id = (
-                auth_header.replace("Bearer ", "")
-                if auth_header.startswith("Bearer ")
-                else "unknown"
-            )
+        # Extract client ID from authorization header for logging
+        auth_header = request.headers.get("Authorization", "")
+        client_id = (
+            auth_header.replace("Bearer ", "")
+            if auth_header.startswith("Bearer ")
+            else "unknown"
+        )
 
-            log_audit_event(
-                client_id=client_id,
-                user=None,
-                action=AuditAction.CREATE_ROLE,
-                resource=role,
-                details={"result": result},
-                ip_address=request.remote_addr,
-                user_agent=request.headers.get("User-Agent", ""),
-                success=result,
-            )
+        log_audit_event(
+            client_id=client_id,
+            user=None,
+            action=AuditAction.CREATE_ROLE,
+            resource=role,
+            details={"result": result},
+            ip_address=request.remote_addr,
+            user_agent=request.headers.get("User-Agent", ""),
+            success=result,
+        )
 
-            return jsonify({"result": result})
-        finally:
-            db.close()
+        return jsonify({"result": result})
 
     @app.route("/api/role/<role>", methods=["DELETE"])
-    def delete_role(role):
+    @with_db_session
+    def delete_role(db, role):
         """Delete a role"""
         # Validate input parameters
         if not validate_role_name(role):
@@ -872,37 +871,31 @@ def register_routes(app, limiter=None):
             )
             return APIResponse.bad_request(f"Invalid role name: {role}")
 
-        db = SessionLocal()
-        try:
-            auth_service = _get_auth_service(db)  # Use helper
-            result = auth_service.del_role(role)
+        auth_service = _get_auth_service(db)  # Use helper
+        result = auth_service.del_role(role)
 
-            # Extract client ID from authorization header for logging
-            auth_header = request.headers.get("Authorization", "")
-            client_id = (
-                auth_header.replace("Bearer ", "")
-                if auth_header.startswith("Bearer ")
-                else "unknown"
-            )
+        # Extract client ID from authorization header for logging
+        auth_header = request.headers.get("Authorization", "")
+        client_id = (
+            auth_header.replace("Bearer ", "")
+            if auth_header.startswith("Bearer ")
+            else "unknown"
+        )
 
-            log_audit_event(
-                client_id=client_id,
-                user=None,
-                action=AuditAction.DELETE_ROLE,
-                resource=role,
-                details={"result": result},
-                ip_address=request.remote_addr,
-                user_agent=request.headers.get("User-Agent", ""),
-                success=result,
-            )
+        log_audit_event(
+            client_id=client_id,
+            user=None,
+            action=AuditAction.DELETE_ROLE,
+            resource=role,
+            details={"result": result},
+            ip_address=request.remote_addr,
+            user_agent=request.headers.get("User-Agent", ""),
+            success=result,
+        )
 
-            return APIResponse.success(
-                data={"result": result}, message=f"Role '{role}' deletion completed"
-            )
-        except Exception as e:
-            return handle_exception(e)
-        finally:
-            db.close()
+        return APIResponse.success(
+            data={"result": result}, message=f"Role '{role}' deletion completed"
+        )
 
     # Workflow-related endpoints
     @app.route("/api/workflow/users/<workflow_name>", methods=["GET"])
