@@ -1,7 +1,7 @@
 version: '3.8'
 
 services:
-  # Main auth service
+  # Main auth service (uses memory storage for rate limiting by default)
   auth:
     build: .
     container_name: auth-server
@@ -9,6 +9,8 @@ services:
       - "4000:4000"
     volumes:
       - auth-data-volume:/home/app/.auth.sqlite3  # Persistent volume for database
+    # To enable Redis for rate limiting, use docker-compose.redis.yml instead:
+    # docker-compose -f docker-compose.redis.yml up
     restart: unless-stopped
     healthcheck:
       test: ["CMD", "curl", "-f", "http://localhost:4000/ping"]

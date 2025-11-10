@@ -293,7 +293,7 @@ class AuthorizationService:
         if not group:
             return False
 
-        # Get or create permission
+        # Try to get existing permission first
         permission = (
             self.db.query(AuthPermission)
             .filter(AuthPermission.creator == self.client, AuthPermission.name == name)
@@ -301,9 +301,26 @@ class AuthorizationService:
         )
 
         if not permission:
-            permission = AuthPermission(creator=self.client, name=name)
-            self.db.add(permission)
-            self.db.flush()
+            # Check again inside a try-catch to handle race conditions or concurrent creation
+            try:
+                permission = AuthPermission(creator=self.client, name=name)
+                self.db.add(permission)
+                self.db.flush()
+            except Exception:
+                # If there was an exception (likely IntegrityError due to duplicate),
+                # rollback and get the existing permission
+                self.db.rollback()
+                permission = (
+                    self.db.query(AuthPermission)
+                    .filter(
+                        AuthPermission.creator == self.client,
+                        AuthPermission.name == name,
+                    )
+                    .first()
+                )
+                # If it's still None after rollback, something else went wrong
+                if not permission:
+                    return False
 
         # Check if permission is already in the group
         if group not in permission.groups:

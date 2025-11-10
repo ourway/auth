@@ -10,3 +10,6 @@ flask-limiter
 PyJWT
 cryptography
 APScheduler
+psycopg2-binary
+redis
+python-dotenv

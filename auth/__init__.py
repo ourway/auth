@@ -3,9 +3,24 @@ from typing import Optional
 
 from auth.client import Client, EnhancedAuthClient  # Import the new client
 from auth.database import SessionLocal
-from auth.main import app
-from auth.main import app as api
 from auth.service import AuthorizationService
+
+
+# Lazy import for Flask app to avoid immediate initialization
+def _get_app():
+    from auth.main import app
+
+    return app
+
+
+# Access app through lazy function
+def get_app():
+    """Get the Flask app instance. This avoids immediate initialization issues."""
+    return _get_app()
+
+
+app = get_app
+api = app
 
 
 # Compatibility wrapper for old tests

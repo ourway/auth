@@ -108,6 +108,7 @@ Environment Variables
 - ``ENABLE_ENCRYPTION`` - Enable data encryption [default: false]
 - ``ENCRYPTION_KEY`` - Encryption key [required if encryption enabled]
 - ``RATE_LIMIT_DEFAULT`` - Default rate limit [default: 1000 per hour]
+- ``RATELIMIT_STORAGE_URL`` - Rate limiting storage backend (redis://localhost:6379 for Redis, memory:// for in-memory) [default: memory://]
 - ``SERVER_HOST`` - Server host [default: 0.0.0.0]
 - ``SERVER_PORT`` - Server port [default: 4000]
 - ``ALLOW_CORS`` - Enable CORS [default: true]
@@ -121,6 +122,30 @@ For production deployment with multiple workers:
 
     pip install waitress
     waitress-serve --host=0.0.0.0 --port=4000 --threads=10 auth.main:app
+
+Docker Deployment
+-----------------
+To run with default configuration (SQLite database, memory-based rate limiting):
+
+.. code:: Bash
+
+    docker-compose up
+
+To run with Redis for rate limiting (recommended for production):
+
+.. code:: Bash
+
+    docker-compose -f docker-compose.redis.yml up
+
+Rate Limiting with Redis
+------------------------
+To use Redis for rate limiting (recommended for production), set the ``RATELIMIT_STORAGE_URL`` environment variable:
+
+.. code:: Bash
+
+    export RATELIMIT_STORAGE_URL=redis://localhost:6379
+
+This provides better performance and allows rate limits to be shared across multiple server instances. If not specified, the system defaults to in-memory rate limiting which is not recommended for production use.
 
 Architecture
 ------------

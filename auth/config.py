@@ -6,6 +6,26 @@ import os
 from dataclasses import dataclass
 from enum import Enum
 
+# Load environment variables from .env file if it exists
+try:
+    import os
+
+    # Determine the project root directory based on the location of this file
+    import sys
+
+    from dotenv import load_dotenv
+
+    # Get the directory containing this config.py file
+    current_dir = os.path.dirname(os.path.abspath(__file__))
+    # The project root is one level up from the auth package directory
+    project_root = os.path.dirname(current_dir)
+    load_dotenv(os.path.join(project_root, ".env"))
+    # Load test.env as fallback/override
+    load_dotenv(os.path.join(project_root, "test.env"))
+except ImportError:
+    # python-dotenv is not required, just a nice-to-have
+    pass
+
 
 class DatabaseType(Enum):
     """Supported database types"""
