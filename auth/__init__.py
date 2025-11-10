@@ -1,6 +1,7 @@
 __author__ = "Farshid Ashouri"
 from typing import Optional
 
+from auth.client import Client, EnhancedAuthClient  # Import the new client
 from auth.database import SessionLocal
 from auth.main import app
 from auth.main import app as api
@@ -66,3 +67,7 @@ class Authorization:
 
     def which_users_can(self, name: str):
         return self.service.which_users_can(name)
+
+
+# Export the new client for users who want enhanced features
+__all__ = ["Authorization", "Client", "EnhancedAuthClient", "SessionLocal"]

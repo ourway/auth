@@ -1,405 +1,137 @@
-====================================
-Auth | Authorization for Humans
-====================================
+Auth | Enterprise Authorization System
+======================================
 
-RESTful, Simple Authorization system with ZERO configuration.
+A comprehensive, bank-grade authorization system with role-based access control, audit logging, and high availability features.
 
-.. image:: https://badge.fury.io/py/auth.svg
-    :target: https://badge.fury.io/py/auth
+Features
+--------
+- Role-based access control (RBAC) with user, role, and permission management
+- JWT-based authentication and authorization
+- Comprehensive audit logging for security compliance
+- Database encryption for sensitive data protection
+- Rate limiting and circuit breaker resilience patterns
+- PostgreSQL and SQLite support
+- API versioning and consistent response formats
+- APScheduler integration for workflow permission checking
+- Enhanced client with connection pooling and retry logic
+- Configurable CORS and security settings
 
-.. image:: https://img.shields.io/pypi/dm/auth.svg
-    :target: https://pypi.python.org/pypi/auth
-
-.. image:: https://api.travis-ci.org/ourway/auth.svg
-    :target: https://travis-ci.org/ourway/auth
-
-.. image:: https://codecov.io/github/ourway/auth/coverage.svg?branch=master
-    :target: https://codecov.io/github/ourway/auth?branch=master
-
-.. note:: **IMPORTANT: Version 0.9.2 is a BREAKING CHANGE**
-
-   This version (0.9.2) moves the client secret key from URL path parameters to the Authorization header for improved security.
-   All API endpoints now require the client key to be passed as a Bearer token in the Authorization header.
-   
-   **Before:** ``/api/membership/{KEY}/{user}/{group}``
-   **After:** ``/api/membership/{user}/{group}`` with header ``Authorization: Bearer {KEY}``
-   
-   If you need the previous version with URL-based keys:
-   
-   .. code:: Bash
-   
-       pip install auth==0.9.1
-
-***************
-What is Auth?
-***************
-Auth is a modern Python module that makes authorization simple, scalable, and powerful. It provides a beautiful RESTful API for use in micro-service architectures and platforms. 
-
-Built with Flask, SQLAlchemy, and modern Python tools, it offers robust APIs and modern database support with SQLite3 as the default backend.
-
-It supports Python 3.7+ and requires ZERO configuration steps. Just type ``auth-server`` and press enter!
-
-I use Travis and Codecov to keep myself honest.
-
-*******************
 Requirements
-*******************
+------------
+- Python 3.9+
+- PostgreSQL (for production) or SQLite (for development)
 
-Auth uses **SQLite3** as the default database. The database file is automatically created at ``~/.auth.sqlite3``. No additional setup required!
-
-*******************
 Installation
-*******************
-
+------------
 .. code:: Bash
 
     pip install auth
 
-
-*******************
-Show me an example
-*******************
-Let's imagine you have two users, **Jack** and **Sara**. Sara can cook and Jack can dance. Both can laugh.
-
-You also need to choose a secret key for your application. The client key **must be a valid UUID4** for new API usage. Each application instance should have its own unique key for proper scope separation.
-
-.. code:: Python
-
-    import uuid
-    my_secret_key = str(uuid.uuid4())  # Generate a valid UUID4
-    from auth import Authorization
-    cas = Authorization(my_secret_key)
-
-Now, let's add 3 groups: Cookers, Dancers and Laughers. Remember that groups are Roles. So when we create a group, indeed we create a role:
-
-.. code:: Python
-
-    cas.add_role('cookers')
-    cas.add_role('dancers')
-    cas.add_role('laughers')
-
-Great! You have 3 groups and you need to authorize them to do special things.
-
-.. code:: Python
-
-    cas.add_permission('cookers', 'cook')
-    cas.add_permission('dancers', 'dance')
-    cas.add_permission('laughers', 'laugh')
-
-Good. You let cookers to cook and dancers to dance etc...
-The final part is to set memberships for Sara and Jack:
-
-.. code:: Python
-
-    cas.add_membership('sara', 'cookers')
-    cas.add_membership('sara', 'laughers')
-    cas.add_membership('jack', 'dancers')
-    cas.add_membership('jack', 'laughers')
-
-That's all we need. Now let's ensure that Jack can dance:
-
-.. code:: Python
-
-    if cas.user_has_permission('jack', 'dance'):
-        print('YES!!! Jack can dance.')
-
-**********************
-Authorization Methods
-**********************
-
-Use pydoc to see all methods:
-
-.. code:: Bash
-
-    pydoc auth.Authorization
-
-*******************
-RESTful API
-*******************
-Let's run the server on port 4000:
+Quick Start
+-----------
+To start the server with default SQLite configuration:
 
 .. code:: Bash
 
     auth-server
 
-Simple! Authorization server is ready to use.
+Server Configuration with PostgreSQL
+------------------------------------
+To configure the server with PostgreSQL, set the following environment variables:
 
-You can use it via simple curl or using the mighty Requests module. So in your remote application, you can do something like this:
+.. code:: Bash
 
-.. code:: Python
+    export AUTH_DB_TYPE=postgresql
+    export POSTGRESQL_URL=postgresql://username:password@localhost:5432/auth_db
+    export JWT_SECRET_KEY=your_secure_secret_key
+    export ENABLE_ENCRYPTION=true
+    export ENCRYPTION_KEY=your_encryption_key
+    export RATE_LIMIT_DEFAULT=500 per hour
 
-    import requests
-    import uuid
-    secret_key = str(uuid.uuid4())  # Client key must be a valid UUID4
-    auth_api = "http://127.0.0.1:4000/api"
+Then start the server:
 
-Let's create admin role:
+.. code:: Bash
 
-.. code:: Python
+    auth-server
 
-    requests.post(auth_api+'/role/admin', headers={"Authorization": f"Bearer {secret_key}"})
-
-And let's add a permission to the admin role:
-
-.. code:: Python
-
-    requests.post(auth_api+'/permission/admin/manage', headers={"Authorization": f"Bearer {secret_key}"})
-
-And finally let's check if an admin can manage:
-
-.. code:: Python
-
-    response = requests.get(auth_api+'/has_permission/admin/manage', headers={"Authorization": f"Bearer {secret_key}"})
-    print(response.json())
-
-********************
-RESTful API helpers
-********************
-Auth comes with a helper class that makes your life easy.
-Note: The client key must be a valid UUID4.
+API Usage
+---------
+All API endpoints require a valid UUID4 Bearer token in the Authorization header:
 
 .. code:: Python
 
     import uuid
-    from auth.client import Client
-    service = Client(str(uuid.uuid4()), 'http://192.168.99.100:4000')  # Use a valid UUID4
-    print(service)
-    service.add_role(role='admin')
-    service.get_roles()
+    from auth.client import EnhancedAuthClient
+    
+    # Generate a client key
+    client_key = str(uuid.uuid4())
+    
+    # Create client instance
+    client = EnhancedAuthClient(
+        api_key=client_key, 
+        service_url='http://127.0.0.1:4000'
+    )
+    
+    # Add a role
+    client.create_role('admin')
+    
+    # Add a permission
+    client.add_permission('admin', 'manage_users')
+    
+    # Add user to role
+    client.add_membership('john_doe', 'admin')
+    
+    # Check user permission
+    result = client.user_has_permission('john_doe', 'manage_users')
+    print(result)
 
-*******************
-API Methods
-*******************
+Key API Endpoints
+-----------------
+- ``/ping`` [GET] - Health check
+- ``/api/role/{role}`` [POST/DELETE] - Manage roles
+- ``/api/permission/{group}/{name}`` [POST/GET/DELETE] - Manage permissions
+- ``/api/membership/{user}/{group}`` [POST/GET/DELETE] - Manage memberships
+- ``/api/has_permission/{user}/{name}`` [GET] - Check user permissions
+- ``/api/user_permissions/{user}`` [GET] - Get user permissions
+- ``/api/which_users_can/{name}`` [GET] - Get users who can perform action
+- ``/api/workflow/users/{workflow_name}`` [GET] - Get users who can run workflow
+- ``/api/workflow/user/{user}/can_run/{workflow_name}`` [GET] - Check user workflow permission
 
-.. code:: Bash
+Environment Variables
+---------------------
+- ``AUTH_DB_TYPE`` - Database type (sqlite or postgresql) [default: sqlite]
+- ``POSTGRESQL_URL`` - PostgreSQL connection string
+- ``AUTH_DB_PATH`` - SQLite database path [default: ~/.auth.sqlite3]
+- ``JWT_SECRET_KEY`` - Secret key for JWT tokens [required for production]
+- ``JWT_ALGORITHM`` - JWT algorithm [default: HS256]
+- ``JWT_ACCESS_TOKEN_EXPIRE_MINUTES`` - Token expiration [default: 1440]
+- ``ENABLE_ENCRYPTION`` - Enable data encryption [default: false]
+- ``ENCRYPTION_KEY`` - Encryption key [required if encryption enabled]
+- ``RATE_LIMIT_DEFAULT`` - Default rate limit [default: 1000 per hour]
+- ``SERVER_HOST`` - Server host [default: 0.0.0.0]
+- ``SERVER_PORT`` - Server port [default: 4000]
+- ``ALLOW_CORS`` - Enable CORS [default: true]
+- ``CORS_ORIGINS`` - Allowed CORS origins [default: *]
 
-    pydoc auth.CAS.REST.service
-
-.. note:: **Important:** All API endpoints require a valid UUID4 Bearer token in the 'Authorization' header.
-
-- ``/ping`` [GET]
-
- Ping API, useful for your monitoring tools
-
-- ``/api/membership/{user}/{group}`` [GET/POST/DELETE]
-
- Adding, removing and getting membership information.
-
-- ``/api/permission/{group}/{name}`` [GET/POST/DELETE]
-
- Adding, removing and getting permissions
-
-- ``/api/has_permission/{user}/{name}`` [GET]
-
- Getting user permission info
-
-- ``/api/role/{role}`` [GET/POST/DELETE]
-
-  Adding, removing and getting roles
-
-- ``/api/which_roles_can/{name}`` [GET]
-
-  For example:  Which roles can send_mail?
-
-- ``/api/which_users_can/{name}`` [GET]
-
-  For example:  Which users can send_mail?
-
-- ``/api/user_permissions/{user}`` [GET]
-
-  Get all permissions that a user has
-
-- ``/api/role_permissions/{role}`` [GET]
-
-  Get all permissions that a role has
-
-- ``/api/user_roles/{user}`` [GET]
-
-    Get roles that user assigned to
-
-- ``/api/roles`` [GET]
-
-    Get all available roles
-
-*******************
-Use Cases
-*******************
-
-**Microservices Architecture**
-- Centralized authorization service for multiple microservices
-- Consistent permission management across your entire platform
-- Easy integration with Flask-based services
-
-**Multi-tenant Applications**
-- Separate authorization scopes using different secret keys
-- Manage permissions for different organizations or teams
-- Scalable role-based access control
-
-**API Gateway Authorization**
-- Validate user permissions before routing requests
-- Centralized permission checks for API endpoints
-- Real-time permission validation
-
-**Content Management Systems**
-- Role-based content access control
-- User group management for collaborative editing
-- Fine-grained permission control for different content types
-
-**Enterprise Applications**
-- Department-based access control
-- Project team permission management
-- Audit trail through comprehensive API logging
-
-**Educational Platforms**
-- Student/Teacher role management
-- Course access permissions
-- Group project collaboration controls
-
-**Healthcare Systems**
-- HIPAA-compliant access controls
-- Patient data access management
-- Staff role-based permissions
-
-*******************
-Deployment
-*******************
-
-Deploying Auth module in production environment is easy:
-
-.. code:: Bash
-
-    python -c "from auth.main import app; app.run(host='0.0.0.0', port=4000, threaded=True, debug=False)"
-
-For production use with multiple workers using waitress:
+Production Deployment
+---------------------
+For production deployment with multiple workers:
 
 .. code:: Bash
 
     pip install waitress
-    waitress-serve --host=0.0.0.0 --port=4000 --threads=4 auth.main:app
+    waitress-serve --host=0.0.0.0 --port=4000 --threads=10 auth.main:app
 
-*******************
-Dockerizing
-*******************
-
-It's simple:
-
-.. code:: Bash
-
-    docker build -t python/auth-server .
-    docker run --name=auth -p 4000:4000 -d --restart=always python/auth-server
-
-*******************
-Copyright
-*******************
-
-- Farshid Ashouri `@RODMENA LIMITED <mailto:farsheed.ashouri@gmail.com>`_
-
-*******************
-Documentation
-*******************
-Feel free to dig into source code. If you think you can improve the documentation, please do so and send me a pull request.
-
-*******************
 Architecture
-*******************
+------------
+The system follows a layered architecture with clear separation of concerns:
+- API Layer: Flask-based REST endpoints with validation and rate limiting
+- Service Layer: Business logic with authorization rules
+- Data Layer: SQLAlchemy ORM with encryption support
+- Security Layer: JWT authentication, audit logging, and circuit breakers
 
-.. code-block:: mermaid
+The system is designed for high availability and can be deployed in containerized environments with load balancers for horizontal scaling.
 
-    graph TB
-        subgraph "Client Applications"
-            A["Application 1"]
-            B["Application 2"]
-            C["Application N"]
-        end
-
-        subgraph "Auth Service"
-            subgraph "API Layer"
-                D["Flask Routes"]
-                E["Request Validation"]
-                F["Response Handling"]
-            end
-
-            subgraph "Service Layer"
-                G["AuthorizationService"]
-                H["Permission Logic"]
-                I["Membership Logic"]
-            end
-
-            subgraph "Data Layer"
-                J["SQLAlchemy ORM"]
-                K["SQLite Database"]
-                L["Table Models"]
-            end
-        end
-
-        subgraph "External Systems"
-            M["Microservices"]
-            N["API Gateway"]
-            O["Monitoring Tools"]
-        end
-
-        A --> D
-        B --> D
-        C --> D
-        D --> G
-        E --> G
-        F --> G
-        G --> H
-        G --> I
-        G --> J
-        J --> K
-        J --> L
-        D --> M
-        D --> N
-        D --> O
-
-    style D fill:#e1f5fe
-    style G fill:#e8f5e8
-    style J fill:#fff3e0
-    style K fill:#ffebee
-
-**********************************
-Remote Access with reTunnel
-**********************************
-
-To securely expose your local Auth server to the internet without complex networking setup, we recommend using `reTunnel <https://retunnel.com>`_.
-
-**Installation:**
-
-.. code:: Bash
-
-    pip install retunnel
-
-**Usage:**
-
-To serve your local Auth server running on port 4000:
-
-.. code:: Bash
-
-    retunnel http 4000
-
-This will provide you with a secure public URL that forwards requests to your local Auth server.
-
-**Benefits of using reTunnel:**
-- No need to configure firewalls or expose ports directly
-- Secure encrypted tunnel
-- Easy to use with a simple command
-- No complex networking setup required
-- Perfect for testing and development
-
-**********
-To DO
-**********
-- Add Authentication features
-- Improve Code Coverage
-- Add support for additional database backends (PostgreSQL, MySQL)
-- Add OpenAPI documentation enhancements
-
-************************
-Unit Tests and Coverage
-************************
-Comprehensive test suite with pytest covering all functionality:
-
-.. code:: Bash
-
-    pytest
+Copyright
+---------
+Farshid Ashouri @RODMENA LIMITED

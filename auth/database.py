@@ -2,7 +2,6 @@
 SQLAlchemy database models and session management
 """
 
-import os
 import sqlite3
 from contextlib import contextmanager
 from typing import TYPE_CHECKING, Generator
@@ -26,27 +25,44 @@ if TYPE_CHECKING:
 
 from sqlalchemy.sql import func
 
+from auth.config import get_config
+from auth.encryption import decrypt_sensitive_data, encrypt_sensitive_data
+
 # Create base class for SQLAlchemy models
 Base = declarative_base()
 
-# Default database path - can be overridden by AUTH_DB_PATH environment variable
-default_db_path = os.path.expanduser("~/.auth.sqlite3")
-DB_PATH = os.environ.get("AUTH_DB_PATH", default_db_path)
+# Get database configuration
+config = get_config()
 
-# Create engine with connection pooling and SQLite optimizations
-engine = create_engine(
-    f"sqlite:///{DB_PATH}",
-    pool_pre_ping=True,
-    pool_recycle=300,  # Recycle connections after 5 minutes
-    pool_size=1,  # Connection pool size
-    max_overflow=0,  # Maximum overflow connections
-    isolation_level="SERIALIZABLE",  # Set serializable isolation level (highest for SQLite)
-    connect_args={
-        "check_same_thread": False,
-        "timeout": 30,  # Connection timeout in seconds
-        "detect_types": sqlite3.PARSE_DECLTYPES | sqlite3.PARSE_COLNAMES,
-    },
-)
+# Create engine with connection pooling and database-specific optimizations
+if config.database_type.value == "postgresql":
+    # PostgreSQL-specific engine configuration
+    engine = create_engine(
+        config.database_url,
+        pool_pre_ping=True,
+        pool_recycle=300,  # Recycle connections after 5 minutes
+        pool_size=5,  # Connection pool size
+        max_overflow=10,  # Maximum overflow connections
+        isolation_level="READ_COMMITTED",  # Default isolation level for PostgreSQL
+        connect_args={
+            "connect_timeout": 30,  # Connection timeout in seconds
+        },
+    )
+else:
+    # SQLite-specific engine configuration
+    engine = create_engine(
+        config.database_url,
+        pool_pre_ping=True,
+        pool_recycle=300,  # Recycle connections after 5 minutes
+        pool_size=1,  # Connection pool size
+        max_overflow=0,  # Maximum overflow connections
+        isolation_level="SERIALIZABLE",  # Set serializable isolation level (highest for SQLite)
+        connect_args={
+            "check_same_thread": False,
+            "timeout": 30,  # Connection timeout in seconds
+            "detect_types": sqlite3.PARSE_DECLTYPES | sqlite3.PARSE_COLNAMES,
+        },
+    )
 
 
 # Create session factory
@@ -80,7 +96,7 @@ class AuthGroup(Base):
     id = Column(Integer, primary_key=True, index=True)
     creator = Column(String(64), nullable=False, index=True)
     role = Column(String(32), nullable=False, index=True)
-    description = Column(String(256))
+    _description = Column("description", String(256))  # Encrypted description field
     is_active = Column(Boolean, default=True)
     date_created = Column(DateTime, default=func.now())
     modified = Column(DateTime, default=func.now(), onupdate=func.now())
@@ -100,6 +116,21 @@ class AuthGroup(Base):
         },
     )
 
+    @property
+    def description(self):
+        """Decrypt description when accessed"""
+        if self._description:
+            return decrypt_sensitive_data(self._description)
+        return None
+
+    @description.setter
+    def description(self, value):
+        """Encrypt description when set"""
+        if value:
+            self._description = encrypt_sensitive_data(value)
+        else:
+            self._description = value
+
 
 class AuthMembership(Base):
     """AuthMembership model for SQLAlchemy"""
@@ -107,7 +138,9 @@ class AuthMembership(Base):
     __tablename__ = "auth_membership"
 
     id = Column(Integer, primary_key=True, index=True)
-    user = Column(String(64), nullable=False, index=True)
+    _user = Column(
+        "user", String(64), nullable=False, index=True
+    )  # Potentially encrypted user field
     creator = Column(String(64), nullable=False, index=True)
     is_active = Column(Boolean, default=True)
     date_created = Column(DateTime, default=func.now())
@@ -125,6 +158,21 @@ class AuthMembership(Base):
         },
     )
 
+    @property
+    def user(self):
+        """Decrypt user when accessed"""
+        if self._user:
+            return decrypt_sensitive_data(self._user)
+        return None
+
+    @user.setter
+    def user(self, value):
+        """Encrypt user when set"""
+        if value:
+            self._user = encrypt_sensitive_data(value)
+        else:
+            self._user = value
+
 
 class AuthPermission(Base):
     """AuthPermission model for SQLAlchemy"""
@@ -132,7 +180,9 @@ class AuthPermission(Base):
     __tablename__ = "auth_permission"
 
     id = Column(Integer, primary_key=True, index=True)
-    name = Column(String(64), nullable=False, index=True)
+    _name = Column(
+        "name", String(64), nullable=False, index=True
+    )  # Potentially encrypted name field
     creator = Column(String(64), nullable=False, index=True)
     is_active = Column(Boolean, default=True)
     date_created = Column(DateTime, default=func.now())
@@ -149,6 +199,21 @@ class AuthPermission(Base):
             "sqlite_autoincrement": True,
         },
     )
+
+    @property
+    def name(self):
+        """Decrypt name when accessed"""
+        if self._name:
+            return decrypt_sensitive_data(self._name)
+        return None
+
+    @name.setter
+    def name(self, value):
+        """Encrypt name when set"""
+        if value:
+            self._name = encrypt_sensitive_data(value)
+        else:
+            self._name = value
 
 
 def create_tables():

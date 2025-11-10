@@ -6,3 +6,7 @@ mongoengine
 pytest
 pytest-cov
 waitress
+flask-limiter
+PyJWT
+cryptography
+APScheduler
