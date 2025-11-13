@@ -26,7 +26,7 @@ def test_roles_property(mock_make_db_connection):
         mock_auth_group.objects.return_value = mock_query
 
         auth = Authorization("test_client")
-        auth.roles
+        _ = auth.roles  # Ensure roles property is accessed
         mock_auth_group.objects.assert_called_with(creator="test_client")
         mock_query.only.assert_called_with("role")
 

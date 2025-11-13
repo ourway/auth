@@ -2,9 +2,9 @@
 Flask routes for authorization service
 """
 
-from flask import abort, jsonify, request
+from functools import wraps
 
-from contextlib import contextmanager
+from flask import abort, jsonify, request
 
 from auth.audit import AuditAction, log_audit_event
 from auth.database import SessionLocal, get_db
@@ -25,12 +25,11 @@ from auth.validation import (
 )
 
 
-from functools import wraps
-
 def with_db_session(route_func):
     """
     Decorator to provide a database session to route functions
     """
+
     @wraps(route_func)  # Preserve function metadata to avoid Flask endpoint conflicts
     def wrapper(*args, **kwargs):
         with get_db() as db:
@@ -39,6 +38,7 @@ def with_db_session(route_func):
             except Exception as e:
                 db.rollback()  # Rollback any failed transactions
                 raise e
+
     return wrapper
 
 
@@ -74,7 +74,7 @@ def _get_auth_service(db):
         abort(400, description=str(e))
 
 
-def register_routes(app, limiter=None):
+def register_routes(app):
     """Register all routes with the Flask app"""
 
     @app.route("/ping", methods=["GET"])
@@ -104,6 +104,7 @@ def register_routes(app, limiter=None):
             return APIResponse.bad_request(error_msg)
 
         from auth.database import get_db
+
         with get_db() as db:
             try:
                 auth_service = _get_auth_service(db)  # Use helper
@@ -982,28 +983,3 @@ def register_routes(app, limiter=None):
             return handle_exception(e)
         finally:
             db.close()
-
-    # Apply rate limiting if limiter is provided
-    if limiter:
-        # Apply rate limiting to API endpoints
-        ping = limiter.limit("100 per minute")(ping)
-        check_membership = limiter.limit("500 per hour")(check_membership)
-        add_membership = limiter.limit("200 per hour")(add_membership)
-        remove_membership = limiter.limit("200 per hour")(remove_membership)
-        check_permission = limiter.limit("500 per hour")(check_permission)
-        add_permission = limiter.limit("200 per hour")(add_permission)
-        remove_permission = limiter.limit("200 per hour")(remove_permission)
-        check_user_permission = limiter.limit("500 per hour")(check_user_permission)
-        get_user_permissions = limiter.limit("500 per hour")(get_user_permissions)
-        get_role_permissions = limiter.limit("500 per hour")(get_role_permissions)
-        get_user_roles = limiter.limit("500 per hour")(get_user_roles)
-        get_role_members = limiter.limit("500 per hour")(get_role_members)
-        list_roles = limiter.limit("500 per hour")(list_roles)
-        which_roles_can = limiter.limit("500 per hour")(which_roles_can)
-        which_users_can = limiter.limit("500 per hour")(which_users_can)
-        create_role = limiter.limit("200 per hour")(create_role)
-        delete_role = limiter.limit("200 per hour")(delete_role)
-        get_users_for_workflow = limiter.limit("500 per hour")(get_users_for_workflow)
-        check_user_workflow_permission = limiter.limit("500 per hour")(
-            check_user_workflow_permission
-        )

@@ -11,8 +11,6 @@ try:
     import os
 
     # Determine the project root directory based on the location of this file
-    import sys
-
     from dotenv import load_dotenv
 
     # Get the directory containing this config.py file
@@ -56,10 +54,6 @@ class Config:
         os.getenv("JWT_REFRESH_TOKEN_EXPIRE_DAYS", "7")
     )
 
-    # Rate limiting settings
-    rate_limit_default: str = os.getenv("RATE_LIMIT_DEFAULT", "1000 per hour")
-    rate_limit_storage_url: str = os.getenv("RATELIMIT_STORAGE_URL", "memory://")
-
     # Security settings
     allow_cors: bool = os.getenv("ALLOW_CORS", "true").lower() == "true"
     cors_origins: str = os.getenv("CORS_ORIGINS", "*")
@@ -92,6 +86,18 @@ class Config:
                 self.database_url = f"sqlite:///{self.sqlite_path}"
             elif self.database_type == DatabaseType.POSTGRESQL:
                 self.database_url = self.postgresql_url
+        else:
+            # If database_url is provided, detect database type from the URL
+            if (
+                self.database_url.startswith("postgresql://")
+                or self.database_url.startswith("postgresql+psycopg2://")
+                or self.database_url.startswith("postgresql+psycopg3://")
+                or self.database_url.startswith("postgresql+pg8000://")
+                or self.database_url.startswith("postgresql+asyncpg://")
+            ):
+                self.database_type = DatabaseType.POSTGRESQL
+            elif self.database_url.startswith("sqlite:///"):
+                self.database_type = DatabaseType.SQLITE
 
 
 # Global configuration instance

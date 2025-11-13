@@ -145,7 +145,9 @@ class EnhancedAuthClient:
             try:
                 return circuit_breaker("api_call")(request_func)()
             except Exception as e:
-                raise ConnectionError(f"Circuit breaker prevented request: {str(e)}")
+                raise ConnectionError(
+                    f"Circuit breaker prevented request: {str(e)}"
+                ) from e
         else:
             return request_func()
 

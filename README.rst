@@ -9,7 +9,7 @@ Features
 - JWT-based authentication and authorization
 - Comprehensive audit logging for security compliance
 - Database encryption for sensitive data protection
-- Rate limiting and circuit breaker resilience patterns
+
 - PostgreSQL and SQLite support
 - API versioning and consistent response formats
 - APScheduler integration for workflow permission checking
@@ -46,7 +46,7 @@ To configure the server with PostgreSQL, set the following environment variables
     export JWT_SECRET_KEY=your_secure_secret_key
     export ENABLE_ENCRYPTION=true
     export ENCRYPTION_KEY=your_encryption_key
-    export RATE_LIMIT_DEFAULT=500 per hour
+
 
 Then start the server:
 
@@ -107,8 +107,7 @@ Environment Variables
 - ``JWT_ACCESS_TOKEN_EXPIRE_MINUTES`` - Token expiration [default: 1440]
 - ``ENABLE_ENCRYPTION`` - Enable data encryption [default: false]
 - ``ENCRYPTION_KEY`` - Encryption key [required if encryption enabled]
-- ``RATE_LIMIT_DEFAULT`` - Default rate limit [default: 1000 per hour]
-- ``RATELIMIT_STORAGE_URL`` - Rate limiting storage backend (redis://localhost:6379 for Redis, memory:// for in-memory) [default: memory://]
+
 - ``SERVER_HOST`` - Server host [default: 0.0.0.0]
 - ``SERVER_PORT`` - Server port [default: 4000]
 - ``ALLOW_CORS`` - Enable CORS [default: true]
@@ -125,32 +124,16 @@ For production deployment with multiple workers:
 
 Docker Deployment
 -----------------
-To run with default configuration (SQLite database, memory-based rate limiting):
+To run with default configuration:
 
 .. code:: Bash
 
     docker-compose up
 
-To run with Redis for rate limiting (recommended for production):
-
-.. code:: Bash
-
-    docker-compose -f docker-compose.redis.yml up
-
-Rate Limiting with Redis
-------------------------
-To use Redis for rate limiting (recommended for production), set the ``RATELIMIT_STORAGE_URL`` environment variable:
-
-.. code:: Bash
-
-    export RATELIMIT_STORAGE_URL=redis://localhost:6379
-
-This provides better performance and allows rate limits to be shared across multiple server instances. If not specified, the system defaults to in-memory rate limiting which is not recommended for production use.
-
 Architecture
 ------------
 The system follows a layered architecture with clear separation of concerns:
-- API Layer: Flask-based REST endpoints with validation and rate limiting
+- API Layer: Flask-based REST endpoints with validation
 - Service Layer: Business logic with authorization rules
 - Data Layer: SQLAlchemy ORM with encryption support
 - Security Layer: JWT authentication, audit logging, and circuit breakers

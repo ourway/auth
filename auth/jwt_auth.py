@@ -3,6 +3,7 @@ JWT-based authentication and authorization for the authorization system
 """
 
 import datetime
+import os
 from typing import Any, Dict, Optional
 
 import jwt
@@ -100,7 +101,6 @@ class JWTAuth:
 
 
 # Initialize JWT auth with a default secret key (should be configured via environment in production)
-import os
 
 JWT_SECRET_KEY = os.getenv("JWT_SECRET_KEY", "default_secret_key_for_development")
 jwt_auth = JWTAuth(JWT_SECRET_KEY)

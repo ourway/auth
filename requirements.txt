@@ -6,10 +6,10 @@ mongoengine
 pytest
 pytest-cov
 waitress
-flask-limiter
+
 PyJWT
 cryptography
 APScheduler
-psycopg2-binary
-redis
+psycopg3[binary]
+
 python-dotenv

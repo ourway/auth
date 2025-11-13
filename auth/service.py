@@ -175,7 +175,9 @@ class AuthorizationService:
             return True
 
         try:
-            new_group = AuthGroup(creator=self.client, role=role, description=description)
+            new_group = AuthGroup(
+                creator=self.client, role=role, description=description
+            )
             self.db.add(new_group)
             self.db.commit()
         except Exception:
@@ -191,7 +193,7 @@ class AuthorizationService:
             if existing:
                 return True  # Role already exists
             return False  # Failed to create role
-        
+
         return True
 
     def del_role(self, role: str) -> bool:
@@ -242,7 +244,10 @@ class AuthorizationService:
                 # Try to get the membership again in case it was created by another transaction
                 membership = (
                     self.db.query(AuthMembership)
-                    .filter(AuthMembership.creator == self.client, AuthMembership.user == user)
+                    .filter(
+                        AuthMembership.creator == self.client,
+                        AuthMembership.user == user,
+                    )
                     .first()
                 )
                 if not membership:

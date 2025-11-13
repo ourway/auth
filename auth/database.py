@@ -25,7 +25,7 @@ if TYPE_CHECKING:
 
 from sqlalchemy.sql import func
 
-from auth.config import get_config
+from auth.config import DatabaseType, get_config
 from auth.encryption import decrypt_sensitive_data, encrypt_sensitive_data
 
 # Create base class for SQLAlchemy models
@@ -35,18 +35,31 @@ Base = declarative_base()
 config = get_config()
 
 # Create engine with connection pooling and database-specific optimizations
-if config.database_type.value == "postgresql":
-    # PostgreSQL-specific engine configuration
+if config.database_type == DatabaseType.POSTGRESQL:
+    # PostgreSQL-specific engine configuration with psycopg3 optimizations
+    connect_args = {
+        "connect_timeout": 30,  # Connection timeout in seconds
+        "application_name": "auth_server",  # Application name for monitoring
+        # Additional psycopg3-specific options can go here
+    }
+
+    # Add SSL mode if not using localhost (for security)
+    if (
+        "localhost" not in config.database_url
+        and "127.0.0.1" not in config.database_url
+    ):
+        connect_args["sslmode"] = "require"
+
     engine = create_engine(
         config.database_url,
         pool_pre_ping=True,
         pool_recycle=300,  # Recycle connections after 5 minutes
-        pool_size=5,  # Connection pool size
-        max_overflow=10,  # Maximum overflow connections
+        pool_size=10,  # Increased pool size for better performance
+        max_overflow=20,  # Maximum overflow connections
+        pool_timeout=30,  # Timeout for getting connection from pool
+        echo=False,  # Set to True to log SQL queries (useful for debugging)
         isolation_level="READ_COMMITTED",  # Default isolation level for PostgreSQL
-        connect_args={
-            "connect_timeout": 30,  # Connection timeout in seconds
-        },
+        connect_args=connect_args,
     )
 else:
     # SQLite-specific engine configuration
@@ -222,25 +235,26 @@ def create_tables():
 
     from sqlalchemy.exc import OperationalError
 
-    # Apply SQLite optimizations
-    try:
-        with engine.connect() as conn:
-            # Enable WAL mode for better concurrency
-            conn.execute(text("PRAGMA journal_mode=WAL"))
-            # Enable synchronous NORMAL for better performance
-            conn.execute(text("PRAGMA synchronous=ON"))
-            # Increase cache size (64MB)
-            conn.execute(
-                text("PRAGMA cache_size=-65536")
-            )  # Negative value indicates KB
-            # Enable foreign key constraints
-            conn.execute(text("PRAGMA foreign_keys=ON"))
-            # Optimize query planner
-            conn.execute(text("PRAGMA optimize"))
-            conn.commit()
-    except (OperationalError, sqlite3.OperationalError):
-        # It's ok if optimizations fail due to concurrent access
-        pass
+    # Apply SQLite-specific optimizations only for SQLite database
+    if config.database_type == DatabaseType.SQLITE:
+        try:
+            with engine.connect() as conn:
+                # Enable WAL mode for better concurrency
+                conn.execute(text("PRAGMA journal_mode=WAL"))
+                # Enable synchronous NORMAL for better performance
+                conn.execute(text("PRAGMA synchronous=ON"))
+                # Increase cache size (64MB)
+                conn.execute(
+                    text("PRAGMA cache_size=-65536")
+                )  # Negative value indicates KB
+                # Enable foreign key constraints
+                conn.execute(text("PRAGMA foreign_keys=ON"))
+                # Optimize query planner
+                conn.execute(text("PRAGMA optimize"))
+                conn.commit()
+        except (OperationalError, sqlite3.OperationalError):
+            # It's ok if optimizations fail due to concurrent access
+            pass
 
     # Create tables
     try:

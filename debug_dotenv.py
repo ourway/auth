@@ -1,5 +1,7 @@
 import os
 
+from dotenv import load_dotenv
+
 # Debug the .env file loading with auth/config.py path
 print("Current file:", __file__)
 print("Current dir:", os.path.dirname(os.path.abspath(__file__)))
@@ -17,7 +19,5 @@ print("Does .env exist?", os.path.exists(os.path.join(project_root, ".env")))
 print("Does test.env exist?", os.path.exists(os.path.join(project_root, "test.env")))
 
 # Try to load dotenv and check values
-from dotenv import load_dotenv
 
 load_dotenv(os.path.join(project_root, ".env"))
-print("After loading .env, RATELIMIT_STORAGE_URL:", os.getenv("RATELIMIT_STORAGE_URL"))
