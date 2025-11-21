@@ -18,7 +18,8 @@ def validate_client_key(client_key: str) -> bool:
     """
     if not isinstance(client_key, str):
         return False
-    return bool(CLIENT_KEY_PATTERN.match(client_key))
+    match_result = CLIENT_KEY_PATTERN.match(client_key)
+    return bool(match_result)
 
 
 def validate_user_name(user_name: str) -> bool:
@@ -27,7 +28,8 @@ def validate_user_name(user_name: str) -> bool:
     """
     if not isinstance(user_name, str):
         return False
-    return bool(USER_ROLE_NAME_PATTERN.match(user_name))
+    match_result = USER_ROLE_NAME_PATTERN.match(user_name)
+    return bool(match_result)
 
 
 def validate_role_name(role_name: str) -> bool:
@@ -36,7 +38,8 @@ def validate_role_name(role_name: str) -> bool:
     """
     if not isinstance(role_name, str):
         return False
-    return bool(USER_ROLE_NAME_PATTERN.match(role_name))
+    match_result = USER_ROLE_NAME_PATTERN.match(role_name)
+    return bool(match_result)
 
 
 def validate_permission_name(permission_name: str) -> bool:
@@ -47,7 +50,8 @@ def validate_permission_name(permission_name: str) -> bool:
         return False
     # Permission names can include more characters than role names
     pattern = re.compile(r"^[a-zA-Z0-9_-]{1,128}$")
-    return bool(pattern.match(permission_name))
+    match_result = pattern.match(permission_name)
+    return bool(match_result)
 
 
 def sanitize_input(input_str: str) -> str:

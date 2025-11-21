@@ -2,7 +2,7 @@
 Consistent error handling and response formatting for the authorization system
 """
 
-from typing import Any, Dict, Optional
+from typing import Any, Dict, Optional, Tuple
 
 from flask import Response, jsonify
 
@@ -13,7 +13,7 @@ class APIResponse:
     @staticmethod
     def success(
         data: Any = None, message: str = "Success", code: int = 200
-    ) -> Response:
+    ) -> Tuple[Response, int]:
         """Create a standardized success response"""
         response_data = {
             "success": True,
@@ -27,7 +27,7 @@ class APIResponse:
     @staticmethod
     def error(
         message: str, code: int = 400, details: Optional[Dict] = None
-    ) -> Response:
+    ) -> Tuple[Response, int]:
         """Create a standardized error response"""
         response_data = {
             "success": False,
@@ -41,7 +41,7 @@ class APIResponse:
     @staticmethod
     def not_found(
         item_type: str = "Resource", item_id: Optional[str] = None
-    ) -> Response:
+    ) -> Tuple[Response, int]:
         """Create a standardized not found response"""
         message = f"{item_type} not found"
         if item_id:
@@ -50,27 +50,27 @@ class APIResponse:
         return APIResponse.error(message, 404)
 
     @staticmethod
-    def unauthorized(message: str = "Unauthorized access") -> Response:
+    def unauthorized(message: str = "Unauthorized access") -> Tuple[Response, int]:
         """Create a standardized unauthorized response"""
         return APIResponse.error(message, 401)
 
     @staticmethod
-    def forbidden(message: str = "Forbidden access") -> Response:
+    def forbidden(message: str = "Forbidden access") -> Tuple[Response, int]:
         """Create a standardized forbidden response"""
         return APIResponse.error(message, 403)
 
     @staticmethod
-    def bad_request(message: str = "Bad request") -> Response:
+    def bad_request(message: str = "Bad request") -> Tuple[Response, int]:
         """Create a standardized bad request response"""
         return APIResponse.error(message, 400)
 
     @staticmethod
-    def server_error(message: str = "Internal server error") -> Response:
+    def server_error(message: str = "Internal server error") -> Tuple[Response, int]:
         """Create a standardized server error response"""
         return APIResponse.error(message, 500)
 
 
-def handle_exception(e: Exception) -> Response:
+def handle_exception(e: Exception) -> Tuple[Response, int]:
     """Handle exceptions and return appropriate error response"""
     import traceback
 

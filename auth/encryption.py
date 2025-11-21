@@ -9,7 +9,7 @@ from cryptography.fernet import Fernet
 from cryptography.hazmat.primitives import hashes
 from cryptography.hazmat.primitives.kdf.pbkdf2 import PBKDF2HMAC
 
-from auth.config import get_config
+from auth.config import get_settings
 
 
 class DataEncryption:
@@ -20,7 +20,7 @@ class DataEncryption:
         Initialize with a password. If no password is provided, uses the one from config
         """
         if password is None:
-            config = get_config()
+            config = get_settings()
             password = config.encryption_key
 
         if not password:
@@ -57,8 +57,11 @@ class DataEncryption:
 class FieldEncryption:
     """Handles encryption of individual database fields"""
 
+    encryptor: Optional[DataEncryption]
+    enabled: bool
+
     def __init__(self):
-        config = get_config()
+        config = get_settings()
         if config.enable_encryption and config.encryption_key:
             self.encryptor = DataEncryption(config.encryption_key)
             self.enabled = True
@@ -68,7 +71,7 @@ class FieldEncryption:
 
     def encrypt_field(self, field_value: Optional[str]) -> Optional[str]:
         """Encrypt a field value if encryption is enabled"""
-        if not self.enabled or not field_value:
+        if not self.enabled or not field_value or self.encryptor is None:
             return field_value
 
         try:
@@ -79,7 +82,7 @@ class FieldEncryption:
 
     def decrypt_field(self, encrypted_value: Optional[str]) -> Optional[str]:
         """Decrypt a field value if encryption is enabled"""
-        if not self.enabled or not encrypted_value:
+        if not self.enabled or not encrypted_value or self.encryptor is None:
             return encrypted_value
 
         try:

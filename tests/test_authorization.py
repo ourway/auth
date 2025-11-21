@@ -2,10 +2,10 @@ from unittest.mock import Mock, patch
 
 from mongoengine.errors import NotUniqueError
 
-from auth.CAS.authorization import Authorization
+from auth.dal.authorization import Authorization
 
 
-@patch("auth.CAS.authorization.make_db_connection")
+@patch("auth.dal.authorization.make_db_connection")
 def test_authorization_init(mock_make_db_connection):
     """Test Authorization class initialization"""
     auth = Authorization("test_client")
@@ -14,12 +14,12 @@ def test_authorization_init(mock_make_db_connection):
     mock_make_db_connection.assert_called_once()
 
 
-@patch("auth.CAS.authorization.make_db_connection")
+@patch("auth.dal.authorization.make_db_connection")
 def test_roles_property(mock_make_db_connection):
     """Test roles property"""
 
     # Mock the AuthGroup query
-    with patch("auth.CAS.authorization.AuthGroup") as mock_auth_group:
+    with patch("auth.dal.authorization.AuthGroup") as mock_auth_group:
         mock_query = Mock()
         mock_query.only.return_value = Mock()
         mock_query.only.return_value.to_json.return_value = '[{"role": "admin"}]'
@@ -31,14 +31,14 @@ def test_roles_property(mock_make_db_connection):
         mock_query.only.assert_called_with("role")
 
 
-@patch("auth.CAS.authorization.make_db_connection")
+@patch("auth.dal.authorization.make_db_connection")
 def test_get_permissions(mock_make_db_connection):
     """Test get_permissions method"""
     auth = Authorization("test_client")
 
     with (
-        patch("auth.CAS.authorization.AuthGroup") as mock_auth_group,
-        patch("auth.CAS.authorization.AuthPermission") as mock_auth_permission,
+        patch("auth.dal.authorization.AuthGroup") as mock_auth_group,
+        patch("auth.dal.authorization.AuthPermission") as mock_auth_permission,
     ):
         mock_group = Mock()
         mock_group_query = Mock()
@@ -61,12 +61,12 @@ def test_get_permissions(mock_make_db_connection):
         )
 
 
-@patch("auth.CAS.authorization.make_db_connection")
+@patch("auth.dal.authorization.make_db_connection")
 def test_get_user_permissions(mock_make_db_connection):
     """Test get_user_permissions method"""
     auth = Authorization("test_client")
 
-    with patch("auth.CAS.authorization.AuthMembership") as mock_auth_membership:
+    with patch("auth.dal.authorization.AuthMembership") as mock_auth_membership:
         # Mock membership query result
         mock_membership = Mock()
         mock_membership.groups = [Mock(role="admin")]
@@ -75,7 +75,7 @@ def test_get_user_permissions(mock_make_db_connection):
         mock_membership_query.only.return_value = [mock_membership]
         mock_auth_membership.objects.return_value = mock_membership_query
 
-        with patch("auth.CAS.authorization.AuthPermission") as mock_auth_permission:
+        with patch("auth.dal.authorization.AuthPermission") as mock_auth_permission:
             mock_permission = Mock()
             mock_permission.name = "read"
             mock_permission_query = Mock()
@@ -88,12 +88,12 @@ def test_get_user_permissions(mock_make_db_connection):
             assert permissions[0]["name"] == "read"
 
 
-@patch("auth.CAS.authorization.make_db_connection")
+@patch("auth.dal.authorization.make_db_connection")
 def test_get_user_roles(mock_make_db_connection):
     """Test get_user_roles method"""
     auth = Authorization("test_client")
 
-    with patch("auth.CAS.authorization.AuthMembership") as mock_auth_membership:
+    with patch("auth.dal.authorization.AuthMembership") as mock_auth_membership:
         # Mock membership query result
         mock_membership = Mock()
         mock_membership.groups = [Mock(role="admin")]
@@ -108,14 +108,14 @@ def test_get_user_roles(mock_make_db_connection):
         assert roles[0]["role"] == "admin"
 
 
-@patch("auth.CAS.authorization.make_db_connection")
+@patch("auth.dal.authorization.make_db_connection")
 def test_get_role_members(mock_make_db_connection):
     """Test get_role_members method"""
     auth = Authorization("test_client")
 
     with (
-        patch("auth.CAS.authorization.AuthGroup") as mock_auth_group,
-        patch("auth.CAS.authorization.AuthMembership") as mock_auth_membership,
+        patch("auth.dal.authorization.AuthGroup") as mock_auth_group,
+        patch("auth.dal.authorization.AuthMembership") as mock_auth_membership,
     ):
         mock_group_query = Mock()
         mock_group_query.only.return_value = [Mock(role="admin", id=1)]
@@ -134,12 +134,12 @@ def test_get_role_members(mock_make_db_connection):
         mock_auth_group.objects.assert_called_with(creator="test_client", role="admin")
 
 
-@patch("auth.CAS.authorization.make_db_connection")
+@patch("auth.dal.authorization.make_db_connection")
 def test_which_roles_can(mock_make_db_connection):
     """Test which_roles_can method"""
     auth = Authorization("test_client")
 
-    with patch("auth.CAS.authorization.AuthPermission") as mock_auth_permission:
+    with patch("auth.dal.authorization.AuthPermission") as mock_auth_permission:
         mock_permission = Mock()
         mock_permission.groups = [Mock(role="admin")]
         mock_permission_query = Mock()
@@ -152,7 +152,7 @@ def test_which_roles_can(mock_make_db_connection):
         assert roles[0]["role"] == "admin"
 
 
-@patch("auth.CAS.authorization.make_db_connection")
+@patch("auth.dal.authorization.make_db_connection")
 def test_which_users_can(mock_make_db_connection):
     """Test which_users_can method"""
     auth = Authorization("test_client")
@@ -172,12 +172,12 @@ def test_which_users_can(mock_make_db_connection):
         mock_get_members.assert_called_with("admin")
 
 
-@patch("auth.CAS.authorization.make_db_connection")
+@patch("auth.dal.authorization.make_db_connection")
 def test_get_role(mock_make_db_connection):
     """Test get_role method"""
     auth = Authorization("test_client")
 
-    with patch("auth.CAS.authorization.AuthGroup") as mock_auth_group:
+    with patch("auth.dal.authorization.AuthGroup") as mock_auth_group:
         mock_group = Mock()
         mock_group_query = Mock()
         mock_group_query.first.return_value = mock_group
@@ -189,12 +189,12 @@ def test_get_role(mock_make_db_connection):
         mock_auth_group.objects.assert_called_with(role="admin", creator="test_client")
 
 
-@patch("auth.CAS.authorization.make_db_connection")
+@patch("auth.dal.authorization.make_db_connection")
 def test_add_role_success(mock_make_db_connection):
     """Test add_role method success"""
     auth = Authorization("test_client")
 
-    with patch("auth.CAS.authorization.AuthGroup") as mock_auth_group:
+    with patch("auth.dal.authorization.AuthGroup") as mock_auth_group:
         mock_group_instance = Mock()
         mock_auth_group.return_value = mock_group_instance
 
@@ -204,12 +204,12 @@ def test_add_role_success(mock_make_db_connection):
         mock_group_instance.save.assert_called_once()
 
 
-@patch("auth.CAS.authorization.make_db_connection")
+@patch("auth.dal.authorization.make_db_connection")
 def test_add_role_duplicate(mock_make_db_connection):
     """Test add_role method with duplicate error"""
     auth = Authorization("test_client")
 
-    with patch("auth.CAS.authorization.AuthGroup") as mock_auth_group:
+    with patch("auth.dal.authorization.AuthGroup") as mock_auth_group:
         mock_group_instance = Mock()
         mock_group_instance.save.side_effect = NotUniqueError()
         mock_auth_group.return_value = mock_group_instance
@@ -219,12 +219,12 @@ def test_add_role_duplicate(mock_make_db_connection):
         assert result is False
 
 
-@patch("auth.CAS.authorization.make_db_connection")
+@patch("auth.dal.authorization.make_db_connection")
 def test_del_role_success(mock_make_db_connection):
     """Test del_role method success"""
     auth = Authorization("test_client")
 
-    with patch("auth.CAS.authorization.AuthGroup") as mock_auth_group:
+    with patch("auth.dal.authorization.AuthGroup") as mock_auth_group:
         mock_group = Mock()
         mock_group_query = Mock()
         mock_group_query.first.return_value = mock_group
@@ -236,12 +236,12 @@ def test_del_role_success(mock_make_db_connection):
         mock_group.delete.assert_called_once()
 
 
-@patch("auth.CAS.authorization.make_db_connection")
+@patch("auth.dal.authorization.make_db_connection")
 def test_del_role_not_found(mock_make_db_connection):
     """Test del_role method when role not found"""
     auth = Authorization("test_client")
 
-    with patch("auth.CAS.authorization.AuthGroup") as mock_auth_group:
+    with patch("auth.dal.authorization.AuthGroup") as mock_auth_group:
         mock_group_query = Mock()
         mock_group_query.first.return_value = None
         mock_auth_group.objects.return_value = mock_group_query
@@ -251,14 +251,14 @@ def test_del_role_not_found(mock_make_db_connection):
         assert result is False
 
 
-@patch("auth.CAS.authorization.make_db_connection")
+@patch("auth.dal.authorization.make_db_connection")
 def test_add_membership_new_user(mock_make_db_connection):
     """Test add_membership for a new user"""
     auth = Authorization("test_client")
 
     with (
-        patch("auth.CAS.authorization.AuthGroup") as mock_auth_group,
-        patch("auth.CAS.authorization.AuthMembership") as mock_auth_membership,
+        patch("auth.dal.authorization.AuthGroup") as mock_auth_group,
+        patch("auth.dal.authorization.AuthMembership") as mock_auth_membership,
     ):
 
         # Mock group exists
@@ -284,14 +284,14 @@ def test_add_membership_new_user(mock_make_db_connection):
         new_membership.save.assert_called()
 
 
-@patch("auth.CAS.authorization.make_db_connection")
+@patch("auth.dal.authorization.make_db_connection")
 def test_add_membership_existing_user(mock_make_db_connection):
     """Test add_membership for an existing user"""
     auth = Authorization("test_client")
 
     with (
-        patch("auth.CAS.authorization.AuthGroup") as mock_auth_group,
-        patch("auth.CAS.authorization.AuthMembership") as mock_auth_membership,
+        patch("auth.dal.authorization.AuthGroup") as mock_auth_group,
+        patch("auth.dal.authorization.AuthMembership") as mock_auth_membership,
     ):
 
         # Mock group exists
@@ -312,15 +312,15 @@ def test_add_membership_existing_user(mock_make_db_connection):
         assert result is True
 
 
-@patch("auth.CAS.authorization.make_db_connection")
+@patch("auth.dal.authorization.make_db_connection")
 def test_del_membership_success(mock_make_db_connection):
     """Test del_membership method success"""
     auth = Authorization("test_client")
 
     with (
         patch.object(auth, "has_membership") as mock_has_membership,
-        patch("auth.CAS.authorization.AuthMembership") as mock_auth_membership,
-        patch("auth.CAS.authorization.AuthGroup") as mock_auth_group,
+        patch("auth.dal.authorization.AuthMembership") as mock_auth_membership,
+        patch("auth.dal.authorization.AuthGroup") as mock_auth_group,
     ):
 
         mock_has_membership.return_value = True
@@ -342,7 +342,7 @@ def test_del_membership_success(mock_make_db_connection):
         assert result is True
 
 
-@patch("auth.CAS.authorization.make_db_connection")
+@patch("auth.dal.authorization.make_db_connection")
 def test_del_membership_not_exists(mock_make_db_connection):
     """Test del_membership method when membership doesn't exist"""
     auth = Authorization("test_client")
@@ -355,12 +355,12 @@ def test_del_membership_not_exists(mock_make_db_connection):
         assert result is True  # Returns True if doesn't exist
 
 
-@patch("auth.CAS.authorization.make_db_connection")
+@patch("auth.dal.authorization.make_db_connection")
 def test_has_membership_success(mock_make_db_connection):
     """Test has_membership method success"""
     auth = Authorization("test_client")
 
-    with patch("auth.CAS.authorization.AuthMembership") as mock_auth_membership:
+    with patch("auth.dal.authorization.AuthMembership") as mock_auth_membership:
         mock_membership = Mock()
         mock_membership.groups = [Mock(role="admin")]
         mock_membership_query = Mock()
@@ -372,12 +372,12 @@ def test_has_membership_success(mock_make_db_connection):
         assert result is True
 
 
-@patch("auth.CAS.authorization.make_db_connection")
+@patch("auth.dal.authorization.make_db_connection")
 def test_has_membership_not_found(mock_make_db_connection):
     """Test has_membership method not found"""
     auth = Authorization("test_client")
 
-    with patch("auth.CAS.authorization.AuthMembership") as mock_auth_membership:
+    with patch("auth.dal.authorization.AuthMembership") as mock_auth_membership:
         mock_membership_query = Mock()
         mock_membership_query.first.return_value = None
         mock_auth_membership.objects.return_value = mock_membership_query
@@ -387,15 +387,15 @@ def test_has_membership_not_found(mock_make_db_connection):
         assert result is False
 
 
-@patch("auth.CAS.authorization.make_db_connection")
+@patch("auth.dal.authorization.make_db_connection")
 def test_add_permission_success(mock_make_db_connection):
     """Test add_permission method success"""
     auth = Authorization("test_client")
 
     with (
         patch.object(auth, "has_permission") as mock_has_permission,
-        patch("auth.CAS.authorization.AuthGroup") as mock_auth_group,
-        patch("auth.CAS.authorization.AuthPermission") as mock_auth_permission,
+        patch("auth.dal.authorization.AuthGroup") as mock_auth_group,
+        patch("auth.dal.authorization.AuthPermission") as mock_auth_permission,
     ):
 
         mock_has_permission.return_value = False  # Permission doesn't exist yet
@@ -413,7 +413,7 @@ def test_add_permission_success(mock_make_db_connection):
         assert result is True
 
 
-@patch("auth.CAS.authorization.make_db_connection")
+@patch("auth.dal.authorization.make_db_connection")
 def test_add_permission_already_exists(mock_make_db_connection):
     """Test add_permission method when permission already exists"""
     auth = Authorization("test_client")
@@ -426,15 +426,15 @@ def test_add_permission_already_exists(mock_make_db_connection):
         assert result is True
 
 
-@patch("auth.CAS.authorization.make_db_connection")
+@patch("auth.dal.authorization.make_db_connection")
 def test_del_permission_success(mock_make_db_connection):
     """Test del_permission method success"""
     auth = Authorization("test_client")
 
     with (
         patch.object(auth, "has_permission") as mock_has_permission,
-        patch("auth.CAS.authorization.AuthGroup") as mock_auth_group,
-        patch("auth.CAS.authorization.AuthPermission") as mock_auth_permission,
+        patch("auth.dal.authorization.AuthGroup") as mock_auth_group,
+        patch("auth.dal.authorization.AuthPermission") as mock_auth_permission,
     ):
 
         mock_has_permission.return_value = True
@@ -455,14 +455,14 @@ def test_del_permission_success(mock_make_db_connection):
         mock_permission.delete.assert_called_once()
 
 
-@patch("auth.CAS.authorization.make_db_connection")
+@patch("auth.dal.authorization.make_db_connection")
 def test_has_permission_success(mock_make_db_connection):
     """Test has_permission method success"""
     auth = Authorization("test_client")
 
     with (
-        patch("auth.CAS.authorization.AuthGroup") as mock_auth_group,
-        patch("auth.CAS.authorization.AuthPermission") as mock_auth_permission,
+        patch("auth.dal.authorization.AuthGroup") as mock_auth_group,
+        patch("auth.dal.authorization.AuthPermission") as mock_auth_permission,
     ):
 
         mock_group = Mock()
@@ -480,12 +480,12 @@ def test_has_permission_success(mock_make_db_connection):
         assert result is True
 
 
-@patch("auth.CAS.authorization.make_db_connection")
+@patch("auth.dal.authorization.make_db_connection")
 def test_user_has_permission_success(mock_make_db_connection):
     """Test user_has_permission method success"""
     auth = Authorization("test_client")
 
-    with patch("auth.CAS.authorization.AuthMembership") as mock_auth_membership:
+    with patch("auth.dal.authorization.AuthMembership") as mock_auth_membership:
         mock_membership = Mock()
         mock_membership.groups = [Mock(role="admin")]
         mock_membership_query = Mock()

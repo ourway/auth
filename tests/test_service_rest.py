@@ -1,6 +1,6 @@
 from unittest.mock import patch
 
-from auth.CAS.REST.service import app
+from auth.services.rest_service import app
 
 # Create a test client for the Flask app
 client = app.test_client()
@@ -15,7 +15,7 @@ def test_ping_endpoint():
 
 def test_get_membership():
     """Test getting membership"""
-    with patch("auth.CAS.REST.service.Authorization") as mock_auth:
+    with patch("auth.services.rest_service.Authorization") as mock_auth:
         mock_auth_instance = mock_auth.return_value
         mock_auth_instance.has_membership.return_value = True
 
@@ -28,7 +28,7 @@ def test_get_membership():
 
 def test_add_membership():
     """Test adding membership"""
-    with patch("auth.CAS.REST.service.Authorization") as mock_auth:
+    with patch("auth.services.rest_service.Authorization") as mock_auth:
         mock_auth_instance = mock_auth.return_value
         mock_auth_instance.add_membership.return_value = True
 
@@ -41,7 +41,7 @@ def test_add_membership():
 
 def test_delete_membership():
     """Test deleting membership"""
-    with patch("auth.CAS.REST.service.Authorization") as mock_auth:
+    with patch("auth.services.rest_service.Authorization") as mock_auth:
         mock_auth_instance = mock_auth.return_value
         mock_auth_instance.del_membership.return_value = True
 
@@ -54,7 +54,7 @@ def test_delete_membership():
 
 def test_get_permission():
     """Test getting permission"""
-    with patch("auth.CAS.REST.service.Authorization") as mock_auth:
+    with patch("auth.services.rest_service.Authorization") as mock_auth:
         mock_auth_instance = mock_auth.return_value
         mock_auth_instance.has_permission.return_value = True
 
@@ -67,7 +67,7 @@ def test_get_permission():
 
 def test_add_permission():
     """Test adding permission"""
-    with patch("auth.CAS.REST.service.Authorization") as mock_auth:
+    with patch("auth.services.rest_service.Authorization") as mock_auth:
         mock_auth_instance = mock_auth.return_value
         mock_auth_instance.add_permission.return_value = True
 
@@ -80,7 +80,7 @@ def test_add_permission():
 
 def test_delete_permission():
     """Test deleting permission"""
-    with patch("auth.CAS.REST.service.Authorization") as mock_auth:
+    with patch("auth.services.rest_service.Authorization") as mock_auth:
         mock_auth_instance = mock_auth.return_value
         mock_auth_instance.del_permission.return_value = True
 
@@ -93,7 +93,7 @@ def test_delete_permission():
 
 def test_user_has_permission():
     """Test user has permission"""
-    with patch("auth.CAS.REST.service.Authorization") as mock_auth:
+    with patch("auth.services.rest_service.Authorization") as mock_auth:
         mock_auth_instance = mock_auth.return_value
         mock_auth_instance.user_has_permission.return_value = True
 
@@ -108,7 +108,7 @@ def test_user_has_permission():
 
 def test_get_user_permissions():
     """Test getting user permissions"""
-    with patch("auth.CAS.REST.service.Authorization") as mock_auth:
+    with patch("auth.services.rest_service.Authorization") as mock_auth:
         mock_auth_instance = mock_auth.return_value
         mock_auth_instance.get_user_permissions.return_value = ["perm1", "perm2"]
 
@@ -121,7 +121,7 @@ def test_get_user_permissions():
 
 def test_get_role_permissions():
     """Test getting role permissions"""
-    with patch("auth.CAS.REST.service.Authorization") as mock_auth:
+    with patch("auth.services.rest_service.Authorization") as mock_auth:
         mock_auth_instance = mock_auth.return_value
         mock_auth_instance.get_permissions.return_value = ["perm1", "perm2"]
 
@@ -134,7 +134,7 @@ def test_get_role_permissions():
 
 def test_get_user_roles():
     """Test getting user roles"""
-    with patch("auth.CAS.REST.service.Authorization") as mock_auth:
+    with patch("auth.services.rest_service.Authorization") as mock_auth:
         mock_auth_instance = mock_auth.return_value
         mock_auth_instance.get_user_roles.return_value = ["role1", "role2"]
 
@@ -147,7 +147,7 @@ def test_get_user_roles():
 
 def test_get_role_members():
     """Test getting role members"""
-    with patch("auth.CAS.REST.service.Authorization") as mock_auth:
+    with patch("auth.services.rest_service.Authorization") as mock_auth:
         mock_auth_instance = mock_auth.return_value
         mock_auth_instance.get_role_members.return_value = ["user1", "user2"]
 
@@ -160,7 +160,7 @@ def test_get_role_members():
 
 def test_list_roles():
     """Test listing roles"""
-    with patch("auth.CAS.REST.service.Authorization") as mock_auth:
+    with patch("auth.services.rest_service.Authorization") as mock_auth:
         mock_auth_instance = mock_auth.return_value
         mock_auth_instance.roles = ["role1", "role2"]
 
@@ -171,7 +171,7 @@ def test_list_roles():
 
 def test_which_roles_can():
     """Test which roles can"""
-    with patch("auth.CAS.REST.service.Authorization") as mock_auth:
+    with patch("auth.services.rest_service.Authorization") as mock_auth:
         mock_auth_instance = mock_auth.return_value
         mock_auth_instance.which_roles_can.return_value = ["role1", "role2"]
 
@@ -184,7 +184,7 @@ def test_which_roles_can():
 
 def test_which_users_can():
     """Test which users can"""
-    with patch("auth.CAS.REST.service.Authorization") as mock_auth:
+    with patch("auth.services.rest_service.Authorization") as mock_auth:
         mock_auth_instance = mock_auth.return_value
         mock_auth_instance.which_users_can.return_value = ["user1", "user2"]
 
@@ -197,7 +197,7 @@ def test_which_users_can():
 
 def test_add_role():
     """Test adding role"""
-    with patch("auth.CAS.REST.service.Authorization") as mock_auth:
+    with patch("auth.services.rest_service.Authorization") as mock_auth:
         mock_auth_instance = mock_auth.return_value
         mock_auth_instance.add_role.return_value = True
 
@@ -210,7 +210,7 @@ def test_add_role():
 
 def test_delete_role():
     """Test deleting role"""
-    with patch("auth.CAS.REST.service.Authorization") as mock_auth:
+    with patch("auth.services.rest_service.Authorization") as mock_auth:
         mock_auth_instance = mock_auth.return_value
         mock_auth_instance.del_role.return_value = True
 

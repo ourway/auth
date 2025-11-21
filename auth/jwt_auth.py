@@ -46,7 +46,7 @@ class JWTAuth:
         Decode a JWT token and return the payload
         """
         try:
-            payload = jwt.decode(token, self.secret_key, algorithms=[self.algorithm])
+            payload: Dict[str, Any] = jwt.decode(token, self.secret_key, algorithms=[self.algorithm])
             return payload
         except jwt.ExpiredSignatureError:
             return None
@@ -112,7 +112,8 @@ def get_user_permissions_from_jwt(token: str) -> list:
     """
     payload = jwt_auth.decode_token(token)
     if payload:
-        return payload.get("permissions", [])
+        permissions: list = payload.get("permissions", [])
+        return permissions
     return []
 
 

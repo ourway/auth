@@ -1,7 +1,7 @@
 import os
 from unittest.mock import patch
 
-from auth.CAS.models.db import (
+from auth.models.mongo import (
     AuthGroup,
     AuthMembership,
     AuthPermission,
@@ -9,8 +9,8 @@ from auth.CAS.models.db import (
 )
 
 
-@patch("auth.CAS.models.db.connect")
-def test_make_db_connection(mock_connect):
+@patch("auth.models.mongo.connect")
+def test_make_db_connection_default(mock_connect):
     """Test make_db_connection function with default settings"""
     make_db_connection()
 
@@ -20,7 +20,7 @@ def test_make_db_connection(mock_connect):
     )
 
 
-@patch("auth.CAS.models.db.connect")
+@patch("auth.models.mongo.connect")
 def test_make_db_connection_with_env_vars(mock_connect):
     """Test make_db_connection function with environment variables"""
     # Test with custom environment variables

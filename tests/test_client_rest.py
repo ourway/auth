@@ -3,7 +3,7 @@ from unittest.mock import Mock, patch
 import pytest
 from requests.exceptions import ConnectionError
 
-from auth.CAS.REST.client import (
+from auth.core.REST.client import (
     Client,
     connect,
     connection_factory,
@@ -92,7 +92,7 @@ def test_connection_factory_full_functionality():
         api_key = "test_key"
         service_url = "http://example.com"
 
-    with patch("auth.CAS.REST.client.connect") as mock_connect:
+    with patch("auth.core.REST.client.connect") as mock_connect:
         # Create a mock response
         mock_response = Mock()
         mock_response.content = b'{"result": true}'

@@ -9,7 +9,7 @@ from apscheduler.schedulers.background import BackgroundScheduler
 from apscheduler.triggers.cron import CronTrigger
 
 from auth.database import SessionLocal
-from auth.service import AuthorizationService
+from auth.services.service import AuthorizationService
 
 
 class WorkflowPermissionChecker:
@@ -98,8 +98,8 @@ class WorkflowPermissionChecker:
         """
         try:
             permissions = self.auth_service.get_user_permissions(user)
-            workflow_names = [
-                perm.get("name") for perm in permissions if perm.get("name")
+            workflow_names: List[str] = [
+                str(perm.get("name")) for perm in permissions if perm.get("name")
             ]
             return workflow_names
         except Exception as e:

@@ -10,6 +10,10 @@ waitress
 PyJWT
 cryptography
 APScheduler
-psycopg3[binary]
+psycopg
 
-python-dotenv
+pydantic
+pydantic-settings
+
+python-json-logger
+bleach

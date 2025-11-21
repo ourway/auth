@@ -4,7 +4,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "auth"
-version = "0.10.2"
+version = "0.10.3"
 description = "Authorization for humans"
 readme = {file = "README.rst", content-type = "text/x-rst"}
 requires-python = ">=3.9"

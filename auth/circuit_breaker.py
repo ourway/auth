@@ -5,7 +5,7 @@ This module integrates the highway_circuitbreaker library for resilience
 
 import time
 from functools import wraps
-from typing import Callable
+from typing import Callable, Optional, Type
 
 
 # Placeholder for highway_circuitbreaker - in real implementation
@@ -27,19 +27,19 @@ class CircuitBreaker:
         name: str,
         failure_threshold: int = 5,
         recovery_timeout: int = 60,
-        expected_exception: type = Exception,
+        expected_exception: Type[Exception] = Exception,
     ):
         self.name = name
         self.failure_threshold = failure_threshold
         self.recovery_timeout = recovery_timeout
         self.expected_exception = expected_exception
         self.failure_count = 0
-        self.last_failure_time = None
+        self.last_failure_time: Optional[float] = None
         self.state = CircuitBreakerState.CLOSED
 
     def call(self, func: Callable, *args, **kwargs):
         if self.state == CircuitBreakerState.OPEN:
-            if time.time() - self.last_failure_time >= self.recovery_timeout:
+            if self.last_failure_time is not None and time.time() - self.last_failure_time >= self.recovery_timeout:
                 self.state = CircuitBreakerState.HALF_OPEN
             else:
                 raise Exception(f"Circuit breaker {self.name} is OPEN")

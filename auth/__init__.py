@@ -3,7 +3,7 @@ from typing import Optional
 
 from auth.client import Client, EnhancedAuthClient  # Import the new client
 from auth.database import SessionLocal
-from auth.service import AuthorizationService
+from auth.services.service import AuthorizationService
 
 
 # Lazy import for Flask app to avoid immediate initialization

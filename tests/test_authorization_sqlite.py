@@ -1,12 +1,12 @@
 from unittest.mock import Mock, patch
 
-from auth.CAS.authorization_sqlite import Authorization
+from auth.dal.authorization_sqlite import Authorization
 
 
-@patch("auth.CAS.authorization_sqlite.make_db_connection")
-@patch("auth.CAS.authorization_sqlite.AuthGroup")
-@patch("auth.CAS.authorization_sqlite.AuthMembership")
-@patch("auth.CAS.authorization_sqlite.AuthPermission")
+@patch("auth.dal.authorization_sqlite.make_db_connection")
+@patch("auth.dal.authorization_sqlite.AuthGroup")
+@patch("auth.dal.authorization_sqlite.AuthMembership")
+@patch("auth.dal.authorization_sqlite.AuthPermission")
 def test_authorization_init(
     mock_permission, mock_membership, mock_group, mock_make_db_connection
 ):
@@ -26,10 +26,10 @@ def test_authorization_init(
     mock_permission.assert_called_once_with(mock_conn)
 
 
-@patch("auth.CAS.authorization_sqlite.make_db_connection")
-@patch("auth.CAS.authorization_sqlite.AuthGroup")
-@patch("auth.CAS.authorization_sqlite.AuthMembership")
-@patch("auth.CAS.authorization_sqlite.AuthPermission")
+@patch("auth.dal.authorization_sqlite.make_db_connection")
+@patch("auth.dal.authorization_sqlite.AuthGroup")
+@patch("auth.dal.authorization_sqlite.AuthMembership")
+@patch("auth.dal.authorization_sqlite.AuthPermission")
 def test_roles_property(
     mock_permission, mock_membership, mock_group, mock_make_db_connection
 ):
@@ -53,10 +53,10 @@ def test_roles_property(
     mock_group_instance.get_all_by_creator.assert_called_with("test_client")
 
 
-@patch("auth.CAS.authorization_sqlite.make_db_connection")
-@patch("auth.CAS.authorization_sqlite.AuthGroup")
-@patch("auth.CAS.authorization_sqlite.AuthMembership")
-@patch("auth.CAS.authorization_sqlite.AuthPermission")
+@patch("auth.dal.authorization_sqlite.make_db_connection")
+@patch("auth.dal.authorization_sqlite.AuthGroup")
+@patch("auth.dal.authorization_sqlite.AuthMembership")
+@patch("auth.dal.authorization_sqlite.AuthPermission")
 def test_get_permissions(
     mock_permission, mock_membership, mock_group, mock_make_db_connection
 ):
@@ -86,10 +86,10 @@ def test_get_permissions(
     mock_permission_instance.get_all_by_group.assert_called_with("test_client", 1)
 
 
-@patch("auth.CAS.authorization_sqlite.make_db_connection")
-@patch("auth.CAS.authorization_sqlite.AuthGroup")
-@patch("auth.CAS.authorization_sqlite.AuthMembership")
-@patch("auth.CAS.authorization_sqlite.AuthPermission")
+@patch("auth.dal.authorization_sqlite.make_db_connection")
+@patch("auth.dal.authorization_sqlite.AuthGroup")
+@patch("auth.dal.authorization_sqlite.AuthMembership")
+@patch("auth.dal.authorization_sqlite.AuthPermission")
 def test_get_permissions_role_not_found(
     mock_permission, mock_membership, mock_group, mock_make_db_connection
 ):
@@ -109,10 +109,10 @@ def test_get_permissions_role_not_found(
     assert permissions == []
 
 
-@patch("auth.CAS.authorization_sqlite.make_db_connection")
-@patch("auth.CAS.authorization_sqlite.AuthGroup")
-@patch("auth.CAS.authorization_sqlite.AuthMembership")
-@patch("auth.CAS.authorization_sqlite.AuthPermission")
+@patch("auth.dal.authorization_sqlite.make_db_connection")
+@patch("auth.dal.authorization_sqlite.AuthGroup")
+@patch("auth.dal.authorization_sqlite.AuthMembership")
+@patch("auth.dal.authorization_sqlite.AuthPermission")
 def test_get_user_permissions(
     mock_permission, mock_membership, mock_group, mock_make_db_connection
 ):
@@ -142,10 +142,10 @@ def test_get_user_permissions(
     mock_permission_instance.get_all_by_group.assert_called_with("test_client", 1)
 
 
-@patch("auth.CAS.authorization_sqlite.make_db_connection")
-@patch("auth.CAS.authorization_sqlite.AuthGroup")
-@patch("auth.CAS.authorization_sqlite.AuthMembership")
-@patch("auth.CAS.authorization_sqlite.AuthPermission")
+@patch("auth.dal.authorization_sqlite.make_db_connection")
+@patch("auth.dal.authorization_sqlite.AuthGroup")
+@patch("auth.dal.authorization_sqlite.AuthMembership")
+@patch("auth.dal.authorization_sqlite.AuthPermission")
 def test_get_user_roles(
     mock_permission, mock_membership, mock_group, mock_make_db_connection
 ):
@@ -165,14 +165,14 @@ def test_get_user_roles(
 
     roles = auth.get_user_roles("user1")
 
-    assert roles == [{"role": "admin"}, {"role": "user"}]
+    assert roles == [{"user": "user1", "role": "admin"}, {"user": "user1", "role": "user"}]
     mock_membership_instance.get_groups.assert_called_with("test_client", "user1")
 
 
-@patch("auth.CAS.authorization_sqlite.make_db_connection")
-@patch("auth.CAS.authorization_sqlite.AuthGroup")
-@patch("auth.CAS.authorization_sqlite.AuthMembership")
-@patch("auth.CAS.authorization_sqlite.AuthPermission")
+@patch("auth.dal.authorization_sqlite.make_db_connection")
+@patch("auth.dal.authorization_sqlite.AuthGroup")
+@patch("auth.dal.authorization_sqlite.AuthMembership")
+@patch("auth.dal.authorization_sqlite.AuthPermission")
 def test_get_role_members(
     mock_permission, mock_membership, mock_group, mock_make_db_connection
 ):
@@ -197,16 +197,16 @@ def test_get_role_members(
 
     members = auth.get_role_members("admin")
 
-    assert members == [{"user": "user1"}, {"user": "user2"}]
+    assert members == [{"user": "user1", "role": "admin"}, {"user": "user2", "role": "admin"}]
     mock_group_instance.get_by_role.assert_called_with("test_client", "admin")
     # The call will be made to the raw SQL method, but testing the logic
     assert mock_membership_instance._fetch_all.called
 
 
-@patch("auth.CAS.authorization_sqlite.make_db_connection")
-@patch("auth.CAS.authorization_sqlite.AuthGroup")
-@patch("auth.CAS.authorization_sqlite.AuthMembership")
-@patch("auth.CAS.authorization_sqlite.AuthPermission")
+@patch("auth.dal.authorization_sqlite.make_db_connection")
+@patch("auth.dal.authorization_sqlite.AuthGroup")
+@patch("auth.dal.authorization_sqlite.AuthMembership")
+@patch("auth.dal.authorization_sqlite.AuthPermission")
 def test_get_role_members_role_not_found(
     mock_permission, mock_membership, mock_group, mock_make_db_connection
 ):
@@ -226,10 +226,10 @@ def test_get_role_members_role_not_found(
     assert members == []
 
 
-@patch("auth.CAS.authorization_sqlite.make_db_connection")
-@patch("auth.CAS.authorization_sqlite.AuthGroup")
-@patch("auth.CAS.authorization_sqlite.AuthMembership")
-@patch("auth.CAS.authorization_sqlite.AuthPermission")
+@patch("auth.dal.authorization_sqlite.make_db_connection")
+@patch("auth.dal.authorization_sqlite.AuthGroup")
+@patch("auth.dal.authorization_sqlite.AuthMembership")
+@patch("auth.dal.authorization_sqlite.AuthPermission")
 def test_which_roles_can(
     mock_permission, mock_membership, mock_group, mock_make_db_connection
 ):
@@ -253,10 +253,10 @@ def test_which_roles_can(
     mock_permission_instance.get_groups.assert_called_with("test_client", "read")
 
 
-@patch("auth.CAS.authorization_sqlite.make_db_connection")
-@patch("auth.CAS.authorization_sqlite.AuthGroup")
-@patch("auth.CAS.authorization_sqlite.AuthMembership")
-@patch("auth.CAS.authorization_sqlite.AuthPermission")
+@patch("auth.dal.authorization_sqlite.make_db_connection")
+@patch("auth.dal.authorization_sqlite.AuthGroup")
+@patch("auth.dal.authorization_sqlite.AuthMembership")
+@patch("auth.dal.authorization_sqlite.AuthPermission")
 def test_which_users_can(
     mock_permission, mock_membership, mock_group, mock_make_db_connection
 ):
@@ -279,16 +279,17 @@ def test_which_users_can(
 
         result = auth.which_users_can("read")
 
-        assert result == [[{"user": "user1"}, {"user": "user2"}], [{"user": "user3"}]]
+        # which_users_can now flattens the list instead of returning nested lists
+        assert result == [{"user": "user1"}, {"user": "user2"}, {"user": "user3"}]
         mock_which_roles.assert_called_with("read")
         mock_get_members.assert_any_call("admin")
         mock_get_members.assert_any_call("editor")
 
 
-@patch("auth.CAS.authorization_sqlite.make_db_connection")
-@patch("auth.CAS.authorization_sqlite.AuthGroup")
-@patch("auth.CAS.authorization_sqlite.AuthMembership")
-@patch("auth.CAS.authorization_sqlite.AuthPermission")
+@patch("auth.dal.authorization_sqlite.make_db_connection")
+@patch("auth.dal.authorization_sqlite.AuthGroup")
+@patch("auth.dal.authorization_sqlite.AuthMembership")
+@patch("auth.dal.authorization_sqlite.AuthPermission")
 def test_get_role(
     mock_permission, mock_membership, mock_group, mock_make_db_connection
 ):
@@ -310,10 +311,10 @@ def test_get_role(
     mock_group_instance.get_by_role.assert_called_with("test_client", "admin")
 
 
-@patch("auth.CAS.authorization_sqlite.make_db_connection")
-@patch("auth.CAS.authorization_sqlite.AuthGroup")
-@patch("auth.CAS.authorization_sqlite.AuthMembership")
-@patch("auth.CAS.authorization_sqlite.AuthPermission")
+@patch("auth.dal.authorization_sqlite.make_db_connection")
+@patch("auth.dal.authorization_sqlite.AuthGroup")
+@patch("auth.dal.authorization_sqlite.AuthMembership")
+@patch("auth.dal.authorization_sqlite.AuthPermission")
 def test_add_role(
     mock_permission, mock_membership, mock_group, mock_make_db_connection
 ):
@@ -334,10 +335,10 @@ def test_add_role(
     mock_group_instance.create.assert_called_with("test_client", "admin", None)
 
 
-@patch("auth.CAS.authorization_sqlite.make_db_connection")
-@patch("auth.CAS.authorization_sqlite.AuthGroup")
-@patch("auth.CAS.authorization_sqlite.AuthMembership")
-@patch("auth.CAS.authorization_sqlite.AuthPermission")
+@patch("auth.dal.authorization_sqlite.make_db_connection")
+@patch("auth.dal.authorization_sqlite.AuthGroup")
+@patch("auth.dal.authorization_sqlite.AuthMembership")
+@patch("auth.dal.authorization_sqlite.AuthPermission")
 def test_add_role_with_description(
     mock_permission, mock_membership, mock_group, mock_make_db_connection
 ):
@@ -360,10 +361,10 @@ def test_add_role_with_description(
     )
 
 
-@patch("auth.CAS.authorization_sqlite.make_db_connection")
-@patch("auth.CAS.authorization_sqlite.AuthGroup")
-@patch("auth.CAS.authorization_sqlite.AuthMembership")
-@patch("auth.CAS.authorization_sqlite.AuthPermission")
+@patch("auth.dal.authorization_sqlite.make_db_connection")
+@patch("auth.dal.authorization_sqlite.AuthGroup")
+@patch("auth.dal.authorization_sqlite.AuthMembership")
+@patch("auth.dal.authorization_sqlite.AuthPermission")
 def test_del_role(
     mock_permission, mock_membership, mock_group, mock_make_db_connection
 ):
@@ -384,10 +385,10 @@ def test_del_role(
     mock_group_instance.delete.assert_called_with("test_client", "admin")
 
 
-@patch("auth.CAS.authorization_sqlite.make_db_connection")
-@patch("auth.CAS.authorization_sqlite.AuthGroup")
-@patch("auth.CAS.authorization_sqlite.AuthMembership")
-@patch("auth.CAS.authorization_sqlite.AuthPermission")
+@patch("auth.dal.authorization_sqlite.make_db_connection")
+@patch("auth.dal.authorization_sqlite.AuthGroup")
+@patch("auth.dal.authorization_sqlite.AuthMembership")
+@patch("auth.dal.authorization_sqlite.AuthPermission")
 def test_add_membership(
     mock_permission, mock_membership, mock_group, mock_make_db_connection
 ):
@@ -416,10 +417,10 @@ def test_add_membership(
     mock_membership_instance.add_group.assert_called_with(100, 1)
 
 
-@patch("auth.CAS.authorization_sqlite.make_db_connection")
-@patch("auth.CAS.authorization_sqlite.AuthGroup")
-@patch("auth.CAS.authorization_sqlite.AuthMembership")
-@patch("auth.CAS.authorization_sqlite.AuthPermission")
+@patch("auth.dal.authorization_sqlite.make_db_connection")
+@patch("auth.dal.authorization_sqlite.AuthGroup")
+@patch("auth.dal.authorization_sqlite.AuthMembership")
+@patch("auth.dal.authorization_sqlite.AuthPermission")
 def test_add_membership_role_not_found(
     mock_permission, mock_membership, mock_group, mock_make_db_connection
 ):
@@ -440,10 +441,10 @@ def test_add_membership_role_not_found(
     mock_group_instance.get_by_role.assert_called_with("test_client", "nonexistent")
 
 
-@patch("auth.CAS.authorization_sqlite.make_db_connection")
-@patch("auth.CAS.authorization_sqlite.AuthGroup")
-@patch("auth.CAS.authorization_sqlite.AuthMembership")
-@patch("auth.CAS.authorization_sqlite.AuthPermission")
+@patch("auth.dal.authorization_sqlite.make_db_connection")
+@patch("auth.dal.authorization_sqlite.AuthGroup")
+@patch("auth.dal.authorization_sqlite.AuthMembership")
+@patch("auth.dal.authorization_sqlite.AuthPermission")
 def test_del_membership(
     mock_permission, mock_membership, mock_group, mock_make_db_connection
 ):
@@ -475,10 +476,10 @@ def test_del_membership(
         mock_membership_instance.remove_group.assert_called_with(100, 1)
 
 
-@patch("auth.CAS.authorization_sqlite.make_db_connection")
-@patch("auth.CAS.authorization_sqlite.AuthGroup")
-@patch("auth.CAS.authorization_sqlite.AuthMembership")
-@patch("auth.CAS.authorization_sqlite.AuthPermission")
+@patch("auth.dal.authorization_sqlite.make_db_connection")
+@patch("auth.dal.authorization_sqlite.AuthGroup")
+@patch("auth.dal.authorization_sqlite.AuthMembership")
+@patch("auth.dal.authorization_sqlite.AuthPermission")
 def test_del_membership_not_exists(
     mock_permission, mock_membership, mock_group, mock_make_db_connection
 ):
@@ -496,10 +497,10 @@ def test_del_membership_not_exists(
         assert result is True  # Returns True if doesn't exist
 
 
-@patch("auth.CAS.authorization_sqlite.make_db_connection")
-@patch("auth.CAS.authorization_sqlite.AuthGroup")
-@patch("auth.CAS.authorization_sqlite.AuthMembership")
-@patch("auth.CAS.authorization_sqlite.AuthPermission")
+@patch("auth.dal.authorization_sqlite.make_db_connection")
+@patch("auth.dal.authorization_sqlite.AuthGroup")
+@patch("auth.dal.authorization_sqlite.AuthMembership")
+@patch("auth.dal.authorization_sqlite.AuthPermission")
 def test_has_membership(
     mock_permission, mock_membership, mock_group, mock_make_db_connection
 ):
@@ -520,10 +521,10 @@ def test_has_membership(
     mock_membership_instance.get_groups.assert_called_with("test_client", "user1")
 
 
-@patch("auth.CAS.authorization_sqlite.make_db_connection")
-@patch("auth.CAS.authorization_sqlite.AuthGroup")
-@patch("auth.CAS.authorization_sqlite.AuthMembership")
-@patch("auth.CAS.authorization_sqlite.AuthPermission")
+@patch("auth.dal.authorization_sqlite.make_db_connection")
+@patch("auth.dal.authorization_sqlite.AuthGroup")
+@patch("auth.dal.authorization_sqlite.AuthMembership")
+@patch("auth.dal.authorization_sqlite.AuthPermission")
 def test_has_membership_false(
     mock_permission, mock_membership, mock_group, mock_make_db_connection
 ):
@@ -545,10 +546,10 @@ def test_has_membership_false(
     assert result is False
 
 
-@patch("auth.CAS.authorization_sqlite.make_db_connection")
-@patch("auth.CAS.authorization_sqlite.AuthGroup")
-@patch("auth.CAS.authorization_sqlite.AuthMembership")
-@patch("auth.CAS.authorization_sqlite.AuthPermission")
+@patch("auth.dal.authorization_sqlite.make_db_connection")
+@patch("auth.dal.authorization_sqlite.AuthGroup")
+@patch("auth.dal.authorization_sqlite.AuthMembership")
+@patch("auth.dal.authorization_sqlite.AuthPermission")
 def test_add_permission(
     mock_permission, mock_membership, mock_group, mock_make_db_connection
 ):
@@ -580,10 +581,10 @@ def test_add_permission(
         mock_permission_instance.add_group.assert_called_with(100, 1)
 
 
-@patch("auth.CAS.authorization_sqlite.make_db_connection")
-@patch("auth.CAS.authorization_sqlite.AuthGroup")
-@patch("auth.CAS.authorization_sqlite.AuthMembership")
-@patch("auth.CAS.authorization_sqlite.AuthPermission")
+@patch("auth.dal.authorization_sqlite.make_db_connection")
+@patch("auth.dal.authorization_sqlite.AuthGroup")
+@patch("auth.dal.authorization_sqlite.AuthMembership")
+@patch("auth.dal.authorization_sqlite.AuthPermission")
 def test_add_permission_already_exists(
     mock_permission, mock_membership, mock_group, mock_make_db_connection
 ):
@@ -601,10 +602,10 @@ def test_add_permission_already_exists(
         assert result is True
 
 
-@patch("auth.CAS.authorization_sqlite.make_db_connection")
-@patch("auth.CAS.authorization_sqlite.AuthGroup")
-@patch("auth.CAS.authorization_sqlite.AuthMembership")
-@patch("auth.CAS.authorization_sqlite.AuthPermission")
+@patch("auth.dal.authorization_sqlite.make_db_connection")
+@patch("auth.dal.authorization_sqlite.AuthGroup")
+@patch("auth.dal.authorization_sqlite.AuthMembership")
+@patch("auth.dal.authorization_sqlite.AuthPermission")
 def test_del_permission(
     mock_permission, mock_membership, mock_group, mock_make_db_connection
 ):
@@ -636,10 +637,10 @@ def test_del_permission(
         mock_permission_instance.remove_group.assert_called_with(100, 1)
 
 
-@patch("auth.CAS.authorization_sqlite.make_db_connection")
-@patch("auth.CAS.authorization_sqlite.AuthGroup")
-@patch("auth.CAS.authorization_sqlite.AuthMembership")
-@patch("auth.CAS.authorization_sqlite.AuthPermission")
+@patch("auth.dal.authorization_sqlite.make_db_connection")
+@patch("auth.dal.authorization_sqlite.AuthGroup")
+@patch("auth.dal.authorization_sqlite.AuthMembership")
+@patch("auth.dal.authorization_sqlite.AuthPermission")
 def test_has_permission(
     mock_permission, mock_membership, mock_group, mock_make_db_connection
 ):
@@ -666,10 +667,10 @@ def test_has_permission(
     mock_permission_instance.get_groups.assert_called_with("test_client", "read")
 
 
-@patch("auth.CAS.authorization_sqlite.make_db_connection")
-@patch("auth.CAS.authorization_sqlite.AuthGroup")
-@patch("auth.CAS.authorization_sqlite.AuthMembership")
-@patch("auth.CAS.authorization_sqlite.AuthPermission")
+@patch("auth.dal.authorization_sqlite.make_db_connection")
+@patch("auth.dal.authorization_sqlite.AuthGroup")
+@patch("auth.dal.authorization_sqlite.AuthMembership")
+@patch("auth.dal.authorization_sqlite.AuthPermission")
 def test_has_permission_false(
     mock_permission, mock_membership, mock_group, mock_make_db_connection
 ):
@@ -696,10 +697,10 @@ def test_has_permission_false(
     assert result is False
 
 
-@patch("auth.CAS.authorization_sqlite.make_db_connection")
-@patch("auth.CAS.authorization_sqlite.AuthGroup")
-@patch("auth.CAS.authorization_sqlite.AuthMembership")
-@patch("auth.CAS.authorization_sqlite.AuthPermission")
+@patch("auth.dal.authorization_sqlite.make_db_connection")
+@patch("auth.dal.authorization_sqlite.AuthGroup")
+@patch("auth.dal.authorization_sqlite.AuthMembership")
+@patch("auth.dal.authorization_sqlite.AuthPermission")
 def test_user_has_permission(
     mock_permission, mock_membership, mock_group, mock_make_db_connection
 ):
@@ -724,10 +725,10 @@ def test_user_has_permission(
         mock_has_permission.assert_called_with("admin", "read")
 
 
-@patch("auth.CAS.authorization_sqlite.make_db_connection")
-@patch("auth.CAS.authorization_sqlite.AuthGroup")
-@patch("auth.CAS.authorization_sqlite.AuthMembership")
-@patch("auth.CAS.authorization_sqlite.AuthPermission")
+@patch("auth.dal.authorization_sqlite.make_db_connection")
+@patch("auth.dal.authorization_sqlite.AuthGroup")
+@patch("auth.dal.authorization_sqlite.AuthMembership")
+@patch("auth.dal.authorization_sqlite.AuthPermission")
 def test_user_has_permission_false(
     mock_permission, mock_membership, mock_group, mock_make_db_connection
 ):

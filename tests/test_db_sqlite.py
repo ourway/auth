@@ -2,7 +2,7 @@ import os
 import sqlite3
 from unittest.mock import patch
 
-from auth.CAS.models.db_sqlite import (
+from auth.models.sqlite import (
     AuthGroup,
     AuthMembership,
     AuthPermission,
@@ -58,7 +58,7 @@ def test_base_model_execute():
 
 def test_base_model_fetch_one():
     """Test BaseModel fetch_one method"""
-    from auth.CAS.models.db_sqlite import make_test_db_connection
+    from auth.models.sqlite import make_test_db_connection
 
     conn = make_test_db_connection()
     base_model = BaseModel(conn)
@@ -88,7 +88,7 @@ def test_base_model_fetch_one():
 
 def test_base_model_fetch_all():
     """Test BaseModel fetch_all method"""
-    from auth.CAS.models.db_sqlite import make_test_db_connection
+    from auth.models.sqlite import make_test_db_connection
 
     conn = make_test_db_connection()
     base_model = BaseModel(conn)
@@ -111,7 +111,7 @@ def test_base_model_fetch_all():
 
 def test_auth_group_create():
     """Test AuthGroup create method"""
-    from auth.CAS.models.db_sqlite import make_test_db_connection
+    from auth.models.sqlite import make_test_db_connection
 
     conn = make_test_db_connection()
     auth_group = AuthGroup(conn)

@@ -131,10 +131,12 @@ class EnhancedAuthClient:
 
                 # Try to parse JSON response
                 try:
-                    return response.json()
+                    json_response: Dict[str, Any] = response.json()
+                    return json_response
                 except json.JSONDecodeError:
                     # If JSON parsing fails, return the text content
-                    return {"result": response.text}
+                    text_response: Dict[str, Any] = {"result": response.text}
+                    return text_response
 
             except requests.exceptions.RequestException as e:
                 # Convert to our expected exception type
@@ -143,13 +145,15 @@ class EnhancedAuthClient:
         if self.circuit_breaker_enabled:
             # Use circuit breaker to wrap the request
             try:
-                return circuit_breaker("api_call")(request_func)()
+                cb_result: Dict[str, Any] = circuit_breaker("api_call")(request_func)()
+                return cb_result
             except Exception as e:
                 raise ConnectionError(
                     f"Circuit breaker prevented request: {str(e)}"
                 ) from e
         else:
-            return request_func()
+            direct_result: Dict[str, Any] = request_func()
+            return direct_result
 
     def ping(self) -> Dict[str, Any]:
         """Health check"""

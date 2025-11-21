@@ -10,7 +10,7 @@ import pytest
 from sqlalchemy import create_engine
 from sqlalchemy.orm import sessionmaker
 
-from auth.database import Base
+from auth.models.sql import Base
 from auth.main import create_app
 
 
@@ -132,7 +132,7 @@ def test_check_membership(client):
         "/api/membership/john/admin", headers={"Authorization": f"Bearer {SECRET_KEY}"}
     )
     assert response.status_code == 200
-    assert response.get_json() == {"result": True}
+    assert response.get_json()["data"]["has_permission"] is True
 
 
 def test_check_user_permission(client):
@@ -151,7 +151,7 @@ def test_check_user_permission(client):
         headers={"Authorization": f"Bearer {SECRET_KEY}"},
     )
     assert response.status_code == 200
-    assert response.get_json() == {"result": True}
+    assert response.get_json()["data"]["has_permission"] is True
 
 
 def test_get_user_permissions(client):
@@ -172,9 +172,9 @@ def test_get_user_permissions(client):
         "/api/user_permissions/john", headers={"Authorization": f"Bearer {SECRET_KEY}"}
     )
     assert response.status_code == 200
-    data = response.get_json()
-    assert "results" in data
-    permissions = [p["name"] for p in data["results"]]
+    data = response.get_json()["data"]
+    assert "permissions" in data
+    permissions = [p["name"] for p in data["permissions"]]
     assert "read" in permissions
     assert "write" in permissions
 
@@ -194,9 +194,9 @@ def test_get_role_permissions(client):
         "/api/role_permissions/admin", headers={"Authorization": f"Bearer {SECRET_KEY}"}
     )
     assert response.status_code == 200
-    data = response.get_json()
-    assert "results" in data
-    permissions = [p["name"] for p in data["results"]]
+    data = response.get_json()["data"]
+    assert isinstance(data, list)
+    permissions = [p["name"] for p in data]
     assert "read" in permissions
     assert "write" in permissions
 
@@ -219,9 +219,9 @@ def test_get_user_roles(client):
     assert response.status_code == 200
     data = response.get_json()
     assert "result" in data
-    # Check for user in the list of membership dictionaries
-    users = [item["user"] for item in data["result"]]
-    assert "john" in users
+    roles = [item["role"] for item in data["result"]]
+    assert "admin" in roles
+    assert "user" in roles
 
 
 def test_get_role_members(client):
@@ -312,20 +312,20 @@ def test_delete_membership(client):
     response = client.get(
         "/api/membership/john/admin", headers={"Authorization": f"Bearer {SECRET_KEY}"}
     )
-    assert response.get_json() == {"result": True}
+    assert response.get_json()["data"]["has_permission"] is True
 
     # Remove membership
     response = client.delete(
         "/api/membership/john/admin", headers={"Authorization": f"Bearer {SECRET_KEY}"}
     )
     assert response.status_code == 200
-    assert response.get_json() == {"result": True}
+    assert response.get_json() == {'result': True}
 
     # Check membership removed
     response = client.get(
         "/api/membership/john/admin", headers={"Authorization": f"Bearer {SECRET_KEY}"}
     )
-    assert response.get_json() == {"result": False}
+    assert response.get_json()["data"]["has_permission"] is False
 
 
 def test_delete_permission(client):
@@ -347,7 +347,7 @@ def test_delete_permission(client):
         "/api/permission/admin/read", headers={"Authorization": f"Bearer {SECRET_KEY}"}
     )
     assert response.status_code == 200
-    assert response.get_json() == {"result": True}
+    assert response.get_json() == {'result': True}
 
     # Check permission removed
     response = client.get(
@@ -373,7 +373,7 @@ def test_delete_role(client):
         "/api/role/admin", headers={"Authorization": f"Bearer {SECRET_KEY}"}
     )
     assert response.status_code == 200
-    assert response.get_json() == {"result": True}
+    assert response.get_json()["data"] == {"result": True}
 
     # Check role removed
     response = client.get(
@@ -414,13 +414,13 @@ def test_nonexistent_operations(client):
         "/api/permission/nonexistent/read",
         headers={"Authorization": f"Bearer {SECRET_KEY}"},
     )
-    assert response.get_json() == {"result": True}
+    assert response.get_json()["result"] is True
 
     # Delete non-existent role
     response = client.delete(
         "/api/role/nonexistent", headers={"Authorization": f"Bearer {SECRET_KEY}"}
     )
-    assert response.get_json() == {"result": False}
+    assert response.get_json()["data"]["result"] is False
 
 
 def test_empty_results(client):
@@ -432,32 +432,32 @@ def test_empty_results(client):
     response = client.get(
         "/api/roles", headers={"Authorization": f"Bearer {fresh_key}"}
     )
-    assert response.get_json() == {"result": []}
+    assert response.get_json()["result"] == []
 
     # Empty permissions
     response = client.get(
         "/api/role_permissions/nonexistent",
         headers={"Authorization": f"Bearer {fresh_key}"},
     )
-    assert response.get_json() == {"results": []}
+    assert response.get_json()["data"] == []
 
     # Empty user permissions
     response = client.get(
         "/api/user_permissions/nonexistent",
         headers={"Authorization": f"Bearer {fresh_key}"},
     )
-    assert response.get_json() == {"results": []}
+    assert response.get_json()["data"]["permissions"] == []
 
     # Empty which roles can
     response = client.get(
         "/api/which_roles_can/nonexistent",
         headers={"Authorization": f"Bearer {fresh_key}"},
     )
-    assert response.get_json() == {"result": []}
+    assert response.get_json()["result"] == []
 
     # Empty which users can
     response = client.get(
         "/api/which_users_can/nonexistent",
         headers={"Authorization": f"Bearer {fresh_key}"},
     )
-    assert response.get_json() == {"result": []}
+    assert response.get_json()["result"] == []

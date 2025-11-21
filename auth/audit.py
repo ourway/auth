@@ -10,7 +10,8 @@ from typing import Any, Dict, Optional
 
 from sqlalchemy import Column, DateTime, Integer, String, Text
 
-from auth.database import Base, SessionLocal
+from auth.database import SessionLocal
+from auth.models.sql import Base
 
 
 class AuditAction(Enum):
@@ -90,7 +91,7 @@ def log_audit_event(
         session.commit()
 
         # Also log to structured logger
-        log_msg = {
+        log_msg: Dict[str, Any] = {
             "type": "audit",
             "client_id": client_id,
             "user": user,
@@ -120,4 +121,4 @@ def setup_audit_tables():
     """Create audit log table if it doesn't exist"""
     from auth.database import engine
 
-    Base.metadata.create_all(bind=engine, tables=[AuditLog.__table__])
+    Base.metadata.create_all(bind=engine, tables=[AuditLog.__table__])  # type: ignore[list-item]

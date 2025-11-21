@@ -5,34 +5,24 @@ import pytest
 from sqlalchemy import create_engine
 from sqlalchemy.orm import sessionmaker
 
-from auth import Authorization
-from auth.database import Base
+from auth.dal.authorization_sqlite import Authorization
+from auth.models.sql import Base
 
 # Generate a valid UUID4 for tests
 secret_key = str(uuid.uuid4())
 
 
+from auth.models.sqlite import make_test_db_connection
 @pytest.fixture
 def cas():
-    # Use in-memory database for testing
-    test_engine = create_engine(
-        "sqlite:///:memory:", connect_args={"check_same_thread": False}
-    )
-    TestSessionLocal = sessionmaker(autocommit=False, autoflush=False, bind=test_engine)
-
-    # Create tables
-    Base.metadata.create_all(bind=test_engine)
-
-    # Create a session for the test
-    db = TestSessionLocal()
-
-    # Create Authorization instance with custom session
-    cas_instance = Authorization(secret_key, db_session=db)
+    conn = make_test_db_connection()
+    # Create Authorization instance with custom connection
+    cas_instance = Authorization(secret_key, conn=conn)
 
     yield cas_instance
 
     # Cleanup
-    db.close()
+    conn.close()
 
 
 # roles
@@ -260,19 +250,11 @@ def test_authorization_nonexistent_role(cas):
 
 def test_authorization_empty_results():
     # Create a fresh in-memory database for this test
-    test_engine = create_engine(
-        "sqlite:///:memory:", connect_args={"check_same_thread": False}
-    )
-    TestSessionLocal = sessionmaker(autocommit=False, autoflush=False, bind=test_engine)
+    from auth.models.sqlite import make_test_db_connection
+    conn = make_test_db_connection()
 
-    # Create tables
-    Base.metadata.create_all(bind=test_engine)
-
-    # Create a session for the test
-    db = TestSessionLocal()
-
-    # Create Authorization instance with custom session
-    cas_instance = Authorization(secret_key, db_session=db)
+    # Create Authorization instance with custom connection
+    cas_instance = Authorization(secret_key, conn=conn)
 
     # Test empty results for various methods
     assert cas_instance.roles == []
@@ -284,4 +266,4 @@ def test_authorization_empty_results():
     assert cas_instance.which_users_can("nonexistent_permission") == []
 
     # Cleanup
-    db.close()
+    conn.close()
