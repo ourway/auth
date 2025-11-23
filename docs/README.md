@@ -176,13 +176,20 @@ UUID4 identifier for API authentication. Each tenant/client has a unique key.
 
 | Variable | Description | Default |
 |----------|-------------|---------|
-| `AUTH_DB_TYPE` | Database type (sqlite/postgresql) | sqlite |
-| `POSTGRESQL_URL` | PostgreSQL connection string | - |
-| `SQLITE_PATH` | SQLite database path | ~/.auth.sqlite3 |
-| `JWT_SECRET_KEY` | Secret for JWT tokens | auto-generated |
-| `ENABLE_ENCRYPTION` | Enable field encryption | false |
-| `ENCRYPTION_KEY` | Encryption key | - |
-| `SERVER_PORT` | Server port | 5000 |
+| `AUTH_DATABASE_TYPE` | Database type (sqlite/postgresql) | sqlite |
+| `AUTH_DATABASE_URL` | Full database connection URL | - |
+| `AUTH_POSTGRESQL_URL` | PostgreSQL connection string | - |
+| `AUTH_SQLITE_PATH` | SQLite database path | ~/.auth.sqlite3 |
+| `AUTH_JWT_SECRET_KEY` | Secret for JWT tokens | auto-generated |
+| `AUTH_JWT_ALGORITHM` | JWT algorithm | HS256 |
+| `AUTH_ENABLE_ENCRYPTION` | Enable field encryption | false |
+| `AUTH_ENCRYPTION_KEY` | Encryption key | - |
+| `AUTH_SERVER_HOST` | Server host | 127.0.0.1 |
+| `AUTH_SERVER_PORT` | Server port | 8000 |
+| `AUTH_DEBUG_MODE` | Debug mode | false |
+| `AUTH_ALLOW_CORS` | Enable CORS | true |
+| `AUTH_CORS_ORIGINS` | Allowed CORS origins | * |
+| `AUTH_ENABLE_AUDIT_LOGGING` | Enable audit logging | true |
 
 See [Main README - Configuration](../README.md#configuration) for complete list.
 
@@ -227,11 +234,11 @@ docker-compose up -d
 
 1. **Use HTTPS in production** - Never use HTTP for production deployments
 2. **Secure client keys** - Treat UUID4 client keys like passwords
-3. **Enable encryption** - Use `ENABLE_ENCRYPTION=true` for sensitive data
+3. **Enable encryption** - Use `AUTH_ENABLE_ENCRYPTION=true` for sensitive data
 4. **Use PostgreSQL** - SQLite is for development only
 5. **Rotate keys** - Regularly rotate JWT and encryption keys
 6. **Monitor audit logs** - Review logs for suspicious activity
-7. **Set strong JWT secret** - Use a cryptographically secure `JWT_SECRET_KEY`
+7. **Set strong JWT secret** - Use a cryptographically secure `AUTH_JWT_SECRET_KEY`
 
 ## Troubleshooting
 
@@ -254,8 +261,8 @@ A: Verify:
 **Q: Encryption errors**
 
 A: Ensure:
-1. `ENABLE_ENCRYPTION=true` is set
-2. `ENCRYPTION_KEY` is provided (32+ characters)
+1. `AUTH_ENABLE_ENCRYPTION=true` is set
+2. `AUTH_ENCRYPTION_KEY` is provided (32+ characters)
 3. Same encryption key is used consistently
 
 See [Main README - Troubleshooting](../README.md#troubleshooting) for more details.

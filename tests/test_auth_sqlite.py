@@ -4,12 +4,10 @@ import uuid
 import pytest
 
 from auth.dal.authorization_sqlite import Authorization
+from auth.models.sqlite import make_test_db_connection
 
 # Generate a valid UUID4 for tests
 secret_key = str(uuid.uuid4())
-
-
-from auth.models.sqlite import make_test_db_connection
 
 
 @pytest.fixture

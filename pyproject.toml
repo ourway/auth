@@ -4,7 +4,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "auth"
-version = "1.0.1"
+version = "1.1.0"
 description = "Authorization for humans"
 readme = {file = "README.rst", content-type = "text/x-rst"}
 requires-python = ">=3.9"
@@ -165,15 +165,11 @@ show_error_context = true
 namespace_packages = true
 
 [[tool.mypy.overrides]]
-module = ["mongoengine.*", "requests.*", "requests.exceptions.*"]
+module = ["requests.*", "requests.exceptions.*"]
 ignore_missing_imports = true
 
 [[tool.mypy.overrides]]
 module = ["auth.CAS.models.db"]
-ignore_missing_imports = true
-
-[[tool.mypy.overrides]]
-module = ["mongoengine.errors"]
 ignore_missing_imports = true
 
 [[tool.mypy.overrides]]

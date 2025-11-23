@@ -20,7 +20,7 @@ A comprehensive, production-ready authorization system with role-based access co
 ### Security Features
 - UUID4-based client authentication
 - JWT token-based authorization
-- Field-level encryption with Fernet
+- **Deterministic field-level encryption** (AES-256-CTR) - Queryable encrypted data
 - Comprehensive audit logging with timestamps
 - Input validation and sanitization
 - CORS configuration
@@ -55,11 +55,11 @@ python -m auth.main
 
 **Production (PostgreSQL):**
 ```bash
-export AUTH_DB_TYPE=postgresql
-export POSTGRESQL_URL=postgresql://username:password@localhost:5432/auth_db
-export JWT_SECRET_KEY=your_secure_secret_key
-export ENABLE_ENCRYPTION=true
-export ENCRYPTION_KEY=your_encryption_key
+export AUTH_DATABASE_TYPE=postgresql
+export AUTH_POSTGRESQL_URL=postgresql://username:password@localhost:5432/auth_db
+export AUTH_JWT_SECRET_KEY=your_secure_secret_key
+export AUTH_ENABLE_ENCRYPTION=true
+export AUTH_ENCRYPTION_KEY=your_encryption_key
 
 python -m auth.main
 ```
@@ -339,30 +339,34 @@ All API responses follow this format:
 
 | Variable | Description | Default |
 |----------|-------------|---------|
-| `AUTH_DB_TYPE` | Database type (sqlite or postgresql) | sqlite |
-| `POSTGRESQL_URL` | PostgreSQL connection string | - |
-| `SQLITE_PATH` | SQLite database path | ~/.auth.sqlite3 |
-| `JWT_SECRET_KEY` | Secret key for JWT tokens | (auto-generated) |
-| `JWT_ALGORITHM` | JWT algorithm | HS256 |
-| `JWT_ACCESS_TOKEN_EXPIRE_MINUTES` | Token expiration time | 1440 |
-| `ENABLE_ENCRYPTION` | Enable data encryption | false |
-| `ENCRYPTION_KEY` | Encryption key for sensitive data | - |
-| `SERVER_HOST` | Server host | 0.0.0.0 |
-| `SERVER_PORT` | Server port | 5000 |
-| `ALLOW_CORS` | Enable CORS | true |
-| `CORS_ORIGINS` | Allowed CORS origins | * |
+| `AUTH_DATABASE_TYPE` | Database type (sqlite or postgresql) | sqlite |
+| `AUTH_DATABASE_URL` | Full database connection URL (overrides other settings) | - |
+| `AUTH_POSTGRESQL_URL` | PostgreSQL connection string | - |
+| `AUTH_SQLITE_PATH` | SQLite database path | ~/.auth.sqlite3 |
+| `AUTH_JWT_SECRET_KEY` | Secret key for JWT tokens | (auto-generated) |
+| `AUTH_JWT_ALGORITHM` | JWT algorithm | HS256 |
+| `AUTH_JWT_ACCESS_TOKEN_EXPIRE_MINUTES` | Token expiration time | 1440 |
+| `AUTH_JWT_REFRESH_TOKEN_EXPIRE_DAYS` | Refresh token expiration time | 7 |
+| `AUTH_ENABLE_ENCRYPTION` | Enable data encryption | false |
+| `AUTH_ENCRYPTION_KEY` | Encryption key for sensitive data | - |
+| `AUTH_SERVER_HOST` | Server host | 127.0.0.1 |
+| `AUTH_SERVER_PORT` | Server port | 8000 |
+| `AUTH_DEBUG_MODE` | Debug mode | false |
+| `AUTH_ALLOW_CORS` | Enable CORS | true |
+| `AUTH_CORS_ORIGINS` | Allowed CORS origins | * |
+| `AUTH_ENABLE_AUDIT_LOGGING` | Enable audit logging | true |
 
 ### Configuration File
 
 You can also use a `.env` file:
 
 ```env
-AUTH_DB_TYPE=postgresql
-POSTGRESQL_URL=postgresql://user:pass@localhost:5432/authdb
-JWT_SECRET_KEY=your-secret-key-here
-ENABLE_ENCRYPTION=true
-ENCRYPTION_KEY=your-encryption-key-here
-SERVER_PORT=5000
+AUTH_DATABASE_TYPE=postgresql
+AUTH_POSTGRESQL_URL=postgresql://user:pass@localhost:5432/authdb
+AUTH_JWT_SECRET_KEY=your-secret-key-here
+AUTH_ENABLE_ENCRYPTION=true
+AUTH_ENCRYPTION_KEY=your-encryption-key-here
+AUTH_SERVER_PORT=8000
 ```
 
 ## Production Deployment
@@ -440,11 +444,65 @@ python -m pytest tests/test_db_*.py -v
 └─────────────────────────────────────────────┘
 ```
 
+## Data Encryption
+
+The Auth system supports **deterministic field-level encryption** for sensitive data using AES-256-CTR with HMAC-derived initialization vectors.
+
+### How It Works
+
+**Deterministic Encryption:**
+- Same plaintext always produces the same ciphertext
+- Enables database queries on encrypted fields (user lookups, permission checks)
+- Uses AES-256-CTR with PBKDF2-derived keys (100,000 iterations)
+- HMAC-based IV generation ensures determinism
+
+**What's Encrypted:**
+- User names in `auth_membership` table
+- Permission names in `auth_permission` table
+- Optional: Role descriptions
+
+**Example:**
+```python
+# Without encryption
+Database stores: "john", "jane", "admin"
+
+# With deterministic encryption enabled
+Database stores: "xxqjTSaj0YGZD7v8khExdKkV+dA=", "sJ4Yaz56uRxmNF0mj3wOwUNE8Y8=", ...
+```
+
+### Enabling Encryption
+
+1. Generate a secure encryption key:
+```bash
+python -c "from cryptography.fernet import Fernet; print(Fernet.generate_key().decode())"
+```
+
+2. Update `.env` file:
+```bash
+AUTH_ENABLE_ENCRYPTION=true
+AUTH_ENCRYPTION_KEY=your_generated_key_here
+```
+
+3. Restart the service - encryption is applied automatically to all new data
+
+### Security Considerations
+
+**Deterministic vs Non-Deterministic:**
+- **Deterministic** (current): Same value = same ciphertext (required for queries)
+- **Trade-off**: Pattern analysis possible (acceptable for usernames/permissions)
+- **Benefit**: Full database functionality with encrypted data
+
+**Best Practices:**
+- Use strong encryption keys (32+ characters)
+- Rotate keys periodically
+- Store keys securely (environment variables, secrets management)
+- Never commit encryption keys to version control
+
 ## Security Best Practices
 
 1. **Use PostgreSQL in Production** - SQLite is for development only
-2. **Enable Encryption** - Set `ENABLE_ENCRYPTION=true` for sensitive data
-3. **Secure JWT Secret** - Use a strong, unique `JWT_SECRET_KEY`
+2. **Enable Encryption** - Set `AUTH_ENABLE_ENCRYPTION=true` for sensitive data
+3. **Secure JWT Secret** - Use a strong, unique `AUTH_JWT_SECRET_KEY`
 4. **Use HTTPS** - Always use TLS/SSL in production
 5. **Rotate Keys** - Regularly rotate encryption and JWT keys
 6. **Audit Logs** - Monitor audit logs for suspicious activity
@@ -462,7 +520,7 @@ If you encounter database connection errors:
 
 ```bash
 # For PostgreSQL
-export POSTGRESQL_URL=postgresql://user:pass@localhost:5432/dbname
+export AUTH_POSTGRESQL_URL=postgresql://user:pass@localhost:5432/dbname
 
 # Check PostgreSQL is running
 psql -U user -d dbname -c "SELECT 1"
@@ -482,8 +540,8 @@ client_key = str(uuid.uuid4())  # Correct format
 If encryption is enabled, ensure the encryption key is set:
 
 ```bash
-export ENABLE_ENCRYPTION=true
-export ENCRYPTION_KEY=your-32-character-key-here
+export AUTH_ENABLE_ENCRYPTION=true
+export AUTH_ENCRYPTION_KEY=your-32-character-key-here
 ```
 
 ## Contributing

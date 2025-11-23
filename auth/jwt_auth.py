@@ -3,10 +3,11 @@ JWT-based authentication and authorization for the authorization system
 """
 
 import datetime
-import os
 from typing import Any, Dict, Optional
 
 import jwt
+
+from auth.config import get_settings
 
 
 class JWTAuth:
@@ -100,10 +101,9 @@ class JWTAuth:
         )
 
 
-# Initialize JWT auth with a default secret key (should be configured via environment in production)
-
-JWT_SECRET_KEY = os.getenv("JWT_SECRET_KEY", "default_secret_key_for_development")
-jwt_auth = JWTAuth(JWT_SECRET_KEY)
+# Initialize JWT auth with secret key from config
+settings = get_settings()
+jwt_auth = JWTAuth(settings.jwt_secret_key, settings.jwt_algorithm)
 
 
 def get_user_permissions_from_jwt(token: str) -> list:

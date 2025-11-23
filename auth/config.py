@@ -21,7 +21,12 @@ class DatabaseType(Enum):
 class Settings(BaseSettings):
     """Configuration class for the authorization system"""
 
-    model_config = SettingsConfigDict(env_file=".env", env_file_encoding="utf-8", extra="ignore")
+    model_config = SettingsConfigDict(
+        env_file=".env",
+        env_file_encoding="utf-8",
+        extra="ignore",
+        env_prefix="AUTH_"
+    )
 
     # Database settings
     database_type: DatabaseType = DatabaseType.SQLITE
@@ -42,7 +47,7 @@ class Settings(BaseSettings):
 
     # Server settings
     server_host: str = "127.0.0.1"
-    server_port: int = int(os.getenv("PORT", 8000))
+    server_port: int = 8000
     debug_mode: bool = False
 
     # Encryption settings

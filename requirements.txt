@@ -2,7 +2,6 @@ flask
 flask-cors
 sqlalchemy
 requests
-mongoengine
 pytest
 pytest-cov
 waitress

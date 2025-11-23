@@ -10,10 +10,13 @@ import os
 import sqlite3
 from typing import Any, Dict, List, Optional
 
+from auth.config import get_settings
+
 
 def make_db_connection():
     """Create SQLite3 database connection and initialize tables"""
-    db_path = os.getenv("AUTH_DB_PATH") or "auth.db"
+    settings = get_settings()
+    db_path = os.path.expanduser(settings.sqlite_path)
     conn = sqlite3.connect(db_path, check_same_thread=False)
     conn.row_factory = sqlite3.Row
     _create_tables(conn)

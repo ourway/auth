@@ -66,11 +66,11 @@ For production with PostgreSQL:
 
 .. code:: bash
 
-    export AUTH_DB_TYPE=postgresql
-    export POSTGRESQL_URL=postgresql://user:pass@localhost:5432/authdb
-    export JWT_SECRET_KEY=your-secret-key
-    export ENABLE_ENCRYPTION=true
-    export ENCRYPTION_KEY=your-encryption-key
+    export AUTH_DATABASE_TYPE=postgresql
+    export AUTH_POSTGRESQL_URL=postgresql://user:pass@localhost:5432/authdb
+    export AUTH_JWT_SECRET_KEY=your-secret-key
+    export AUTH_ENABLE_ENCRYPTION=true
+    export AUTH_ENCRYPTION_KEY=your-encryption-key
 
     # Using Waitress (recommended)
     pip install waitress
@@ -144,16 +144,22 @@ Configuration
 -------------
 Environment variables (or use .env file):
 
-- ``AUTH_DB_TYPE`` - Database type (sqlite or postgresql) [default: sqlite]
-- ``POSTGRESQL_URL`` - PostgreSQL connection string
-- ``SQLITE_PATH`` - SQLite database path [default: ~/.auth.sqlite3]
-- ``JWT_SECRET_KEY`` - Secret key for JWT tokens
-- ``ENABLE_ENCRYPTION`` - Enable data encryption [default: false]
-- ``ENCRYPTION_KEY`` - Encryption key [required if encryption enabled]
-- ``SERVER_HOST`` - Server host [default: 0.0.0.0]
-- ``SERVER_PORT`` - Server port [default: 4000]
-- ``ALLOW_CORS`` - Enable CORS [default: true]
-- ``CORS_ORIGINS`` - Allowed CORS origins [default: \*]
+- ``AUTH_DATABASE_TYPE`` - Database type (sqlite or postgresql) [default: sqlite]
+- ``AUTH_DATABASE_URL`` - Full database connection URL (overrides other settings)
+- ``AUTH_POSTGRESQL_URL`` - PostgreSQL connection string
+- ``AUTH_SQLITE_PATH`` - SQLite database path [default: ~/.auth.sqlite3]
+- ``AUTH_JWT_SECRET_KEY`` - Secret key for JWT tokens
+- ``AUTH_JWT_ALGORITHM`` - JWT algorithm [default: HS256]
+- ``AUTH_JWT_ACCESS_TOKEN_EXPIRE_MINUTES`` - Token expiration [default: 1440]
+- ``AUTH_JWT_REFRESH_TOKEN_EXPIRE_DAYS`` - Refresh token expiration [default: 7]
+- ``AUTH_ENABLE_ENCRYPTION`` - Enable data encryption [default: false]
+- ``AUTH_ENCRYPTION_KEY`` - Encryption key [required if encryption enabled]
+- ``AUTH_SERVER_HOST`` - Server host [default: 127.0.0.1]
+- ``AUTH_SERVER_PORT`` - Server port [default: 8000]
+- ``AUTH_DEBUG_MODE`` - Debug mode [default: false]
+- ``AUTH_ALLOW_CORS`` - Enable CORS [default: true]
+- ``AUTH_CORS_ORIGINS`` - Allowed CORS origins [default: \*]
+- ``AUTH_ENABLE_AUDIT_LOGGING`` - Enable audit logging [default: true]
 
 Testing
 -------
