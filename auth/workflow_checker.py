@@ -8,7 +8,6 @@ from typing import Any, Dict, List, Optional
 from apscheduler.schedulers.background import BackgroundScheduler
 from apscheduler.triggers.cron import CronTrigger
 
-from auth.database import SessionLocal
 from auth.services.service import AuthorizationService
 
 
@@ -21,7 +20,16 @@ class WorkflowPermissionChecker:
         self.scheduler.start()
 
         # Shut down the scheduler when exiting the app
-        atexit.register(lambda: self.scheduler.shutdown())
+        # Suppress any logging errors during shutdown
+        def safe_shutdown():
+            try:
+                # Disable scheduler logging before shutdown to prevent errors
+                # when logging system is already closed
+                self.scheduler._logger.disabled = True
+                self.scheduler.shutdown(wait=False)
+            except Exception:
+                pass  # Ignore errors during shutdown (e.g., closed logging)
+        atexit.register(safe_shutdown)
 
     def get_users_with_workflow_permission(
         self, workflow_name: str
@@ -124,16 +132,23 @@ workflow_checker = None
 def initialize_workflow_checker(auth_service: Optional[AuthorizationService] = None):
     """
     Initialize the workflow permission checker
+
+    Note: If no auth_service is provided, we create a temporary one for initialization.
+    The WorkflowPermissionChecker will use the auth_service's database session,
+    so no connection leak occurs.
     """
     global workflow_checker
     if auth_service is None:
-        # Create a default auth service for the workflow checker
-        db = SessionLocal()
-        auth_service = AuthorizationService(
-            db, "workflow_checker", validate_client=False
-        )
-
-    workflow_checker = WorkflowPermissionChecker(auth_service)
+        # Create a temporary database session for initialization
+        # This will be closed after the auth_service is created
+        from auth.database import get_db
+        with get_db() as db:
+            auth_service = AuthorizationService(
+                db, "workflow_checker", validate_client=False
+            )
+            workflow_checker = WorkflowPermissionChecker(auth_service)
+    else:
+        workflow_checker = WorkflowPermissionChecker(auth_service)
 
 
 def get_workflow_checker() -> Optional[WorkflowPermissionChecker]:

@@ -16,8 +16,6 @@ def validate_client_key(client_key: str) -> bool:
     """
     Validate that the client key is a valid UUID4
     """
-    if not isinstance(client_key, str):
-        return False
     match_result = CLIENT_KEY_PATTERN.match(client_key)
     return bool(match_result)
 
@@ -26,8 +24,6 @@ def validate_user_name(user_name: str) -> bool:
     """
     Validate user name format
     """
-    if not isinstance(user_name, str):
-        return False
     match_result = USER_ROLE_NAME_PATTERN.match(user_name)
     return bool(match_result)
 
@@ -36,8 +32,6 @@ def validate_role_name(role_name: str) -> bool:
     """
     Validate role name format
     """
-    if not isinstance(role_name, str):
-        return False
     match_result = USER_ROLE_NAME_PATTERN.match(role_name)
     return bool(match_result)
 
@@ -46,8 +40,6 @@ def validate_permission_name(permission_name: str) -> bool:
     """
     Validate permission name format
     """
-    if not isinstance(permission_name, str):
-        return False
     # Permission names can include more characters than role names
     pattern = re.compile(r"^[a-zA-Z0-9_-]{1,128}$")
     match_result = pattern.match(permission_name)
@@ -58,9 +50,6 @@ def sanitize_input(input_str: str) -> str:
     """
     Sanitize input by removing dangerous characters
     """
-    if not isinstance(input_str, str):
-        return ""
-
     # Remove potentially dangerous characters
     # Only allow alphanumeric, underscore, hyphen
     sanitized = re.sub(r"[^\w\-]", "", input_str)
@@ -72,9 +61,6 @@ def validate_and_sanitize_user_input(user_input: str) -> Optional[str]:
     Validate and sanitize user input
     Returns sanitized input if valid, None if invalid
     """
-    if not isinstance(user_input, str):
-        return None
-
     # Check for potential SQL injection patterns
     dangerous_patterns = [
         r"(\b(SELECT|INSERT|UPDATE|DELETE|DROP|CREATE|ALTER|EXEC|UNION|SCRIPT)\b)",

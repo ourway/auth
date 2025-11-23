@@ -7,7 +7,7 @@ from functools import wraps
 from flask import abort, jsonify, request
 
 from auth.audit import AuditAction
-from auth.database import get_db
+from auth.database import get_db, get_pool_status
 from auth.decorators import audit_log
 from auth.response_format import (
     APIResponse,
@@ -82,6 +82,24 @@ def register_routes(app):
     def ping():
         """Health check endpoint"""
         return jsonify({"message": "PONG"})
+
+    @app.route("/health", methods=["GET"])
+    def health():
+        """
+        Health check endpoint with connection pool statistics
+        Useful for monitoring and debugging in production
+        """
+        pool_stats = get_pool_status()
+        return jsonify({
+            "status": "healthy",
+            "database": {
+                "pool_size": pool_stats.get("pool_size", 0),
+                "checked_out": pool_stats.get("checked_out", 0),
+                "available": pool_stats.get("available", 0),
+                "overflow": pool_stats.get("overflow", 0),
+                "total_connections": pool_stats.get("total_connections", 0),
+            }
+        })
 
     @app.route("/api/membership/<user>/<group>", methods=["GET"])
     @with_db_session

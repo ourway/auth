@@ -10,8 +10,8 @@ import pytest
 from sqlalchemy import create_engine
 from sqlalchemy.orm import sessionmaker
 
-from auth.models.sql import Base
 from auth.main import create_app
+from auth.models.sql import Base
 
 
 # Test database setup

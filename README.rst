@@ -3,11 +3,7 @@ Auth | Enterprise Authorization System
 
 A comprehensive, production-ready authorization system with role-based access control, audit logging, encryption, and high availability features.
 
-**📚 For detailed documentation, see:**
-
-- `README.md <README.md>`_ - Complete guide with examples
-- `docs/API.md <docs/API.md>`_ - Full API reference
-- `docs/PYTHON_EXAMPLES.md <docs/PYTHON_EXAMPLES.md>`_ - Python usage examples
+**📚 For detailed documentation, see the project repository.**
 
 **✅ Fully Tested:** 152/152 tests passing (100% pass rate)
 
@@ -52,7 +48,7 @@ Installation
 
 Quick Start
 -----------
-**Start the server** (default SQLite on port 5000):
+**Start the server** (default SQLite on port 4000):
 
 .. code:: bash
 
@@ -78,11 +74,11 @@ For production with PostgreSQL:
 
     # Using Waitress (recommended)
     pip install waitress
-    waitress-serve --host=0.0.0.0 --port=5000 --threads=10 auth.main:app
+    waitress-serve --host=0.0.0.0 --port=4000 --threads=10 auth.main:app
 
     # Or using Gunicorn
     pip install gunicorn
-    gunicorn -w 4 -b 0.0.0.0:5000 auth.main:app
+    gunicorn -w 4 -b 0.0.0.0:4000 auth.main:app
 
 Python Library Usage
 --------------------
@@ -106,7 +102,7 @@ Python Library Usage
     if auth.user_has_permission('alice@example.com', 'manage_users'):
         print("Alice can manage users")
 
-For detailed Python examples, see `docs/PYTHON_EXAMPLES.md <docs/PYTHON_EXAMPLES.md>`_
+For detailed Python examples, see the project documentation.
 
 REST API Usage
 --------------
@@ -118,19 +114,19 @@ REST API Usage
     # Create role
     curl -X POST \
       -H "Authorization: Bearer $CLIENT_KEY" \
-      http://localhost:5000/api/role/admin
+      http://localhost:4000/api/role/admin
 
     # Add permission
     curl -X POST \
       -H "Authorization: Bearer $CLIENT_KEY" \
-      http://localhost:5000/api/permission/admin/manage_users
+      http://localhost:4000/api/permission/admin/manage_users
 
     # Check user permission
     curl -X GET \
       -H "Authorization: Bearer $CLIENT_KEY" \
-      http://localhost:5000/api/has_permission/alice@example.com/manage_users
+      http://localhost:4000/api/has_permission/alice@example.com/manage_users
 
-For complete API reference, see `docs/API.md <docs/API.md>`_
+For complete API reference, see the project documentation.
 
 Key Endpoints
 -------------
@@ -142,7 +138,7 @@ Key Endpoints
 - ``GET /api/user_permissions/{user}`` - Get all user permissions
 - ``GET /api/which_users_can/{name}`` - Find users with permission
 
-*See docs/API.md for complete endpoint documentation*
+*See the project documentation for complete endpoint details*
 
 Configuration
 -------------
@@ -155,9 +151,9 @@ Environment variables (or use .env file):
 - ``ENABLE_ENCRYPTION`` - Enable data encryption [default: false]
 - ``ENCRYPTION_KEY`` - Encryption key [required if encryption enabled]
 - ``SERVER_HOST`` - Server host [default: 0.0.0.0]
-- ``SERVER_PORT`` - Server port [default: 5000]
+- ``SERVER_PORT`` - Server port [default: 4000]
 - ``ALLOW_CORS`` - Enable CORS [default: true]
-- ``CORS_ORIGINS`` - Allowed CORS origins [default: *]
+- ``CORS_ORIGINS`` - Allowed CORS origins [default: \*]
 
 Testing
 -------
@@ -185,12 +181,10 @@ The system follows a layered architecture:
 
 Documentation
 -------------
-- `README.md <README.md>`_ - Complete user guide
-- `docs/API.md <docs/API.md>`_ - Full API reference
-- `docs/PYTHON_EXAMPLES.md <docs/PYTHON_EXAMPLES.md>`_ - Python usage examples
+Complete documentation including API reference and Python examples is available in the project repository.
 
-License & Copyright
--------------------
-MIT License
+License
+-------
+Apache-2.0 License
 
-© Farshid Ashouri @RODMENA LIMITED
+Copyright (c) Farshid Ashouri

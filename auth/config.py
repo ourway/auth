@@ -41,8 +41,8 @@ class Settings(BaseSettings):
     enable_audit_logging: bool = True
 
     # Server settings
-    server_host: str = "0.0.0.0"
-    server_port: int = 4000
+    server_host: str = "127.0.0.1"
+    server_port: int = int(os.getenv("PORT", 8000))
     debug_mode: bool = False
 
     # Encryption settings

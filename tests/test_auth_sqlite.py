@@ -2,17 +2,16 @@
 import uuid
 
 import pytest
-from sqlalchemy import create_engine
-from sqlalchemy.orm import sessionmaker
 
 from auth.dal.authorization_sqlite import Authorization
-from auth.models.sql import Base
 
 # Generate a valid UUID4 for tests
 secret_key = str(uuid.uuid4())
 
 
 from auth.models.sqlite import make_test_db_connection
+
+
 @pytest.fixture
 def cas():
     conn = make_test_db_connection()

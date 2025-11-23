@@ -11,7 +11,7 @@ echo "========================================="
 echo
 
 # Configuration
-SERVER_URL="http://localhost:4000"
+SERVER_URL="https://auth.rodmena.app"
 CLIENT_KEY="$(uuidgen)"
 echo "Using client key: $CLIENT_KEY"
 echo

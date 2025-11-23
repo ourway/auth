@@ -1,0 +1,32 @@
+[Unit]
+Description=Auth Server - Authorization for humans
+After=network.target postgresql.service
+Wants=postgresql.service
+
+[Service]
+Type=notify
+User=farshid
+Group=farshid
+WorkingDirectory=/home/farshid/develop/auth
+EnvironmentFile=/home/farshid/develop/auth/.env
+
+# Virtual environment and Gunicorn path
+ExecStart=/home/farshid/develop/auth/.venv/bin/gunicorn \
+    --config /home/farshid/develop/auth/gunicorn_config.py \
+    auth.main:app
+
+# Restart policy
+Restart=always
+RestartSec=10
+
+# Security
+NoNewPrivileges=true
+PrivateTmp=true
+
+# Logging
+StandardOutput=journal
+StandardError=journal
+SyslogIdentifier=auth-server
+
+[Install]
+WantedBy=multi-user.target
