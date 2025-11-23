@@ -4,7 +4,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "auth"
-version = "1.1.0"
+version = "1.1.1"
 description = "Authorization for humans"
 readme = {file = "README.rst", content-type = "text/x-rst"}
 requires-python = ">=3.9"
@@ -37,11 +37,10 @@ dependencies = [
     "flask-cors>=3.0.0",
     "sqlalchemy>=1.4.0",
     "waitress>=2.0.0",
-
     "PyJWT>=2.0.0",
     "cryptography>=3.0.0",
     "APScheduler>=3.0.0",
-    "psycopg3[binary]>=3.0.0",
+    "psycopg[binary]>=3.0.0",
 ]
 
 [project.optional-dependencies]
