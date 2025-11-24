@@ -20,28 +20,44 @@ from sqlalchemy.sql import func
 from auth.encryption import decrypt_sensitive_data, encrypt_sensitive_data
 
 
+# Get schema configuration
+def _get_schema():
+    """Get configured schema name (e.g., 'auth_rbac' for Highway)"""
+    try:
+        from auth.config import get_settings
+        settings = get_settings()
+        return settings.database_schema or None
+    except Exception:
+        return None
+
+
 class Base(DeclarativeBase):
     """Base class for SQLAlchemy models"""
     pass
 
 
 
+# Get schema for table definitions
+_SCHEMA = _get_schema()
+
 membership_groups = Table(
     "membership_groups",
     Base.metadata,
     Column(
-        "membership_id", Integer, ForeignKey("auth_membership.id"), primary_key=True
+        "membership_id", Integer, ForeignKey(f"{_SCHEMA + '.' if _SCHEMA else ''}auth_membership.id"), primary_key=True
     ),
-    Column("group_id", Integer, ForeignKey("auth_group.id"), primary_key=True),
+    Column("group_id", Integer, ForeignKey(f"{_SCHEMA + '.' if _SCHEMA else ''}auth_group.id"), primary_key=True),
+    schema=_SCHEMA,
 )
 
 permission_groups = Table(
     "permission_groups",
     Base.metadata,
     Column(
-        "permission_id", Integer, ForeignKey("auth_permission.id"), primary_key=True
+        "permission_id", Integer, ForeignKey(f"{_SCHEMA + '.' if _SCHEMA else ''}auth_permission.id"), primary_key=True
     ),
-    Column("group_id", Integer, ForeignKey("auth_group.id"), primary_key=True),
+    Column("group_id", Integer, ForeignKey(f"{_SCHEMA + '.' if _SCHEMA else ''}auth_group.id"), primary_key=True),
+    schema=_SCHEMA,
 )
 
 
@@ -49,6 +65,13 @@ class AuthGroup(Base):
     """AuthGroup model for SQLAlchemy"""
 
     __tablename__ = "auth_group"
+    __table_args__ = (
+        UniqueConstraint("creator", "role", name="uq_auth_group_creator_role"),
+        {
+            "sqlite_autoincrement": True,
+            "schema": _SCHEMA,
+        },
+    )
 
     id = Column(Integer, primary_key=True, index=True)
     creator = Column(String(64), nullable=False, index=True)
@@ -64,13 +87,6 @@ class AuthGroup(Base):
     )
     permissions = relationship(
         "AuthPermission", secondary=permission_groups, back_populates="groups"
-    )
-
-    __table_args__ = (
-        UniqueConstraint("creator", "role", name="uq_auth_group_creator_role"),
-        {
-            "sqlite_autoincrement": True,
-        },
     )
 
     @property
@@ -95,6 +111,13 @@ class AuthMembership(Base):
     """AuthMembership model for SQLAlchemy"""
 
     __tablename__ = "auth_membership"
+    __table_args__ = (
+        UniqueConstraint("creator", "user", name="uq_auth_membership_creator_user"),
+        {
+            "sqlite_autoincrement": True,
+            "schema": _SCHEMA,
+        },
+    )
 
     id = Column(Integer, primary_key=True, index=True)
     _user = Column(
@@ -108,13 +131,6 @@ class AuthMembership(Base):
     # Relationships
     groups = relationship(
         "AuthGroup", secondary=membership_groups, back_populates="memberships"
-    )
-
-    __table_args__ = (
-        UniqueConstraint("creator", "user", name="uq_auth_membership_creator_user"),
-        {
-            "sqlite_autoincrement": True,
-        },
     )
 
     @property
@@ -139,6 +155,13 @@ class AuthPermission(Base):
     """AuthPermission model for SQLAlchemy"""
 
     __tablename__ = "auth_permission"
+    __table_args__ = (
+        UniqueConstraint("creator", "name", name="uq_auth_permission_creator_name"),
+        {
+            "sqlite_autoincrement": True,
+            "schema": _SCHEMA,
+        },
+    )
 
     id = Column(Integer, primary_key=True, index=True)
     _name = Column(
@@ -152,13 +175,6 @@ class AuthPermission(Base):
     # Relationships
     groups = relationship(
         "AuthGroup", secondary=permission_groups, back_populates="permissions"
-    )
-
-    __table_args__ = (
-        UniqueConstraint("creator", "name", name="uq_auth_permission_creator_name"),
-        {
-            "sqlite_autoincrement": True,
-        },
     )
 
     @property

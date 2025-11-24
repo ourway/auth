@@ -54,6 +54,9 @@ class Settings(BaseSettings):
     enable_encryption: bool = False
     encryption_key: str = ""
 
+    # Schema settings (for PostgreSQL multi-tenancy)
+    database_schema: str = ""  # Optional schema name (e.g., "auth_rbac" for Highway)
+
     @model_validator(mode="after")
     def assemble_db_connection(self) -> "Settings":
         # If database_url is not explicitly set, construct it from other fields
