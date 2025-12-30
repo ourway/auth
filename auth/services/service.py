@@ -165,45 +165,32 @@ class AuthorizationService:
         return result
 
     def add_role(self, role: str, description: Optional[str] = None) -> bool:
-        """Add a new role"""
-        # Check if role already exists
-        existing = (
-            self.db.query(AuthGroup)
-            .filter(AuthGroup.creator == self.client, AuthGroup.role == role)
-            .first()
-        )
+        """Add a new role - atomic idempotent using ON CONFLICT.
 
-        if existing:
-            if not existing.is_active:
-                existing.is_active = True  # type: ignore[assignment]
-                if description is not None:
-                    existing.description = description
-                self.db.commit()
-                return True
-            # For compatibility with old tests, return True if role already exists
-            return True
+        Uses PostgreSQL's INSERT ... ON CONFLICT for race-condition-free upsert.
+        The unique constraint (creator, role) ensures atomicity.
+        """
+        from sqlalchemy import text
 
         try:
-            new_group = AuthGroup(
-                creator=self.client, role=role, description=description
+            self.db.execute(
+                text("""
+                    INSERT INTO auth_rbac.auth_group
+                        (creator, role, description, is_active, date_created, modified)
+                    VALUES
+                        (:creator, :role, :description, true, NOW(), NOW())
+                    ON CONFLICT (creator, role) DO UPDATE SET
+                        is_active = true,
+                        description = COALESCE(EXCLUDED.description, auth_rbac.auth_group.description),
+                        modified = NOW()
+                """),
+                {"creator": self.client, "role": role, "description": description},
             )
-            self.db.add(new_group)
             self.db.commit()
+            return True
         except Exception:
             self.db.rollback()
-            # Refresh session state after rollback
-            self.db.expunge_all()
-            # Check if the role was created by another transaction
-            existing = (
-                self.db.query(AuthGroup)
-                .filter(AuthGroup.creator == self.client, AuthGroup.role == role)
-                .first()
-            )
-            if existing:
-                return True  # Role already exists
-            return False  # Failed to create role
-
-        return True
+            return False
 
     def del_role(self, role: str) -> bool:
         """Delete a role"""
@@ -220,54 +207,57 @@ class AuthorizationService:
         return False
 
     def add_membership(self, user: str, role: str) -> bool:
-        """Add user to a role"""
-        group = (
-            self.db.query(AuthGroup)
-            .filter(
-                AuthGroup.creator == self.client,
-                AuthGroup.role == role,
-                AuthGroup.is_active,
-            )
-            .first()
-        )
+        """Add user to a role - atomic idempotent using ON CONFLICT.
 
-        if not group:
+        Uses PostgreSQL's INSERT ... ON CONFLICT for race-condition-free operations.
+        """
+        from sqlalchemy import text
+
+        # Get group ID
+        group_result = self.db.execute(
+            text("""
+                SELECT id FROM auth_rbac.auth_group
+                WHERE creator = :creator AND role = :role AND is_active = true
+            """),
+            {"creator": self.client, "role": role},
+        )
+        row = group_result.fetchone()
+        if not row:
             return False
+        group_id = row[0]
 
-        # Get or create membership
-        membership = (
-            self.db.query(AuthMembership)
-            .filter(AuthMembership.creator == self.client, AuthMembership._user == self._get_encrypted_user(user))
-            .first()
-        )
+        try:
+            # Upsert membership
+            encrypted_user = self._get_encrypted_user(user)
+            membership_result = self.db.execute(
+                text("""
+                    INSERT INTO auth_rbac.auth_membership
+                        (creator, "user", is_active, date_created, modified)
+                    VALUES
+                        (:creator, :user, true, NOW(), NOW())
+                    ON CONFLICT (creator, "user") DO UPDATE SET
+                        is_active = true,
+                        modified = NOW()
+                    RETURNING id
+                """),
+                {"creator": self.client, "user": encrypted_user},
+            )
+            membership_id = membership_result.fetchone()[0]
 
-        if not membership:
-            try:
-                membership = AuthMembership(creator=self.client, user=user)
-                self.db.add(membership)
-                self.db.flush()  # Get the ID
-            except Exception:
-                self.db.rollback()
-                # Refresh session state after rollback
-                self.db.expunge_all()
-                # Try to get the membership again in case it was created by another transaction
-                membership = (
-                    self.db.query(AuthMembership)
-                    .filter(
-                        AuthMembership.creator == self.client,
-                        AuthMembership._user == self._get_encrypted_user(user),
-                    )
-                    .first()
-                )
-                if not membership:
-                    return False
-
-        # Check if user is already in the group
-        if group not in membership.groups:
-            membership.groups.append(group)
+            # Link membership to group (junction table)
+            self.db.execute(
+                text("""
+                    INSERT INTO auth_rbac.membership_groups (membership_id, group_id)
+                    VALUES (:membership_id, :group_id)
+                    ON CONFLICT (membership_id, group_id) DO NOTHING
+                """),
+                {"membership_id": membership_id, "group_id": group_id},
+            )
             self.db.commit()
-
-        return True
+            return True
+        except Exception:
+            self.db.rollback()
+            return False
 
     def del_membership(self, user: str, role: str) -> bool:
         """Remove user from a role"""
@@ -318,60 +308,60 @@ class AuthorizationService:
         )
 
     def add_permission(self, role: str, name: str) -> bool:
-        """Add permission to a role"""
+        """Add permission to a role - atomic idempotent using ON CONFLICT.
+
+        Uses PostgreSQL's INSERT ... ON CONFLICT for race-condition-free operations.
+        """
+        from sqlalchemy import text
+
         if self.has_permission(role, name):
             return True
 
-        group = (
-            self.db.query(AuthGroup)
-            .filter(
-                AuthGroup.creator == self.client,
-                AuthGroup.role == role,
-                AuthGroup.is_active,
-            )
-            .first()
+        # Get group ID
+        group_result = self.db.execute(
+            text("""
+                SELECT id FROM auth_rbac.auth_group
+                WHERE creator = :creator AND role = :role AND is_active = true
+            """),
+            {"creator": self.client, "role": role},
         )
-
-        if not group:
+        row = group_result.fetchone()
+        if not row:
             return False
+        group_id = row[0]
 
-        # Try to get existing permission first
-        permission = (
-            self.db.query(AuthPermission)
-            .filter(AuthPermission.creator == self.client, AuthPermission._name == self._get_encrypted_permission(name))
-            .first()
-        )
+        try:
+            # Upsert permission
+            encrypted_name = self._get_encrypted_permission(name)
+            perm_result = self.db.execute(
+                text("""
+                    INSERT INTO auth_rbac.auth_permission
+                        (creator, name, is_active, date_created, modified)
+                    VALUES
+                        (:creator, :name, true, NOW(), NOW())
+                    ON CONFLICT (creator, name) DO UPDATE SET
+                        is_active = true,
+                        modified = NOW()
+                    RETURNING id
+                """),
+                {"creator": self.client, "name": encrypted_name},
+            )
+            perm_id = perm_result.fetchone()[0]
 
-        if not permission:
-            # Check again inside a try-catch to handle race conditions or concurrent creation
-            try:
-                permission = AuthPermission(creator=self.client, name=name)
-                self.db.add(permission)
-                self.db.flush()
-            except Exception:
-                # If there was an exception (likely IntegrityError due to duplicate),
-                # rollback and get the existing permission
-                self.db.rollback()
-                # Refresh the session state after rollback
-                self.db.expunge_all()
-                permission = (
-                    self.db.query(AuthPermission)
-                    .filter(
-                        AuthPermission.creator == self.client,
-                        AuthPermission._name == self._get_encrypted_permission(name),
-                    )
-                    .first()
-                )
-                # If it's still None after rollback, something else went wrong
-                if not permission:
-                    return False
-
-        # Check if permission is already in the group
-        if group not in permission.groups:
-            permission.groups.append(group)
+            # Link permission to group (junction table)
+            self.db.execute(
+                text("""
+                    INSERT INTO auth_rbac.permission_groups (permission_id, group_id)
+                    VALUES (:perm_id, :group_id)
+                    ON CONFLICT (permission_id, group_id) DO NOTHING
+                """),
+                {"perm_id": perm_id, "group_id": group_id},
+            )
             self.db.commit()
-
-        return True
+            return True
+        except Exception:
+            self.db.rollback()
+            return False
 
     def del_permission(self, role: str, name: str) -> bool:
         """Remove permission from a role"""
