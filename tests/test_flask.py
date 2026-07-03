@@ -2,42 +2,20 @@
 Flask test suite using Flask test client
 """
 
-import os
-import tempfile
 import uuid
 
 import pytest
-from sqlalchemy import create_engine
-from sqlalchemy.orm import sessionmaker
 
 from auth.main import create_app
-from auth.models.sql import Base
 
 
-# Test database setup
 @pytest.fixture
 def test_db():
-    # Create temporary database
-    with tempfile.NamedTemporaryFile(suffix=".db", delete=False) as tmp:
-        db_path = tmp.name
-
-    # Create test app with temporary database
-    test_engine = create_engine(
-        f"sqlite:///{db_path}", connect_args={"check_same_thread": False}
-    )
-    sessionmaker(autocommit=False, autoflush=False, bind=test_engine)
-
-    # Create tables
-    Base.metadata.create_all(bind=test_engine)
-
-    # Create app with test database
+    # The app uses the global engine, which tests/conftest.py points at an
+    # isolated temporary SQLite database before `auth` is first imported.
     app = create_app()
     app.config["TESTING"] = True
-
     yield app
-
-    # Cleanup
-    os.unlink(db_path)
 
 
 @pytest.fixture
