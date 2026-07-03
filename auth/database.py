@@ -286,6 +286,7 @@ def create_tables(raise_on_error: bool = False):
     """
     from sqlalchemy import text
 
+    import auth.audit  # noqa: F401  (registers AuditLog in Base.metadata)
     from auth.models.sql import Base
 
     settings = get_settings()

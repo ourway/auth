@@ -102,6 +102,10 @@ addopts = [
     "--strict-markers",
     "--strict-config",
     "--tb=short",
+    "-m", "not postgres",
+]
+markers = [
+    "postgres: integration tests against a real PostgreSQL (run via 'make test-postgres')",
 ]
 
 [tool.coverage.run]
