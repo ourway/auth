@@ -35,8 +35,15 @@ echo "==> Installing into a fresh venv"
 "$WORK_DIR/venv/bin/pip" install --quiet "$WHEEL"
 
 echo "==> Import + README quick-start on SQLite"
+# Run from the temp dir AND pin every AUTH_ var: pydantic-settings reads a
+# .env from the current working directory, and an unset AUTH_DATABASE_URL
+# would let a developer's .env silently point this at a real database.
+cd "$WORK_DIR"
 env -i PATH="$PATH" HOME="$WORK_DIR" \
     AUTH_DATABASE_TYPE=sqlite \
+    AUTH_DATABASE_URL= \
+    AUTH_POSTGRESQL_URL= \
+    AUTH_DATABASE_SCHEMA= \
     AUTH_SQLITE_PATH="$WORK_DIR/smoke.sqlite3" \
     AUTH_ENABLE_ENCRYPTION=false \
     "$WORK_DIR/venv/bin/python" - <<'EOF'
