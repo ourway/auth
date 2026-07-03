@@ -2,23 +2,32 @@
 Flask application setup
 """
 
+import logging
+
 from flask import Flask
 from flask_cors import CORS
 
 from auth.audit import setup_audit_tables
+from auth.config import get_settings
 from auth.logging_config import setup_logging
 from auth.workflow_checker import initialize_workflow_checker
 
 setup_logging()
 
+logger = logging.getLogger(__name__)
 
 
 def create_app():
     # Create Flask app
     app = Flask(__name__)
 
-    # Enable CORS
-    CORS(app)
+    # Enable CORS according to configuration (default: all origins)
+    settings = get_settings()
+    if settings.allow_cors:
+        origins = settings.cors_origins or "*"
+        if origins != "*":
+            origins = [origin.strip() for origin in origins.split(",")]
+        CORS(app, origins=origins)
 
     # Create tables on startup
     with app.app_context():
@@ -31,6 +40,19 @@ def create_app():
     from auth.routes import register_routes
 
     register_routes(app)
+
+    @app.errorhandler(Exception)
+    def _unhandled_exception(e):
+        from werkzeug.exceptions import HTTPException
+
+        if isinstance(e, HTTPException):
+            # abort(...) and friends keep their existing responses
+            return e
+
+        from auth.response_format import APIResponse
+
+        logger.exception("Unhandled exception while processing request")
+        return APIResponse.server_error("An internal error occurred")
 
     return app
 

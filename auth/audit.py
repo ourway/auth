@@ -4,14 +4,19 @@ Audit logging for the authorization system
 
 import json
 import logging
-from datetime import datetime
+from datetime import datetime, timezone
 from enum import Enum
 from typing import Any, Dict, Optional
 
 from sqlalchemy import Column, DateTime, Integer, String, Text
 
 from auth.database import SessionLocal
-from auth.models.sql import Base
+from auth.models.sql import _SCHEMA, Base
+
+
+def _utcnow() -> datetime:
+    """Naive UTC now — same values datetime.utcnow() produced, no deprecation."""
+    return datetime.now(timezone.utc).replace(tzinfo=None)
 
 
 class AuditAction(Enum):
@@ -35,9 +40,13 @@ class AuditLog(Base):
     """Audit log model"""
 
     __tablename__ = "audit_log"
+    # Follows database_schema like the RBAC tables. Existing deployments that
+    # created audit_log in the default schema can move it with:
+    #   ALTER TABLE audit_log SET SCHEMA <schema>;
+    __table_args__ = {"schema": _SCHEMA}
 
     id = Column(Integer, primary_key=True, index=True)
-    timestamp = Column(DateTime, default=datetime.utcnow, nullable=False)
+    timestamp = Column(DateTime, default=_utcnow, nullable=False)
     client_id = Column(String(64), index=True, nullable=False)
     user = Column(String(64), index=True)
     action = Column(String(50), nullable=False)
@@ -98,7 +107,7 @@ def log_audit_event(
             "action": action.value,
             "resource": resource,
             "success": success,
-            "timestamp": datetime.utcnow().isoformat(),
+            "timestamp": _utcnow().isoformat(),
         }
         if details:
             log_msg["details"] = details

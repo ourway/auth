@@ -53,7 +53,7 @@ def _get_auth_service(db):
         abort(401, description="Authorization header is missing.")
 
     parts = auth_header.split()
-    if parts[0].lower() != "bearer" or len(parts) != 2:
+    if len(parts) != 2 or parts[0].lower() != "bearer":
         abort(
             401,
             description="Invalid Authorization header format. Must be 'Bearer <token>'.",

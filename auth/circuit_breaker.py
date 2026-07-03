@@ -3,6 +3,7 @@ Circuit Breaker Integration for the Authorization System
 This module integrates the highway_circuitbreaker library for resilience
 """
 
+import threading
 import time
 from functools import wraps
 from typing import Callable, Optional, Type
@@ -36,13 +37,16 @@ class CircuitBreaker:
         self.failure_count = 0
         self.last_failure_time: Optional[float] = None
         self.state = CircuitBreakerState.CLOSED
+        # Instances are shared module-level across client threads
+        self._lock = threading.Lock()
 
     def call(self, func: Callable, *args, **kwargs):
-        if self.state == CircuitBreakerState.OPEN:
-            if self.last_failure_time is not None and time.time() - self.last_failure_time >= self.recovery_timeout:
-                self.state = CircuitBreakerState.HALF_OPEN
-            else:
-                raise Exception(f"Circuit breaker {self.name} is OPEN")
+        with self._lock:
+            if self.state == CircuitBreakerState.OPEN:
+                if self.last_failure_time is not None and time.time() - self.last_failure_time >= self.recovery_timeout:
+                    self.state = CircuitBreakerState.HALF_OPEN
+                else:
+                    raise Exception(f"Circuit breaker {self.name} is OPEN")
 
         try:
             result = func(*args, **kwargs)
@@ -53,14 +57,16 @@ class CircuitBreaker:
             raise e
 
     def on_success(self):
-        self.failure_count = 0
-        self.state = CircuitBreakerState.CLOSED
+        with self._lock:
+            self.failure_count = 0
+            self.state = CircuitBreakerState.CLOSED
 
     def on_failure(self):
-        self.failure_count += 1
-        self.last_failure_time = time.time()
-        if self.failure_count >= self.failure_threshold:
-            self.state = CircuitBreakerState.OPEN
+        with self._lock:
+            self.failure_count += 1
+            self.last_failure_time = time.time()
+            if self.failure_count >= self.failure_threshold:
+                self.state = CircuitBreakerState.OPEN
 
 
 # Circuit breakers for different operations

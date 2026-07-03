@@ -2,9 +2,16 @@
 Consistent error handling and response formatting for the authorization system
 """
 
+import os
+from datetime import datetime, timezone
 from typing import Any, Dict, Optional, Tuple
 
 from flask import Response, jsonify
+
+
+def _utc_timestamp() -> str:
+    """Naive-UTC ISO timestamp — same format datetime.utcnow() produced."""
+    return datetime.now(timezone.utc).replace(tzinfo=None).isoformat()
 
 
 class APIResponse:
@@ -20,7 +27,7 @@ class APIResponse:
             "code": code,
             "message": message,
             "data": data,
-            "timestamp": __import__("datetime").datetime.utcnow().isoformat(),
+            "timestamp": _utc_timestamp(),
         }
         return jsonify(response_data), code
 
@@ -34,7 +41,7 @@ class APIResponse:
             "code": code,
             "message": message,
             "details": details or {},
-            "timestamp": __import__("datetime").datetime.utcnow().isoformat(),
+            "timestamp": _utc_timestamp(),
         }
         return jsonify(response_data), code
 
@@ -99,7 +106,7 @@ def handle_exception(e: Exception) -> Tuple[Response, int]:
             "error_message": error_msg,
             "dev_error": (
                 str(e)
-                if __import__("os").getenv("DEBUG", "").lower() == "true"
+                if os.getenv("DEBUG", "").lower() == "true"
                 else "Error details hidden"
             ),
         },

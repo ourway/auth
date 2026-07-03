@@ -3,6 +3,7 @@ APScheduler integration for workflow permission checking
 """
 
 import atexit
+from contextlib import contextmanager
 from typing import Any, Dict, List, Optional
 
 from apscheduler.schedulers.background import BackgroundScheduler
@@ -14,8 +15,16 @@ from auth.services.service import AuthorizationService
 class WorkflowPermissionChecker:
     """Handles workflow permission checking for APScheduler integration"""
 
-    def __init__(self, auth_service: AuthorizationService):
+    def __init__(
+        self,
+        auth_service: Optional[AuthorizationService] = None,
+        client: str = "workflow_checker",
+    ):
+        # When no service is supplied, each operation opens its own session
+        # via _service(); a long-lived service would otherwise hold a session
+        # that get_db() has already closed.
         self.auth_service = auth_service
+        self.client = auth_service.client if auth_service is not None else client
         self.scheduler = BackgroundScheduler()
         self.scheduler.start()
 
@@ -31,6 +40,17 @@ class WorkflowPermissionChecker:
                 pass  # Ignore errors during shutdown (e.g., closed logging)
         atexit.register(safe_shutdown)
 
+    @contextmanager
+    def _service(self):
+        """Yield an AuthorizationService backed by a live database session."""
+        if self.auth_service is not None:
+            yield self.auth_service
+        else:
+            from auth.database import get_db
+
+            with get_db() as db:
+                yield AuthorizationService(db, self.client, validate_client=False)
+
     def get_users_with_workflow_permission(
         self, workflow_name: str
     ) -> List[Dict[str, Any]]:
@@ -39,7 +59,8 @@ class WorkflowPermissionChecker:
         """
         try:
             # In our current structure, which_users_can returns members with user/role format
-            users_with_permission = self.auth_service.which_users_can(workflow_name)
+            with self._service() as svc:
+                users_with_permission = svc.which_users_can(workflow_name)
 
             # Extract unique users from the results
             unique_users = set()
@@ -105,7 +126,8 @@ class WorkflowPermissionChecker:
         Get all workflows that a user has permission to run
         """
         try:
-            permissions = self.auth_service.get_user_permissions(user)
+            with self._service() as svc:
+                permissions = svc.get_user_permissions(user)
             workflow_names: List[str] = [
                 str(perm.get("name")) for perm in permissions if perm.get("name")
             ]
@@ -119,7 +141,8 @@ class WorkflowPermissionChecker:
         Check if a specific user can run a specific workflow
         """
         try:
-            return self.auth_service.user_has_permission(user, workflow_name)
+            with self._service() as svc:
+                return svc.user_has_permission(user, workflow_name)
         except Exception as e:
             print(f"Error checking user workflow permission: {e}")
             return False
@@ -133,20 +156,14 @@ def initialize_workflow_checker(auth_service: Optional[AuthorizationService] = N
     """
     Initialize the workflow permission checker
 
-    Note: If no auth_service is provided, we create a temporary one for initialization.
-    The WorkflowPermissionChecker will use the auth_service's database session,
-    so no connection leak occurs.
+    Without an explicit auth_service the checker opens a fresh database
+    session per operation. Re-initialization without arguments is a no-op so
+    repeated create_app() calls don't leak scheduler threads.
     """
     global workflow_checker
     if auth_service is None:
-        # Create a temporary database session for initialization
-        # This will be closed after the auth_service is created
-        from auth.database import get_db
-        with get_db() as db:
-            auth_service = AuthorizationService(
-                db, "workflow_checker", validate_client=False
-            )
-            workflow_checker = WorkflowPermissionChecker(auth_service)
+        if workflow_checker is None:
+            workflow_checker = WorkflowPermissionChecker()
     else:
         workflow_checker = WorkflowPermissionChecker(auth_service)
 

@@ -30,13 +30,13 @@ class JWTAuth:
         if expires_delta is None:
             expires_delta = datetime.timedelta(hours=24)  # Default to 24 hours
 
-        expire = datetime.datetime.utcnow() + expires_delta
+        now = datetime.datetime.now(datetime.timezone.utc)
         payload = {
             "sub": client_id,
             "user_id": user_id,
             "permissions": permissions or [],
-            "exp": expire,
-            "iat": datetime.datetime.utcnow(),
+            "exp": now + expires_delta,
+            "iat": now,
         }
 
         encoded_token = jwt.encode(payload, self.secret_key, algorithm=self.algorithm)
@@ -64,8 +64,10 @@ class JWTAuth:
         if not payload:
             return False
 
-        # Check if token has expired
-        if payload.get("exp", 0) < datetime.datetime.utcnow().timestamp():
+        # Check if token has expired (exp is an epoch timestamp; the old
+        # utcnow().timestamp() comparison was skewed by the local UTC offset)
+        now_epoch = datetime.datetime.now(datetime.timezone.utc).timestamp()
+        if payload.get("exp", 0) < now_epoch:
             return False
 
         # If required permission is specified, check if it exists in the payload

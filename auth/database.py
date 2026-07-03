@@ -110,6 +110,15 @@ class DatabaseEngine(metaclass=SingletonMeta):
 
     def _create_sqlite_engine(self, database_url: str) -> Engine:
         """Create SQLite engine with connection pooling"""
+        if ":memory:" in database_url:
+            # A QueuePool would hand out a different empty in-memory database
+            # per pooled connection; share a single connection instead.
+            return create_engine(
+                database_url,
+                poolclass=pool.StaticPool,
+                connect_args={"check_same_thread": False},
+            )
+
         pool_size, max_overflow = self._calculate_pool_size()
 
         return create_engine(
@@ -268,17 +277,33 @@ def get_pool_status() -> dict:
     return _db_engine.get_pool_status()
 
 
-def create_tables():
-    """Create database tables"""
-    from sqlalchemy.exc import OperationalError
+def create_tables(raise_on_error: bool = False):
+    """Create database tables (and the configured schema on PostgreSQL).
+
+    Non-raising by default: this runs at import time via auth.main, and
+    existing deployments rely on the app starting even when the runtime DB
+    role has no DDL rights. Failures are logged with the real exception.
+    """
+    from sqlalchemy import text
 
     from auth.models.sql import Base
 
+    settings = get_settings()
     try:
+        if (
+            settings.database_type == DatabaseType.POSTGRESQL
+            and settings.database_schema
+        ):
+            with engine.begin() as conn:
+                conn.execute(
+                    text(f'CREATE SCHEMA IF NOT EXISTS "{settings.database_schema}"')
+                )
         Base.metadata.create_all(bind=engine, checkfirst=True)
         logger.info("Tables created successfully.")
-    except (OperationalError, sqlite3.OperationalError):
-        logger.info("Tables already exist.")
+    except Exception:
+        logger.exception("create_tables failed")
+        if raise_on_error:
+            raise
 
 
 def log_pool_stats():
