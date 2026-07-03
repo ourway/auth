@@ -2,13 +2,23 @@
 SQLAlchemy-based authorization service
 """
 
+import logging
 import uuid
 from typing import Any, Dict, List, Optional
 
+from sqlalchemy import func, select
 from sqlalchemy.orm import Session
 
 from auth.encryption import encrypt_sensitive_data
-from auth.models.sql import AuthGroup, AuthMembership, AuthPermission
+from auth.models.sql import (
+    AuthGroup,
+    AuthMembership,
+    AuthPermission,
+    membership_groups,
+    permission_groups,
+)
+
+logger = logging.getLogger(__name__)
 
 
 def validate_client_key(client: str) -> bool:
@@ -41,6 +51,21 @@ class AuthorizationService:
     def _get_encrypted_permission(self, name: str) -> str:
         """Get the encrypted version of a permission name for database queries"""
         return encrypt_sensitive_data(name) or name
+
+    def _dialect_insert(self, table):
+        """INSERT construct with ON CONFLICT support for the bound dialect.
+
+        The table objects carry the configured schema (settings.database_schema),
+        so upserts follow the deployment's schema instead of a hardcoded name.
+        """
+        dialect = self.db.get_bind().dialect.name
+        if dialect == "postgresql":
+            from sqlalchemy.dialects.postgresql import insert as dialect_insert
+        elif dialect == "sqlite":
+            from sqlalchemy.dialects.sqlite import insert as dialect_insert
+        else:
+            raise NotImplementedError(f"Upserts not supported on dialect {dialect!r}")
+        return dialect_insert(table)
 
     def get_roles(self) -> List[Dict[str, Any]]:
         """Get all roles for the client"""
@@ -165,30 +190,41 @@ class AuthorizationService:
         return result
 
     def add_role(self, role: str, description: Optional[str] = None) -> bool:
-        """Add a new role - atomic idempotent using ON CONFLICT.
+        """Add a new role - atomic idempotent upsert.
 
-        Uses PostgreSQL's INSERT ... ON CONFLICT for race-condition-free upsert.
-        The unique constraint (creator, role) ensures atomicity.
+        Uses INSERT ... ON CONFLICT (PostgreSQL and SQLite) for a
+        race-condition-free upsert. The unique constraint (creator, role)
+        ensures atomicity.
         """
-        from sqlalchemy import text
-
         try:
-            self.db.execute(
-                text("""
-                    INSERT INTO auth_rbac.auth_group
-                        (creator, role, description, is_active, date_created, modified)
-                    VALUES
-                        (:creator, :role, :description, true, NOW(), NOW())
-                    ON CONFLICT (creator, role) DO UPDATE SET
-                        is_active = true,
-                        description = COALESCE(EXCLUDED.description, auth_rbac.auth_group.description),
-                        modified = NOW()
-                """),
-                {"creator": self.client, "role": role, "description": description},
+            table = AuthGroup.__table__
+            # Mirror the AuthGroup.description setter: store encrypted.
+            encrypted_description = (
+                encrypt_sensitive_data(description) if description else description
             )
+            stmt = self._dialect_insert(table).values(
+                creator=self.client,
+                role=role,
+                description=encrypted_description,
+                is_active=True,
+                date_created=func.now(),
+                modified=func.now(),
+            )
+            stmt = stmt.on_conflict_do_update(
+                index_elements=["creator", "role"],
+                set_={
+                    "is_active": True,
+                    "description": func.coalesce(
+                        stmt.excluded.description, table.c.description
+                    ),
+                    "modified": func.now(),
+                },
+            )
+            self.db.execute(stmt)
             self.db.commit()
             return True
         except Exception:
+            logger.exception("add_role failed (client=%s, role=%r)", self.client, role)
             self.db.rollback()
             return False
 
@@ -207,55 +243,61 @@ class AuthorizationService:
         return False
 
     def add_membership(self, user: str, role: str) -> bool:
-        """Add user to a role - atomic idempotent using ON CONFLICT.
+        """Add user to a role - atomic idempotent upsert.
 
-        Uses PostgreSQL's INSERT ... ON CONFLICT for race-condition-free operations.
+        Uses INSERT ... ON CONFLICT (PostgreSQL and SQLite) for
+        race-condition-free operations.
         """
-        from sqlalchemy import text
-
-        # Get group ID
-        group_result = self.db.execute(
-            text("""
-                SELECT id FROM auth_rbac.auth_group
-                WHERE creator = :creator AND role = :role AND is_active = true
-            """),
-            {"creator": self.client, "role": role},
-        )
-        row = group_result.fetchone()
-        if not row:
-            return False
-        group_id = row[0]
-
         try:
+            group_table = AuthGroup.__table__
+            group_id = self.db.execute(
+                select(group_table.c.id).where(
+                    group_table.c.creator == self.client,
+                    group_table.c.role == role,
+                    group_table.c.is_active.is_(True),
+                )
+            ).scalar()
+            if group_id is None:
+                return False
+
             # Upsert membership
             encrypted_user = self._get_encrypted_user(user)
-            membership_result = self.db.execute(
-                text("""
-                    INSERT INTO auth_rbac.auth_membership
-                        (creator, "user", is_active, date_created, modified)
-                    VALUES
-                        (:creator, :user, true, NOW(), NOW())
-                    ON CONFLICT (creator, "user") DO UPDATE SET
-                        is_active = true,
-                        modified = NOW()
-                    RETURNING id
-                """),
-                {"creator": self.client, "user": encrypted_user},
+            m_table = AuthMembership.__table__
+            stmt = self._dialect_insert(m_table).values(
+                creator=self.client,
+                user=encrypted_user,
+                is_active=True,
+                date_created=func.now(),
+                modified=func.now(),
             )
-            membership_id = membership_result.fetchone()[0]
+            stmt = stmt.on_conflict_do_update(
+                index_elements=["creator", "user"],
+                set_={"is_active": True, "modified": func.now()},
+            )
+            self.db.execute(stmt)
+            membership_id = self.db.execute(
+                select(m_table.c.id).where(
+                    m_table.c.creator == self.client,
+                    m_table.c.user == encrypted_user,
+                )
+            ).scalar_one()
 
             # Link membership to group (junction table)
-            self.db.execute(
-                text("""
-                    INSERT INTO auth_rbac.membership_groups (membership_id, group_id)
-                    VALUES (:membership_id, :group_id)
-                    ON CONFLICT (membership_id, group_id) DO NOTHING
-                """),
-                {"membership_id": membership_id, "group_id": group_id},
+            link = (
+                self._dialect_insert(membership_groups)
+                .values(membership_id=membership_id, group_id=group_id)
+                .on_conflict_do_nothing(index_elements=["membership_id", "group_id"])
             )
+            self.db.execute(link)
             self.db.commit()
             return True
         except Exception:
+            logger.exception(
+                "add_membership failed (client=%s, user=%r, role=%r)",
+                self.client,
+                user,
+                role,
+            )
             self.db.rollback()
             return False
 
@@ -308,58 +350,67 @@ class AuthorizationService:
         )
 
     def add_permission(self, role: str, name: str) -> bool:
-        """Add permission to a role - atomic idempotent using ON CONFLICT.
+        """Add permission to a role - atomic idempotent upsert.
 
-        Uses PostgreSQL's INSERT ... ON CONFLICT for race-condition-free operations.
+        Uses INSERT ... ON CONFLICT (PostgreSQL and SQLite) for
+        race-condition-free operations.
         """
-        from sqlalchemy import text
-
         if self.has_permission(role, name):
             return True
 
-        # Get group ID
-        group_result = self.db.execute(
-            text("""
-                SELECT id FROM auth_rbac.auth_group
-                WHERE creator = :creator AND role = :role AND is_active = true
-            """),
-            {"creator": self.client, "role": role},
-        )
-        row = group_result.fetchone()
-        if not row:
-            return False
-        group_id = row[0]
-
         try:
+            group_table = AuthGroup.__table__
+            group_id = self.db.execute(
+                select(group_table.c.id).where(
+                    group_table.c.creator == self.client,
+                    group_table.c.role == role,
+                    group_table.c.is_active.is_(True),
+                )
+            ).scalar()
+            if group_id is None:
+                return False
+
             # Upsert permission
             encrypted_name = self._get_encrypted_permission(name)
-            perm_result = self.db.execute(
-                text("""
-                    INSERT INTO auth_rbac.auth_permission
-                        (creator, name, is_active, date_created, modified)
-                    VALUES
-                        (:creator, :name, true, NOW(), NOW())
-                    ON CONFLICT (creator, name) DO UPDATE SET
-                        is_active = true,
-                        modified = NOW()
-                    RETURNING id
-                """),
-                {"creator": self.client, "name": encrypted_name},
+            p_table = AuthPermission.__table__
+            stmt = (
+                self._dialect_insert(p_table)
+                .values(
+                    creator=self.client,
+                    name=encrypted_name,
+                    is_active=True,
+                    date_created=func.now(),
+                    modified=func.now(),
+                )
+                .on_conflict_do_update(
+                    index_elements=["creator", "name"],
+                    set_={"is_active": True, "modified": func.now()},
+                )
             )
-            perm_id = perm_result.fetchone()[0]
+            self.db.execute(stmt)
+            perm_id = self.db.execute(
+                select(p_table.c.id).where(
+                    p_table.c.creator == self.client,
+                    p_table.c.name == encrypted_name,
+                )
+            ).scalar_one()
 
             # Link permission to group (junction table)
-            self.db.execute(
-                text("""
-                    INSERT INTO auth_rbac.permission_groups (permission_id, group_id)
-                    VALUES (:perm_id, :group_id)
-                    ON CONFLICT (permission_id, group_id) DO NOTHING
-                """),
-                {"perm_id": perm_id, "group_id": group_id},
+            link = (
+                self._dialect_insert(permission_groups)
+                .values(permission_id=perm_id, group_id=group_id)
+                .on_conflict_do_nothing(index_elements=["permission_id", "group_id"])
             )
+            self.db.execute(link)
             self.db.commit()
             return True
         except Exception:
+            logger.exception(
+                "add_permission failed (client=%s, role=%r, name=%r)",
+                self.client,
+                role,
+                name,
+            )
             self.db.rollback()
             return False
 
