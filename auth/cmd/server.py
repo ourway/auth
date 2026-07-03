@@ -6,20 +6,24 @@ CPUs = multiprocessing.cpu_count()
 
 
 _help = """
-    ---------------------------------------------------------------
-    | GET             | /ping                                     |
-    | GET POST DELETE | /api/permission/{key}/{role}/{action}     |
-    | GET POST DELETE | /api/membership/{key}/{user}/{role}       |
-    | GET             | /api/has_permission/{key}/{user}/{action} |
-    | GET             | /api/user_permissions/{key}/{user}        |
-    | GET             | /api/user_roles/{key}/{user}              |
-    | GET             | /api/role_permissions/{key}/{role}        |
-    | GET             | /api/members/{key}/{role}                 |
-    | GET             | /api/roles/{key}/                         |
-    | GET             | /api/which_roles_can/{key}/{action}       |
-    | GET             | /api/which_users_can/{key}/{action}       |
-    | POST DELETE     | /api/role/{key}/{role}                    |
-    ---------------------------------------------------------------
+    Authenticate with header:  Authorization: Bearer <client-uuid4>
+    -----------------------------------------------------------------
+    | GET             | /ping                                       |
+    | GET             | /health                                     |
+    | GET POST DELETE | /api/membership/{user}/{role}               |
+    | GET POST DELETE | /api/permission/{role}/{name}               |
+    | GET             | /api/has_permission/{user}/{name}           |
+    | GET             | /api/user_permissions/{user}                |
+    | GET             | /api/user_roles/{user}                      |
+    | GET             | /api/role_permissions/{role}                |
+    | GET             | /api/members/{role}                         |
+    | GET             | /api/roles                                  |
+    | GET             | /api/which_roles_can/{name}                 |
+    | GET             | /api/which_users_can/{name}                 |
+    | POST DELETE     | /api/role/{role}                            |
+    | GET             | /api/workflow/users/{workflow}              |
+    | GET             | /api/workflow/user/{user}/can_run/{workflow}|
+    -----------------------------------------------------------------
 """
 
 

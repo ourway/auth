@@ -59,3 +59,8 @@ target/
 .venv
 venv/
 .env.bk
+
+# Runtime artifacts
+*.pid
+response.json
+dependency-grap/

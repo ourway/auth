@@ -5,8 +5,6 @@ A comprehensive, production-ready authorization system with role-based access co
 
 **📚 For detailed documentation, see the project repository.**
 
-**✅ Fully Tested:** 152/152 tests passing (100% pass rate)
-
 Features
 --------
 **Core Features:**
@@ -14,16 +12,14 @@ Features
 - Role-based access control (RBAC) with hierarchical permissions
 - Multiple storage backends (SQLite for development, PostgreSQL for production)
 - Dual interface: REST API and Python library
-- JWT-based authentication and authorization
-- Optional field-level encryption for sensitive data
+- Optional deterministic field-level encryption for sensitive data
 - Comprehensive audit logging for security compliance
 - Workflow permission checking with APScheduler
 
 **Security Features:**
 
-- UUID4-based client authentication
-- JWT token-based authorization
-- Field-level encryption with Fernet
+- UUID4 client keys as isolated tenant namespaces
+- Deterministic field-level encryption (AES-256-CTR, PBKDF2-derived keys)
 - Input validation and sanitization
 - Configurable CORS settings
 
@@ -44,21 +40,30 @@ Installation
 ------------
 .. code:: bash
 
-    pip install -r requirements.txt
+    pip install auth
+
+Security model
+--------------
+The REST API identifies callers by a client key: any valid UUID4 presented
+as ``Authorization: Bearer <uuid4>`` acts as an isolated tenant namespace.
+The key is **not** verified against a secret — treat it like an API key you
+keep private, and deploy the service on a trusted network or behind an
+authenticating gateway. Do not expose the server directly to the public
+internet.
 
 Quick Start
 -----------
-**Start the server** (default SQLite on port 4000):
+**Start the server** (default SQLite backend, port 4000):
 
 .. code:: bash
 
-    python -m auth.main
+    auth-server
 
 **Test the API:**
 
 .. code:: bash
 
-    bash showcase_api.sh
+    curl http://localhost:4000/ping
 
 Production Deployment
 ---------------------
@@ -163,18 +168,18 @@ Environment variables (or use .env file):
 
 Testing
 -------
-Run the complete test suite:
+Run the complete test suite (from a source checkout):
 
 .. code:: bash
 
-    # All tests (152 tests)
+    # SQLite suite
     python -m pytest tests/ -v
+
+    # PostgreSQL integration suite (Docker required)
+    make test-postgres
 
     # With coverage
     python -m pytest tests/ --cov=auth --cov-report=html
-
-    # Run showcase script
-    bash showcase_api.sh
 
 Architecture
 ------------
@@ -191,6 +196,6 @@ Complete documentation including API reference and Python examples is available 
 
 License
 -------
-Apache-2.0 License
+MIT License
 
 Copyright (c) Farshid Ashouri

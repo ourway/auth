@@ -9,9 +9,30 @@ from urllib.parse import urljoin
 import requests
 from requests.adapters import HTTPAdapter
 from requests.exceptions import ConnectionError
-from requests.packages.urllib3.util.retry import Retry
+from urllib3.util.retry import Retry
 
 from auth.circuit_breaker import circuit_breaker
+
+# Methods eligible for retry. The auth server's write endpoints are
+# idempotent upserts, so retrying POST/PUT/DELETE is safe here.
+_RETRY_METHODS = ["HEAD", "GET", "OPTIONS", "POST", "PUT", "DELETE"]
+
+
+def _build_retry(total, backoff_factor, status_forcelist) -> Retry:
+    """Build a Retry that works on both urllib3 1.x and 2.x.
+
+    urllib3 renamed ``method_whitelist`` to ``allowed_methods`` in 1.26 and
+    removed the old name in 2.0.
+    """
+    kwargs = {
+        "total": total,
+        "backoff_factor": backoff_factor,
+        "status_forcelist": list(status_forcelist),
+    }
+    try:
+        return Retry(allowed_methods=_RETRY_METHODS, **kwargs)
+    except TypeError:  # urllib3 < 1.26
+        return Retry(method_whitelist=_RETRY_METHODS, **kwargs)  # type: ignore[call-arg]
 
 
 class RetryableHTTPAdapter(HTTPAdapter):
@@ -70,11 +91,10 @@ class EnhancedAuthClient:
         self.session = requests.Session()
 
         # Configure retries
-        retry_strategy = Retry(
+        retry_strategy = _build_retry(
             total=max_retries,
-            status_forcelist=[429, 500, 502, 503, 504],
-            method_whitelist=["HEAD", "GET", "OPTIONS", "POST", "PUT", "DELETE"],
             backoff_factor=0.3,
+            status_forcelist=[429, 500, 502, 503, 504],
         )
 
         # Use our custom adapter for more control

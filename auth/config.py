@@ -67,6 +67,23 @@ class Settings(BaseSettings):
                 self.database_url = f"sqlite:///{expanded_path}"
             elif self.postgresql_url:
                 self.database_url = self.postgresql_url
+        else:
+            # An explicit AUTH_DATABASE_URL wins: keep database_type in sync
+            # with the URL scheme so engine creation uses the right settings.
+            if self.database_url.startswith(("postgresql", "postgres:")):
+                self.database_type = DatabaseType.POSTGRESQL
+            elif self.database_url.startswith("sqlite"):
+                self.database_type = DatabaseType.SQLITE
+        # psycopg (v3) is the installed driver; SQLAlchemy resolves a bare
+        # postgresql:// URL to psycopg2, which is not a dependency.
+        if self.database_url.startswith("postgresql://"):
+            self.database_url = self.database_url.replace(
+                "postgresql://", "postgresql+psycopg://", 1
+            )
+        elif self.database_url.startswith("postgres://"):
+            self.database_url = self.database_url.replace(
+                "postgres://", "postgresql+psycopg://", 1
+            )
         return self
 
     @field_validator("jwt_secret_key")

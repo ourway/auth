@@ -28,9 +28,9 @@ AuthMembership
    :members:
    :undoc-members:
 
-AuthAuditLog
-============
+AuditLog
+========
 
-.. autoclass:: auth.models.sql.AuthAuditLog
+.. autoclass:: auth.audit.AuditLog
    :members:
    :undoc-members:
