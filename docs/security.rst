@@ -118,7 +118,7 @@ Enable encryption for sensitive data:
 .. code-block:: bash
 
     # Generate encryption key
-    python -c "from cryptography.fernet import Fernet; print(Fernet.generate_key().decode())"
+    python -c "import secrets; print(secrets.token_urlsafe(32))"
     
     # Enable encryption
     export AUTH_ENABLE_ENCRYPTION=true
@@ -454,7 +454,7 @@ Pre-Production
 --------------
 
 - [ ] Generate strong JWT secret key (32+ characters)
-- [ ] Enable encryption with Fernet key
+- [ ] Enable encryption with a strong random key
 - [ ] Configure PostgreSQL with strong password
 - [ ] Set up SSL/TLS certificates
 - [ ] Configure CORS with specific origins
@@ -493,7 +493,7 @@ Security Breach Response
 
        # Rotate all keys immediately
        export AUTH_JWT_SECRET_KEY=$(openssl rand -base64 32)
-       export AUTH_ENCRYPTION_KEY=$(python -c "from cryptography.fernet import Fernet; print(Fernet.generate_key().decode())")
+       export AUTH_ENCRYPTION_KEY=$(python -c "import secrets; print(secrets.token_urlsafe(32))")
        
        # Restart services
        systemctl restart auth-server

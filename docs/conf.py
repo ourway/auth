@@ -16,8 +16,9 @@ copyright = "2025, RODMENA LIMITED"
 author = "Farshid Ashouri"
 
 # The full version, including alpha/beta/rc tags
-release = "1.1.0"
-version = "1.1"
+# Keep in sync with pyproject.toml (checked by `make version-check`)
+release = "1.4.0"
+version = "1.4"
 
 # -- General configuration ---------------------------------------------------
 

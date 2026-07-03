@@ -65,7 +65,7 @@ Decryption Failed
     echo $AUTH_ENCRYPTION_KEY
     
     # Check key format (should be base64)
-    python -c "from cryptography.fernet import Fernet; print(Fernet.generate_key().decode())"
+    python -c "import secrets; print(secrets.token_urlsafe(32))"
 
 Performance Issues
 ==================

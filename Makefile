@@ -1,4 +1,4 @@
-.PHONY: help install format lint type-check test test-cov clean start-server list-keys start-remote start-remote-docker start-compose stop-compose start-compose-remote
+.PHONY: help install format lint type-check test test-cov test-postgres version-check smoke build publish-test publish clean start-server list-keys start-remote start-remote-docker start-compose stop-compose start-compose-remote
 
 # Default target
 help: ## Show this help message
@@ -31,6 +31,46 @@ test: ## Run tests with pytest
 # Run tests with coverage
 test-cov: ## Run tests with coverage
 	pytest --cov=auth --cov-report=html --cov-report=term
+
+# PostgreSQL integration tests against a disposable Docker container.
+# Runs in a separate pytest process: the engine singleton binds at import.
+test-postgres: ## Run PostgreSQL integration tests (Docker required)
+	docker run -d --rm --name auth-test-pg \
+		-e POSTGRES_USER=auth_test -e POSTGRES_PASSWORD=auth_test \
+		-e POSTGRES_DB=auth_test -p 127.0.0.1:55432:5432 postgres:16-alpine
+	@until docker exec auth-test-pg pg_isready -U auth_test -q; do sleep 1; done
+	AUTH_DATABASE_TYPE=postgresql \
+	AUTH_DATABASE_URL="postgresql://auth_test:auth_test@127.0.0.1:55432/auth_test" \
+	AUTH_POSTGRESQL_URL= AUTH_SQLITE_PATH= \
+	AUTH_DATABASE_SCHEMA=auth_rbac \
+	AUTH_ENABLE_ENCRYPTION=true \
+	AUTH_ENCRYPTION_KEY=test-pg-encryption-key-1234 \
+	AUTH_JWT_SECRET_KEY=test-secret \
+	pytest tests/postgres/ -m postgres; \
+	status=$$?; docker stop auth-test-pg >/dev/null; exit $$status
+
+version-check: ## Assert pyproject, docs/conf.py and changelog agree on the version
+	@V=$$(grep -Po '(?<=^version = ")[^"]+' pyproject.toml); \
+	grep -q "release = \"$$V\"" docs/conf.py || { echo "docs/conf.py release != $$V"; exit 1; }; \
+	grep -q "Version $$V" docs/changelog.rst || { echo "changelog missing entry for $$V"; exit 1; }; \
+	echo "version-check OK: $$V"
+
+smoke: ## Build a wheel, install into a fresh venv, run the quick-start
+	bash scripts/smoke_install.sh
+
+build: version-check clean-dist ## Build sdist and wheel
+	python -m pip install --quiet --upgrade build twine
+	python -m build
+	python -m twine check dist/*
+
+clean-dist:
+	rm -rf dist/ build/ *.egg-info
+
+publish-test: build smoke ## Upload to TestPyPI
+	python -m twine upload --repository testpypi dist/*
+
+publish: build smoke ## Upload to PyPI
+	python -m twine upload dist/*
 
 # Clean cache files
 clean: ## Clean cache files

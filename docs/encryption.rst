@@ -53,8 +53,8 @@ Generate Encryption Key
 
 .. code-block:: bash
 
-    # Generate a Fernet key
-    python -c "from cryptography.fernet import Fernet; print(Fernet.generate_key().decode())"
+    # Generate a strong random key
+    python -c "import secrets; print(secrets.token_urlsafe(32))"
 
 Output example:
 
@@ -188,75 +188,74 @@ Migration
 Enabling Encryption on Existing Data
 -------------------------------------
 
-**Important:** Enabling encryption on an existing database requires migration.
+**Important:** Enabling encryption on an existing database requires
+re-writing stored values. The model properties (``AuthMembership.user``,
+``AuthPermission.name``, ``AuthGroup.description``) encrypt transparently
+on assignment when encryption is enabled, so a migration re-assigns each
+value through the property. Run this ONCE, with ``AUTH_ENABLE_ENCRYPTION``
+and ``AUTH_ENCRYPTION_KEY`` already set, before serving traffic:
 
 .. code-block:: python
 
     from auth.database import SessionLocal
-    from auth.encryption import get_encryptor
-    from auth.models.sql import AuthMembership, AuthPermission
-    
+    from auth.models.sql import AuthGroup, AuthMembership, AuthPermission
+
     def migrate_to_encrypted():
-        """Encrypt existing data"""
+        """Encrypt existing plaintext rows in place."""
         db = SessionLocal()
-        encryptor = get_encryptor()
-        
         try:
-            # Encrypt memberships
-            memberships = db.query(AuthMembership).all()
-            for membership in memberships:
-                if not is_encrypted(membership.user):
-                    membership.user = encryptor.encrypt(membership.user)
-            
-            # Encrypt permissions
-            permissions = db.query(AuthPermission).all()
-            for permission in permissions:
-                if not is_encrypted(permission.name):
-                    permission.name = encryptor.encrypt(permission.name)
-            
+            for membership in db.query(AuthMembership).all():
+                # reading decrypts (or passes plaintext through);
+                # assigning re-encrypts with the configured key
+                membership.user = membership.user
+            for permission in db.query(AuthPermission).all():
+                permission.name = permission.name
+            for group in db.query(AuthGroup).all():
+                if group.description:
+                    group.description = group.description
             db.commit()
             print("Migration completed successfully")
-        except Exception as e:
-            db.rollback()
-            print(f"Migration failed: {e}")
-        finally:
-            db.close()
-
-Disabling Encryption
---------------------
-
-To disable encryption, decrypt existing data first:
-
-.. code-block:: python
-
-    def migrate_from_encrypted():
-        """Decrypt existing data"""
-        db = SessionLocal()
-        encryptor = get_encryptor()
-        
-        try:
-            # Decrypt memberships
-            memberships = db.query(AuthMembership).all()
-            for membership in memberships:
-                if is_encrypted(membership.user):
-                    membership.user = encryptor.decrypt(membership.user)
-            
-            # Decrypt permissions
-            permissions = db.query(AuthPermission).all()
-            for permission in permissions:
-                if is_encrypted(permission.name):
-                    permission.name = encryptor.decrypt(permission.name)
-            
-            db.commit()
-            
-            # Now disable encryption
-            os.environ['AUTH_ENABLE_ENCRYPTION'] = 'false'
-            
-        except Exception as e:
+        except Exception:
             db.rollback()
             raise
         finally:
             db.close()
+
+Note: reads fail open — a value that cannot be decrypted is returned
+unchanged — so plaintext rows written before this release remain readable
+even without running the migration.
+
+Disabling Encryption
+--------------------
+
+Decrypt existing data first (with encryption still ENABLED so reads
+decrypt), write the plaintext back with a direct column update, then flip
+``AUTH_ENABLE_ENCRYPTION=false``:
+
+.. code-block:: python
+
+    from auth.database import SessionLocal
+    from auth.models.sql import AuthMembership, AuthPermission
+
+    def migrate_from_encrypted():
+        """Store decrypted values back as plaintext."""
+        db = SessionLocal()
+        try:
+            for membership in db.query(AuthMembership).all():
+                membership._user = membership.user   # decrypted plaintext
+            for permission in db.query(AuthPermission).all():
+                permission._name = permission.name
+            db.commit()
+        except Exception:
+            db.rollback()
+            raise
+        finally:
+            db.close()
+
+**Warning:** changing ``AUTH_ENCRYPTION_KEY`` makes previously encrypted
+rows undecryptable (reads return the raw ciphertext). There is no built-in
+key rotation; rotate by decrypting with the old key and re-encrypting with
+the new one using the pattern above.
 
 Key Management
 ==============
@@ -316,7 +315,7 @@ Key Rotation
 
 .. code-block:: bash
 
-    python -c "from cryptography.fernet import Fernet; print(Fernet.generate_key().decode())"
+    python -c "import secrets; print(secrets.token_urlsafe(32))"
 
 **Rotation process:**
 

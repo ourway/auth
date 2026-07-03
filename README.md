@@ -2,7 +2,7 @@
 
 A comprehensive, production-ready authorization system with role-based access control (RBAC), audit logging, encryption, and high availability features.
 
-[![Tests](https://img.shields.io/badge/tests-152%20passing-brightgreen)]()
+[![Tests](https://img.shields.io/badge/tests-passing-brightgreen)]()
 [![Python](https://img.shields.io/badge/python-3.9%2B-blue)]()
 [![License](https://img.shields.io/badge/license-MIT-blue)]()
 
@@ -31,7 +31,13 @@ A comprehensive, production-ready authorization system with role-based access co
 - Configurable CORS settings
 - Health check endpoint
 - Consistent API response formats
-- Extensive test coverage (152 tests)
+- Extensive test coverage
+
+## Security Model
+
+The REST API identifies callers by a **client key**: any valid UUID4 presented as `Authorization: Bearer <uuid4>` acts as an isolated tenant namespace. The key is **not** verified against a stored secret — treat it like an API key you keep private, and deploy the service on a trusted network or behind an authenticating gateway (nginx with auth, a service mesh, VPN, etc.). Do not expose the server directly to the public internet.
+
+Data written by one client key is invisible to every other key. Optional deterministic field-level encryption (AES-256-CTR with PBKDF2-derived keys) protects user identifiers, permission names, and role descriptions at rest; note that deterministic encryption intentionally reveals when two rows hold the same value, which is what makes lookups possible.
 
 ## Requirements
 
@@ -41,7 +47,7 @@ A comprehensive, production-ready authorization system with role-based access co
 ## Installation
 
 ```bash
-pip install -r requirements.txt
+pip install auth
 ```
 
 ## Quick Start
@@ -50,7 +56,7 @@ pip install -r requirements.txt
 
 **Development (SQLite):**
 ```bash
-python -m auth.main
+auth-server
 ```
 
 **Production (PostgreSQL):**
@@ -61,10 +67,10 @@ export AUTH_JWT_SECRET_KEY=your_secure_secret_key
 export AUTH_ENABLE_ENCRYPTION=true
 export AUTH_ENCRYPTION_KEY=your_encryption_key
 
-python -m auth.main
+auth-server
 ```
 
-The server will start on `http://127.0.0.1:5000`
+The server will start on `http://127.0.0.1:4000`
 
 ### 2. Test the API
 
@@ -189,7 +195,7 @@ client_key = str(uuid.uuid4())
 # Create client instance
 client = EnhancedAuthClient(
     api_key=client_key,
-    service_url='http://127.0.0.1:5000'
+    service_url='http://127.0.0.1:4000'
 )
 
 # Create a role
@@ -213,14 +219,14 @@ print(response)
 
 **Health Check:**
 ```bash
-curl http://localhost:5000/ping
+curl http://localhost:4000/ping
 ```
 
 **Create a Role:**
 ```bash
 CLIENT_KEY=$(uuidgen)
 curl -X POST \
-  http://localhost:5000/api/role/admin \
+  http://localhost:4000/api/role/admin \
   -H "Authorization: Bearer $CLIENT_KEY" \
   -H "Content-Type: application/json"
 ```
@@ -228,7 +234,7 @@ curl -X POST \
 **Add Permission to Role:**
 ```bash
 curl -X POST \
-  http://localhost:5000/api/permission/admin/manage_users \
+  http://localhost:4000/api/permission/admin/manage_users \
   -H "Authorization: Bearer $CLIENT_KEY" \
   -H "Content-Type: application/json"
 ```
@@ -236,7 +242,7 @@ curl -X POST \
 **Add User to Role:**
 ```bash
 curl -X POST \
-  http://localhost:5000/api/membership/alice@example.com/admin \
+  http://localhost:4000/api/membership/alice@example.com/admin \
   -H "Authorization: Bearer $CLIENT_KEY" \
   -H "Content-Type: application/json"
 ```
@@ -244,42 +250,42 @@ curl -X POST \
 **Check User Permission:**
 ```bash
 curl -X GET \
-  http://localhost:5000/api/has_permission/alice@example.com/manage_users \
+  http://localhost:4000/api/has_permission/alice@example.com/manage_users \
   -H "Authorization: Bearer $CLIENT_KEY"
 ```
 
 **Get User Permissions:**
 ```bash
 curl -X GET \
-  http://localhost:5000/api/user_permissions/alice@example.com \
+  http://localhost:4000/api/user_permissions/alice@example.com \
   -H "Authorization: Bearer $CLIENT_KEY"
 ```
 
 **Get User Roles:**
 ```bash
 curl -X GET \
-  http://localhost:5000/api/user_roles/alice@example.com \
+  http://localhost:4000/api/user_roles/alice@example.com \
   -H "Authorization: Bearer $CLIENT_KEY"
 ```
 
 **Get Role Members:**
 ```bash
 curl -X GET \
-  http://localhost:5000/api/members/admin \
+  http://localhost:4000/api/members/admin \
   -H "Authorization: Bearer $CLIENT_KEY"
 ```
 
 **Find Users with Permission:**
 ```bash
 curl -X GET \
-  http://localhost:5000/api/which_users_can/manage_users \
+  http://localhost:4000/api/which_users_can/manage_users \
   -H "Authorization: Bearer $CLIENT_KEY"
 ```
 
 **Find Roles with Permission:**
 ```bash
 curl -X GET \
-  http://localhost:5000/api/which_roles_can/manage_users \
+  http://localhost:4000/api/which_roles_can/manage_users \
   -H "Authorization: Bearer $CLIENT_KEY"
 ```
 
@@ -375,14 +381,14 @@ AUTH_SERVER_PORT=8000
 
 ```bash
 pip install waitress
-waitress-serve --host=0.0.0.0 --port=5000 --threads=10 auth.main:app
+waitress-serve --host=0.0.0.0 --port=4000 --threads=10 auth.main:app
 ```
 
 ### Using Gunicorn
 
 ```bash
 pip install gunicorn
-gunicorn -w 4 -b 0.0.0.0:5000 auth.main:app
+gunicorn -w 4 -b 0.0.0.0:4000 auth.main:app
 ```
 
 ### Docker
@@ -474,7 +480,7 @@ Database stores: "xxqjTSaj0YGZD7v8khExdKkV+dA=", "sJ4Yaz56uRxmNF0mj3wOwUNE8Y8=",
 
 1. Generate a secure encryption key:
 ```bash
-python -c "from cryptography.fernet import Fernet; print(Fernet.generate_key().decode())"
+python -c "import secrets; print(secrets.token_urlsafe(32))"
 ```
 
 2. Update `.env` file:

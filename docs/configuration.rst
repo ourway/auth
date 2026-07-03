@@ -89,7 +89,7 @@ Encryption Configuration
     - **Type:** String (base64-encoded key)
     - **Default:** None
     - **Example:** ``export AUTH_ENCRYPTION_KEY=your-base64-encoded-encryption-key``
-    - **Generate:** ``python -c "from cryptography.fernet import Fernet; print(Fernet.generate_key().decode())"``
+    - **Generate:** ``python -c "import secrets; print(secrets.token_urlsafe(32))"``
 
 Server Configuration
 --------------------
@@ -181,7 +181,7 @@ Production Configuration
     
     # Encryption
     AUTH_ENABLE_ENCRYPTION=true
-    AUTH_ENCRYPTION_KEY=your-generated-fernet-key-here
+    AUTH_ENCRYPTION_KEY=your-generated-random-key-here
     
     # Server
     AUTH_SERVER_HOST=0.0.0.0
@@ -273,7 +273,7 @@ The configuration system validates settings on startup:
     Accepts: ``true``, ``false``, ``1``, ``0``, ``yes``, ``no``
 
 **Encryption Key**
-    Validates Fernet key format if encryption is enabled
+    Requires a non-empty key if encryption is enabled
 
 Common Configuration Patterns
 ==============================
@@ -390,7 +390,7 @@ Regularly rotate sensitive keys:
     openssl rand -base64 32
 
     # Generate new encryption key
-    python -c "from cryptography.fernet import Fernet; print(Fernet.generate_key().decode())"
+    python -c "import secrets; print(secrets.token_urlsafe(32))"
 
 Monitoring and Logging
 =======================
