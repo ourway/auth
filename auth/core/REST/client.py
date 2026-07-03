@@ -39,6 +39,10 @@ def connect(url, method="get", headers=None):
 
 def connection_factory(cls, url, method):
     def closure(*args, **kw):
+        # When invoked as a bound method, args[0] is the Client instance and
+        # carries per-instance credentials; when called directly (or on very
+        # old code paths) fall back to the owner passed to the factory.
+        source = args[0] if args and hasattr(args[0], "api_key") else cls
         attrs = re.findall(re.compile(r"{([\w]+)"), url)
         # kw["client"] is NO LONGER added here
         try:
@@ -47,10 +51,10 @@ def connection_factory(cls, url, method):
             # attrs.remove("client") is NO LONGER needed
             raise AssertionError("I need %s." % set(attrs)) from None
 
-        link = cls.service_url + url.format(**kw)
+        link = source.service_url + url.format(**kw)
 
         # Create auth header
-        headers = {"Authorization": f"Bearer {cls.api_key}"}
+        headers = {"Authorization": f"Bearer {source.api_key}"}
 
         r = connect(link, method, headers=headers)
         return json.loads(r.content.decode())
@@ -86,6 +90,12 @@ class Client(object):
                     new_func_name = "%s_%s" % (translate[method], endpoint_name)
                     setattr(cls, new_func_name, connection_factory(cls, url, method))
         return super(Client, cls).__new__(cls)
+
+    def __init__(self, api_key, service_url):
+        # Store credentials on the instance so two Client objects with
+        # different keys/URLs no longer overwrite each other's state.
+        self.api_key = api_key
+        self.service_url = service_url
 
     def __repr__(self):
         output = ["Methods:"]
