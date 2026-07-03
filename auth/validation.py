@@ -10,6 +10,9 @@ CLIENT_KEY_PATTERN = re.compile(
     r"^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$", re.IGNORECASE
 )
 USER_ROLE_NAME_PATTERN = re.compile(r"^[a-zA-Z0-9_-]{1,64}$")
+# User names additionally allow email addresses (the documented usage and
+# what the Python API accepts): @ . +
+USER_NAME_PATTERN = re.compile(r"^[a-zA-Z0-9_.@+-]{1,64}$")
 
 
 def validate_client_key(client_key: str) -> bool:
@@ -22,9 +25,9 @@ def validate_client_key(client_key: str) -> bool:
 
 def validate_user_name(user_name: str) -> bool:
     """
-    Validate user name format
+    Validate user name format (allows email addresses)
     """
-    match_result = USER_ROLE_NAME_PATTERN.match(user_name)
+    match_result = USER_NAME_PATTERN.match(user_name)
     return bool(match_result)
 
 
@@ -99,7 +102,7 @@ def validate_user_role_combination(user: str, role: str) -> tuple[bool, str]:
     if not validate_user_name(user):
         return (
             False,
-            f"Invalid user name: {user}. User names must be 1-64 characters long and contain only alphanumeric, underscore, and hyphen.",
+            f"Invalid user name: {user}. User names must be 1-64 characters long and contain only alphanumeric, underscore, hyphen, or email characters (@ . +).",
         )
 
     if not validate_role_name(role):

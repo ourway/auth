@@ -142,7 +142,7 @@ class WorkflowPermissionChecker:
         """
         try:
             with self._service() as svc:
-                return svc.user_has_permission(user, workflow_name)
+                return bool(svc.user_has_permission(user, workflow_name))
         except Exception as e:
             print(f"Error checking user workflow permission: {e}")
             return False

@@ -70,6 +70,22 @@ def test_unhandled_exception_returns_json_envelope(client):
     assert body["code"] == 500
 
 
+def test_email_user_names_accepted_over_rest(client):
+    """The documented REST examples use emails; the Python API accepts them,
+    so the REST validation must too (regression: 400 before 1.4.0)."""
+    headers = {"Authorization": f"Bearer {KEY}"}
+    assert client.post("/api/role/support", headers=headers).status_code == 200
+    response = client.post(
+        "/api/membership/alice.smith+dev@example.com/support", headers=headers
+    )
+    assert response.status_code == 200
+    assert response.get_json() == {"result": True}
+    check = client.get(
+        "/api/membership/alice.smith+dev@example.com/support", headers=headers
+    )
+    assert check.get_json()["data"]["has_permission"] is True
+
+
 def test_ping_shape_pinned(client):
     response = client.get("/ping")
     assert response.status_code == 200

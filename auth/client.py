@@ -32,7 +32,7 @@ def _build_retry(total, backoff_factor, status_forcelist) -> Retry:
     try:
         return Retry(allowed_methods=_RETRY_METHODS, **kwargs)
     except TypeError:  # urllib3 < 1.26
-        return Retry(method_whitelist=_RETRY_METHODS, **kwargs)
+        return Retry(method_whitelist=_RETRY_METHODS, **kwargs)  # type: ignore[call-arg]
 
 
 class RetryableHTTPAdapter(HTTPAdapter):

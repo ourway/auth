@@ -182,6 +182,10 @@ module = ["sqlalchemy.*"]
 ignore_missing_imports = true
 
 [[tool.mypy.overrides]]
+module = ["apscheduler.*"]
+ignore_missing_imports = true
+
+[[tool.mypy.overrides]]
 module = ["auth.database"]
 disable_error_code = ["valid-type", "misc"]
 

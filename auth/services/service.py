@@ -52,7 +52,7 @@ class AuthorizationService:
         """Get the encrypted version of a permission name for database queries"""
         return encrypt_sensitive_data(name) or name
 
-    def _dialect_insert(self, table):
+    def _dialect_insert(self, table) -> Any:
         """INSERT construct with ON CONFLICT support for the bound dialect.
 
         The table objects carry the configured schema (settings.database_schema),
@@ -60,12 +60,14 @@ class AuthorizationService:
         """
         dialect = self.db.get_bind().dialect.name
         if dialect == "postgresql":
-            from sqlalchemy.dialects.postgresql import insert as dialect_insert
-        elif dialect == "sqlite":
-            from sqlalchemy.dialects.sqlite import insert as dialect_insert
-        else:
-            raise NotImplementedError(f"Upserts not supported on dialect {dialect!r}")
-        return dialect_insert(table)
+            from sqlalchemy.dialects.postgresql import insert as pg_insert
+
+            return pg_insert(table)
+        if dialect == "sqlite":
+            from sqlalchemy.dialects.sqlite import insert as sqlite_insert
+
+            return sqlite_insert(table)
+        raise NotImplementedError(f"Upserts not supported on dialect {dialect!r}")
 
     def get_roles(self) -> List[Dict[str, Any]]:
         """Get all roles for the client"""

@@ -24,10 +24,11 @@ def create_app():
     # Enable CORS according to configuration (default: all origins)
     settings = get_settings()
     if settings.allow_cors:
-        origins = settings.cors_origins or "*"
-        if origins != "*":
-            origins = [origin.strip() for origin in origins.split(",")]
-        CORS(app, origins=origins)
+        raw_origins = settings.cors_origins or "*"
+        if raw_origins == "*":
+            CORS(app)
+        else:
+            CORS(app, origins=[origin.strip() for origin in raw_origins.split(",")])
 
     # Create tables on startup
     with app.app_context():

@@ -28,6 +28,9 @@ Fixed
 - Fresh PostgreSQL databases bootstrap correctly: ``create_tables()``
   creates the configured schema and reports real failures instead of
   logging "tables already exist".
+- The REST API now accepts email addresses as user names (``@ . +``),
+  matching the documented examples and the Python API; previously
+  ``POST /api/membership/alice@example.com/admin`` returned 400.
 - Malformed ``Authorization`` headers return HTTP 401 instead of a 500.
 - Unhandled server errors return the JSON error envelope instead of an
   HTML page.
