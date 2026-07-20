@@ -50,6 +50,14 @@ def test_llms_txt_is_always_markdown(client):
     assert response.mimetype == "text/markdown"
 
 
+@pytest.mark.parametrize("accept", ["*/*", "text/html"])
+def test_content_type_declares_charset_exactly_once(client, accept):
+    """Flask adds the charset itself; setting it too emitted it twice."""
+    content_type = client.get("/", headers={"Accept": accept}).headers["Content-Type"]
+    assert content_type.count("charset=") == 1, content_type
+    assert "charset=utf-8" in content_type
+
+
 def test_documented_version_matches_package():
     from auth import __version__
 

@@ -2,6 +2,17 @@
 Changelog
 =========
 
+Version 1.5.1 (2026-07-20)
+==========================
+
+Fixed
+-----
+
+- The documentation endpoints sent ``charset=utf-8`` twice in their
+  ``Content-Type`` header (``text/markdown; charset=utf-8; charset=utf-8``).
+  Flask appends the parameter to ``text/*`` responses itself, so passing it
+  explicitly duplicated it.
+
 Version 1.5.0 (2026-07-20)
 ==========================
 

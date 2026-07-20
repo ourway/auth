@@ -261,7 +261,9 @@ def register_docs_routes(app):
     """Register the documentation endpoints."""
 
     def _markdown_response() -> Response:
-        return Response(render_markdown(), mimetype="text/markdown; charset=utf-8")
+        # Flask appends `; charset=utf-8` to text/* mimetypes itself — spelling
+        # it out here would emit the parameter twice.
+        return Response(render_markdown(), mimetype="text/markdown")
 
     @app.route("/", methods=["GET"])
     def index():
@@ -269,7 +271,7 @@ def register_docs_routes(app):
         if _wants_html():
             return Response(
                 _HTML.format(body=_escape(render_markdown())),
-                mimetype="text/html; charset=utf-8",
+                mimetype="text/html",
             )
         return _markdown_response()
 
