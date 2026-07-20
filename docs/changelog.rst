@@ -2,6 +2,27 @@
 Changelog
 =========
 
+Version 1.5.0 (2026-07-20)
+==========================
+
+Added
+-----
+
+- **Self-describing documentation at** ``/``: the service root used to return
+  404. It now serves a complete usage guide — authentication model, quickstart,
+  every endpoint with its exact response shape, naming rules and the Python
+  client — aimed at coding agents given nothing but the base URL. Content is
+  negotiated: Markdown for API clients, a readable HTML page for browsers.
+  ``/docs`` and ``/llms.txt`` serve the same document. No authentication
+  required.
+
+  The page documents four behaviours that are easy to get wrong: writes to a
+  non-existent role return ``200 {"result": false}`` rather than an error;
+  responses come in two different shapes depending on the endpoint; error
+  bodies are HTML rather than JSON; and the membership check answers with a
+  key named ``has_permission``. A test asserts every registered ``/api/``
+  route appears on the page, so new endpoints cannot ship undocumented.
+
 Version 1.4.0 (2026-07-03)
 ==========================
 

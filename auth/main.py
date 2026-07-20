@@ -38,9 +38,11 @@ def create_app():
         initialize_workflow_checker()  # Initialize workflow permission checker
 
     # Import and register routes
+    from auth.docs_page import register_docs_routes
     from auth.routes import register_routes
 
     register_routes(app)
+    register_docs_routes(app)
 
     @app.errorhandler(Exception)
     def _unhandled_exception(e):
