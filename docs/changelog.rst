@@ -2,6 +2,50 @@
 Changelog
 =========
 
+Version 1.7.0 (2026-07-23)
+==========================
+
+Security
+--------
+
+- **Authenticated field encryption.** Deterministic encryption now verifies the
+  synthetic IV it stores (``HMAC(key, plaintext)[:16]``) when decrypting, so
+  tampered, corrupted, or wrong-key values are rejected with
+  ``InvalidCiphertextError`` instead of silently returning plaintext or garbage.
+  The field layer fails closed: a wrong or rotated ``AUTH_ENCRYPTION_KEY`` now
+  fails loudly. The on-disk format is unchanged, so existing encrypted data
+  keeps decrypting and legacy (never-encrypted) rows are still read as-is.
+
+Added
+-----
+
+- **Managed schema migrations (Alembic).** ``migrations/`` and ``alembic.ini``;
+  install the extra (``pip install auth[migrations]``) and run
+  ``alembic upgrade head``. Migration ``0001`` widens the variable and encrypted
+  columns to ``TEXT`` on PostgreSQL — idempotent, and a no-op on SQLite. Alembic
+  manages schema *changes*; ``create_all`` still creates tables.
+
+Changed
+-------
+
+- Variable and encrypted string columns are now ``TEXT`` (``auth_group.role`` /
+  ``description``, ``auth_membership.user``, ``auth_permission.name``,
+  ``audit_log.client_id`` / ``resource`` / ``user_agent``), removing the varchar
+  limits that encrypted values or long audit fields could overflow. Existing
+  PostgreSQL deployments converge by running the migration above.
+- gunicorn now preloads the app and disposes the SQLAlchemy engine after fork,
+  so the schema bootstrap runs once in the master rather than racing across the
+  worker processes at startup.
+
+Upgrading
+---------
+
+- After deploying, run ``alembic upgrade head`` once. It is idempotent and safe
+  on deployments whose columns were already altered to ``text`` by hand.
+- Because decryption now fails closed, confirm that existing encrypted rows
+  authenticate under the configured key before rolling out — a wrong key now
+  surfaces as errors rather than silently returning plaintext.
+
 Version 1.6.0 (2026-07-23)
 ==========================
 
