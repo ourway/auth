@@ -97,16 +97,16 @@ class AuthGroup(Base):
     def description(self) -> Optional[str]:
         """Decrypt description when accessed"""
         if self._description:
-            decrypted = decrypt_sensitive_data(str(self._description))
-            return decrypted
+            return decrypt_sensitive_data(str(self._description), str(self.creator))
         return None
 
     @description.setter
     def description(self, value: Optional[str]) -> None:
         """Encrypt description when set"""
         if value:
-            encrypted = encrypt_sensitive_data(value)
-            self._description = encrypted  # type: ignore[assignment]
+            self._description = encrypt_sensitive_data(  # type: ignore[assignment]
+                value, str(self.creator)
+            )
         else:
             self._description = value  # type: ignore[assignment]
 
@@ -141,16 +141,16 @@ class AuthMembership(Base):
     def user(self) -> Optional[str]:
         """Decrypt user when accessed"""
         if self._user:
-            decrypted = decrypt_sensitive_data(str(self._user))
-            return decrypted
+            return decrypt_sensitive_data(str(self._user), str(self.creator))
         return None
 
     @user.setter
     def user(self, value: Optional[str]) -> None:
         """Encrypt user when set"""
         if value:
-            encrypted = encrypt_sensitive_data(value)
-            self._user = encrypted  # type: ignore[assignment]
+            self._user = encrypt_sensitive_data(  # type: ignore[assignment]
+                value, str(self.creator)
+            )
         else:
             self._user = value  # type: ignore[assignment]
 
@@ -185,15 +185,15 @@ class AuthPermission(Base):
     def name(self) -> Optional[str]:
         """Decrypt name when accessed"""
         if self._name:
-            decrypted = decrypt_sensitive_data(str(self._name))
-            return decrypted
+            return decrypt_sensitive_data(str(self._name), str(self.creator))
         return None
 
     @name.setter
     def name(self, value: Optional[str]) -> None:
         """Encrypt name when set"""
         if value:
-            encrypted = encrypt_sensitive_data(value)
-            self._name = encrypted  # type: ignore[assignment]
+            self._name = encrypt_sensitive_data(  # type: ignore[assignment]
+                value, str(self.creator)
+            )
         else:
             self._name = value  # type: ignore[assignment]
