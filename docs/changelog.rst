@@ -2,6 +2,48 @@
 Changelog
 =========
 
+Version 1.6.0 (2026-07-23)
+==========================
+
+Security
+--------
+
+- **Client keys are no longer written in clear text.** The bearer token was
+  previously stored verbatim in the ``audit_log.client_id`` column and in the
+  JSON audit logs — including on failed authentication. Audit records now store
+  a non-reversible HMAC fingerprint of the key (peppered with
+  ``AUTH_AUDIT_PEPPER``, falling back to the JWT secret). Audit rows written by
+  older versions still contain the raw key and should be scrubbed out of band.
+- **Authentication now runs before auditing.** A missing, malformed or non-UUID
+  bearer token is rejected up front, so unauthenticated requests no longer open
+  a database session or write an audit row. The 400 returned for a non-UUID key
+  no longer echoes the submitted value back.
+
+Fixed
+-----
+
+- **Audit rows are no longer silently dropped.** Over-length fields (a long
+  ``User-Agent``, an oversized ``Authorization`` header) overflowed the
+  ``audit_log`` varchar columns and aborted the INSERT on PostgreSQL, losing the
+  record entirely. Values are now clamped to their column width before insert.
+  No schema migration is required.
+
+Added
+-----
+
+- **Optional application-layer rate limiting**, as defense in depth alongside
+  the nginx edge limiter. Off by default; enable with ``AUTH_ENABLE_RATE_LIMIT``
+  and install the extra (``pip install auth[ratelimit]``). Point
+  ``AUTH_RATELIMIT_STORAGE_URI`` at a shared store such as ``redis://`` for a
+  limit shared across workers, and set ``AUTH_RATELIMIT_DEFAULT`` to tune it.
+- ``AUTH_AUDIT_PEPPER`` configuration option.
+
+Changed
+-------
+
+- ``AUTH_ENABLE_AUDIT_LOGGING=false`` is now honoured; audit logging was
+  previously always on regardless of the flag.
+
 Version 1.5.1 (2026-07-20)
 ==========================
 

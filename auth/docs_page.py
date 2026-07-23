@@ -207,9 +207,10 @@ HTTP entirely — see https://pypi.org/project/auth/.
 
 ## 7. Limits
 
-Requests are rate limited to 20/second per IP with a burst of 40; exceeding it
-returns **429**. `/ping` and `/health` are exempt. User and permission names are
-encrypted at rest, so they are not readable in the database.
+Requests are rate limited to 20/second per IP with a burst of 40 at the edge;
+exceeding it returns **429**. `/ping` and `/health` are exempt. When field
+encryption is enabled (as on the hosted service) user and permission names are
+stored encrypted at rest; role names are not.
 """
 
 

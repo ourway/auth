@@ -44,6 +44,17 @@ class Settings(BaseSettings):
     allow_cors: bool = True
     cors_origins: str = "*"
     enable_audit_logging: bool = True
+    # Pepper used to fingerprint the client key before it is written to audit
+    # rows or logs. Falls back to jwt_secret_key when empty so the fingerprint
+    # is never unsalted; set a dedicated AUTH_AUDIT_PEPPER in production.
+    audit_pepper: str = ""
+    # Application-layer rate limiting. Defense in depth only — nginx is the
+    # primary per-IP limiter at the edge. Off by default; to be effective across
+    # gunicorn workers it needs shared storage
+    # (e.g. AUTH_RATELIMIT_STORAGE_URI=redis://...).
+    enable_rate_limit: bool = False
+    ratelimit_default: str = "40/second"
+    ratelimit_storage_uri: str = "memory://"
 
     # Server settings
     server_host: str = "127.0.0.1"
