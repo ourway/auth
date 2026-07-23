@@ -12,6 +12,7 @@ from sqlalchemy import (
     Integer,
     String,
     Table,
+    Text,
     UniqueConstraint,
 )
 from sqlalchemy.orm import DeclarativeBase, relationship
@@ -75,11 +76,11 @@ class AuthGroup(Base):
 
     id = Column(Integer, primary_key=True, index=True)
     creator = Column(String(64), nullable=False, index=True)
-    # Wide enough for encrypted values (~4/3 expansion + IV); existing
-    # deployments keep their current width until they run the optional
-    # ALTER documented in the changelog.
-    role = Column(String(255), nullable=False, index=True)
-    _description = Column("description", String(512))  # Encrypted description field
+    # Unbounded TEXT: encrypted values expand ~4/3 + IV and could otherwise
+    # overflow a varchar. Fresh installs get TEXT directly; existing deployments
+    # converge via migration 0001 (see migrations/versions/).
+    role = Column(Text, nullable=False, index=True)
+    _description = Column("description", Text)  # Encrypted description field
     is_active = Column(Boolean, default=True)
     date_created = Column(DateTime, default=func.now())
     modified = Column(DateTime, default=func.now(), onupdate=func.now())
@@ -124,8 +125,8 @@ class AuthMembership(Base):
 
     id = Column(Integer, primary_key=True, index=True)
     _user = Column(
-        "user", String(255), nullable=False, index=True
-    )  # Potentially encrypted user field
+        "user", Text, nullable=False, index=True
+    )  # Potentially encrypted user field (TEXT: see AuthGroup.role)
     creator = Column(String(64), nullable=False, index=True)
     is_active = Column(Boolean, default=True)
     date_created = Column(DateTime, default=func.now())
@@ -168,8 +169,8 @@ class AuthPermission(Base):
 
     id = Column(Integer, primary_key=True, index=True)
     _name = Column(
-        "name", String(255), nullable=False, index=True
-    )  # Potentially encrypted name field
+        "name", Text, nullable=False, index=True
+    )  # Potentially encrypted name field (TEXT: see AuthGroup.role)
     creator = Column(String(64), nullable=False, index=True)
     is_active = Column(Boolean, default=True)
     date_created = Column(DateTime, default=func.now())

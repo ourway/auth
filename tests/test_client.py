@@ -39,7 +39,7 @@ def test_build_retry_sets_methods():
     methods = getattr(retry, "allowed_methods", None) or getattr(
         retry, "method_whitelist", None
     )
-    assert set(methods) == {"HEAD", "GET", "OPTIONS", "POST", "PUT", "DELETE"}
+    assert set(methods or []) == {"HEAD", "GET", "OPTIONS", "POST", "PUT", "DELETE"}
 
 
 def test_adapter_constructs():

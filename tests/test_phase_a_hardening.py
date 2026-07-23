@@ -29,12 +29,12 @@ def client():
 def _audit_count() -> int:
     session = SessionLocal()
     try:
-        return session.query(AuditLog).count()
+        return int(session.query(AuditLog).count())
     finally:
         session.close()
 
 
-def _latest_audit() -> AuditLog:
+def _latest_audit():
     session = SessionLocal()
     try:
         return session.query(AuditLog).order_by(AuditLog.id.desc()).first()
@@ -107,7 +107,7 @@ def test_rate_limiter_returns_429_when_enabled(monkeypatch):
     pytest.importorskip("flask_limiter")
     from auth.config import Settings
 
-    rl = Settings(
+    rl = Settings(  # type: ignore[call-arg]
         enable_rate_limit=True,
         ratelimit_default="2/second",
         ratelimit_storage_uri="memory://",

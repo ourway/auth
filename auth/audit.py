@@ -50,13 +50,13 @@ class AuditLog(Base):
 
     id = Column(Integer, primary_key=True, index=True)
     timestamp = Column(DateTime, default=_utcnow, nullable=False)
-    client_id = Column(String(64), index=True, nullable=False)
+    client_id = Column(Text, index=True, nullable=False)
     user = Column(String(64), index=True)
     action = Column(String(50), nullable=False)
-    resource = Column(String(100))
+    resource = Column(Text)
     details = Column(Text)  # JSON string of additional details
     ip_address = Column(String(45))  # Support for IPv6
-    user_agent = Column(String(500))
+    user_agent = Column(Text)
     success = Column(Integer)  # 1 for success, 0 for failure
 
 

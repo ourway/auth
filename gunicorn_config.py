@@ -28,6 +28,18 @@ user = None
 group = None
 tmp_upload_dir = None
 
+# Load the app once in the master and fork workers from it, so the schema/table
+# bootstrap in create_app() runs a single time instead of racing across workers.
+preload_app = True
+
+
+def post_fork(server, worker):
+    # The SQLAlchemy engine/pool is created before the fork; dispose it so each
+    # worker opens its own connections rather than sharing the master's sockets.
+    from auth.database import engine
+
+    engine.dispose()
+
 # SSL (disabled for now, will use Nginx)
 # keyfile = None
 # certfile = None

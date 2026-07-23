@@ -55,9 +55,15 @@ dependencies = [
 ratelimit = [
     "flask-limiter>=3.0.0",
 ]
+# Database schema migrations (Alembic). Needed to run `alembic upgrade head`
+# on a deployment; not required to import or serve the app.
+migrations = [
+    "alembic>=1.13.0",
+]
 dev = [
     "pytest>=6.0",
     "pytest-cov>=2.0",
+    "alembic>=1.13.0",
     "ruff>=0.0.260",
     "mypy>=1.0",
     "types-requests",
