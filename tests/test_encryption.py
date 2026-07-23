@@ -6,12 +6,15 @@ enabled-mode tests build their own DeterministicEncryption/FieldEncryption
 instances so the module singleton stays untouched.
 """
 
+import base64
+
 import pytest
 
 import auth.encryption as encryption_module
 from auth.encryption import (
     DeterministicEncryption,
     FieldEncryption,
+    InvalidCiphertextError,
     decrypt_sensitive_data,
     encrypt_sensitive_data,
 )
@@ -125,3 +128,29 @@ def test_module_helpers_with_enabled_singleton(monkeypatch):
     token = encrypt_sensitive_data("alice@example.com")
     assert token != "alice@example.com"
     assert decrypt_sensitive_data(token) == "alice@example.com"
+
+
+def test_tampered_ciphertext_is_rejected(enc):
+    token = enc.encrypt("sensitive-value")
+    raw = bytearray(base64.b64decode(token))
+    raw[-1] ^= 0x01  # flip a bit in the ciphertext body
+    tampered = base64.b64encode(bytes(raw)).decode()
+    with pytest.raises(InvalidCiphertextError):
+        enc.decrypt(tampered)
+
+
+def test_wrong_key_raises_invalid_ciphertext(enc):
+    other = DeterministicEncryption(password="a-different-password")
+    with pytest.raises(InvalidCiphertextError):
+        other.decrypt(enc.encrypt("sensitive-value"))
+
+
+def test_decrypt_field_fails_closed_on_tampered_ciphertext(monkeypatch):
+    fe = _enabled_field_encryption(monkeypatch)
+    token = fe.encrypt_field("alice@example.com")
+    raw = bytearray(base64.b64decode(token))
+    raw[-1] ^= 0x01
+    tampered = base64.b64encode(bytes(raw)).decode()
+    # Fail closed: must raise, not return the raw/garbage value.
+    with pytest.raises(InvalidCiphertextError):
+        fe.decrypt_field(tampered)
