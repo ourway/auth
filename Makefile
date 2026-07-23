@@ -1,10 +1,14 @@
 .PHONY: help install format lint type-check test test-cov test-postgres version-check smoke build publish-test publish clean start-server list-keys start-remote start-remote-docker start-compose stop-compose start-compose-remote
 
-# Pin pytest to the project virtualenv so `make test` / `make test-postgres`
-# don't fall back to a system python that lacks the deps. Override if needed,
+# Pin dev tools to the project virtualenv so the make targets don't fall back
+# to a system python that lacks the deps. Override any of these if needed,
 # e.g. `make test PYTEST=pytest` when the venv is already activated.
 VENV ?= .venv
 PYTEST ?= $(VENV)/bin/pytest
+BLACK ?= $(VENV)/bin/black
+ISORT ?= $(VENV)/bin/isort
+RUFF ?= $(VENV)/bin/ruff
+MYPY ?= $(VENV)/bin/mypy
 
 # Default target
 help: ## Show this help message
@@ -19,16 +23,16 @@ install: ## Install project dependencies
 
 # Format code with black and isort
 format: ## Format code with black and isort
-	black .
-	isort .
+	$(BLACK) .
+	$(ISORT) .
 
 # Lint code with ruff
 lint: ## Lint code with ruff
-	ruff check .
+	$(RUFF) check .
 
 # Type check with mypy
 type-check: ## Check types with mypy
-	mypy .
+	$(MYPY) .
 
 # Run tests
 test: ## Run tests with pytest
@@ -146,7 +150,7 @@ start-compose-remote: ## Start auth service and provide remote access via reTunn
 
 # Fix lint issues
 lint-fix: ## Fix lint issues automatically
-	ruff check . --fix
+	$(RUFF) check . --fix
 
 # Run format, lint, and type-check together
 check: format lint type-check ## Run format, lint, and type-check
