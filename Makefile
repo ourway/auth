@@ -1,5 +1,11 @@
 .PHONY: help install format lint type-check test test-cov test-postgres version-check smoke build publish-test publish clean start-server list-keys start-remote start-remote-docker start-compose stop-compose start-compose-remote
 
+# Pin pytest to the project virtualenv so `make test` / `make test-postgres`
+# don't fall back to a system python that lacks the deps. Override if needed,
+# e.g. `make test PYTEST=pytest` when the venv is already activated.
+VENV ?= .venv
+PYTEST ?= $(VENV)/bin/pytest
+
 # Default target
 help: ## Show this help message
 	@echo "Available targets:"
@@ -26,11 +32,11 @@ type-check: ## Check types with mypy
 
 # Run tests
 test: ## Run tests with pytest
-	pytest
+	$(PYTEST)
 
 # Run tests with coverage
 test-cov: ## Run tests with coverage
-	pytest --cov=auth --cov-report=html --cov-report=term
+	$(PYTEST) --cov=auth --cov-report=html --cov-report=term
 
 # PostgreSQL integration tests against a disposable Docker container.
 # Runs in a separate pytest process: the engine singleton binds at import.
@@ -46,7 +52,7 @@ test-postgres: ## Run PostgreSQL integration tests (Docker required)
 	AUTH_ENABLE_ENCRYPTION=true \
 	AUTH_ENCRYPTION_KEY=test-pg-encryption-key-1234 \
 	AUTH_JWT_SECRET_KEY=test-secret \
-	pytest tests/postgres/ -m postgres; \
+	$(PYTEST) tests/postgres/ -m postgres; \
 	status=$$?; docker stop auth-test-pg >/dev/null; exit $$status
 
 version-check: ## Assert pyproject, docs/conf.py and changelog agree on the version
