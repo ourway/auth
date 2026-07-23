@@ -2,6 +2,31 @@
 Changelog
 =========
 
+Version 2.0.0 (2026-07-23)
+==========================
+
+Security
+--------
+
+- **Per-tenant field encryption.** Encrypted columns (membership user, permission
+  name, group description) are now encrypted under a key derived per tenant
+  (``creator``) via HKDF, so the same value in two tenants no longer produces the
+  same ciphertext — closing a cross-tenant correlation leak. New ciphertext is
+  tagged ``v2:``; legacy global-key values remain readable until re-encrypted.
+
+Migration (BREAKING)
+--------------------
+
+- Existing **encrypted** deployments MUST re-encrypt their data, because equality
+  lookups now use the per-tenant key and would otherwise miss un-migrated rows.
+  Run, in a maintenance window with the app stopped and after a database backup::
+
+      python -m scripts.reencrypt_pertenant           # preview (dry run)
+      python -m scripts.reencrypt_pertenant --apply   # re-encrypt
+
+  The pass is idempotent and resumable. New or encryption-off deployments need no
+  migration.
+
 Version 1.7.0 (2026-07-23)
 ==========================
 

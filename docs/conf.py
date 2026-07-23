@@ -17,8 +17,8 @@ author = "Farshid Ashouri"
 
 # The full version, including alpha/beta/rc tags
 # Keep in sync with pyproject.toml (checked by `make version-check`)
-release = "1.7.0"
-version = "1.7"
+release = "2.0.0"
+version = "2.0"
 
 # -- General configuration ---------------------------------------------------
 
