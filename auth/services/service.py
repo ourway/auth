@@ -46,11 +46,11 @@ class AuthorizationService:
 
     def _get_encrypted_user(self, user: str) -> str:
         """Get the encrypted version of a user string for database queries"""
-        return encrypt_sensitive_data(user) or user
+        return encrypt_sensitive_data(user, self.client) or user
 
     def _get_encrypted_permission(self, name: str) -> str:
         """Get the encrypted version of a permission name for database queries"""
-        return encrypt_sensitive_data(name) or name
+        return encrypt_sensitive_data(name, self.client) or name
 
     def _dialect_insert(self, table) -> Any:
         """INSERT construct with ON CONFLICT support for the bound dialect.
@@ -202,7 +202,9 @@ class AuthorizationService:
             table = AuthGroup.__table__
             # Mirror the AuthGroup.description setter: store encrypted.
             encrypted_description = (
-                encrypt_sensitive_data(description) if description else description
+                encrypt_sensitive_data(description, self.client)
+                if description
+                else description
             )
             stmt = self._dialect_insert(table).values(
                 creator=self.client,

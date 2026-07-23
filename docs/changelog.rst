@@ -2,6 +2,117 @@
 Changelog
 =========
 
+Version 2.0.0 (2026-07-23)
+==========================
+
+Security
+--------
+
+- **Per-tenant field encryption.** Encrypted columns (membership user, permission
+  name, group description) are now encrypted under a key derived per tenant
+  (``creator``) via HKDF, so the same value in two tenants no longer produces the
+  same ciphertext — closing a cross-tenant correlation leak. New ciphertext is
+  tagged ``v2:``; legacy global-key values remain readable until re-encrypted.
+
+Migration (BREAKING)
+--------------------
+
+- Existing **encrypted** deployments MUST re-encrypt their data, because equality
+  lookups now use the per-tenant key and would otherwise miss un-migrated rows.
+  Run, in a maintenance window with the app stopped and after a database backup::
+
+      python -m scripts.reencrypt_pertenant           # preview (dry run)
+      python -m scripts.reencrypt_pertenant --apply   # re-encrypt
+
+  The pass is idempotent and resumable. New or encryption-off deployments need no
+  migration.
+
+Version 1.7.0 (2026-07-23)
+==========================
+
+Security
+--------
+
+- **Authenticated field encryption.** Deterministic encryption now verifies the
+  synthetic IV it stores (``HMAC(key, plaintext)[:16]``) when decrypting, so
+  tampered, corrupted, or wrong-key values are rejected with
+  ``InvalidCiphertextError`` instead of silently returning plaintext or garbage.
+  The field layer fails closed: a wrong or rotated ``AUTH_ENCRYPTION_KEY`` now
+  fails loudly. The on-disk format is unchanged, so existing encrypted data
+  keeps decrypting and legacy (never-encrypted) rows are still read as-is.
+
+Added
+-----
+
+- **Managed schema migrations (Alembic).** ``migrations/`` and ``alembic.ini``;
+  install the extra (``pip install auth[migrations]``) and run
+  ``alembic upgrade head``. Migration ``0001`` widens the variable and encrypted
+  columns to ``TEXT`` on PostgreSQL — idempotent, and a no-op on SQLite. Alembic
+  manages schema *changes*; ``create_all`` still creates tables.
+
+Changed
+-------
+
+- Variable and encrypted string columns are now ``TEXT`` (``auth_group.role`` /
+  ``description``, ``auth_membership.user``, ``auth_permission.name``,
+  ``audit_log.client_id`` / ``resource`` / ``user_agent``), removing the varchar
+  limits that encrypted values or long audit fields could overflow. Existing
+  PostgreSQL deployments converge by running the migration above.
+- gunicorn now preloads the app and disposes the SQLAlchemy engine after fork,
+  so the schema bootstrap runs once in the master rather than racing across the
+  worker processes at startup.
+
+Upgrading
+---------
+
+- After deploying, run ``alembic upgrade head`` once. It is idempotent and safe
+  on deployments whose columns were already altered to ``text`` by hand.
+- Because decryption now fails closed, confirm that existing encrypted rows
+  authenticate under the configured key before rolling out — a wrong key now
+  surfaces as errors rather than silently returning plaintext.
+
+Version 1.6.0 (2026-07-23)
+==========================
+
+Security
+--------
+
+- **Client keys are no longer written in clear text.** The bearer token was
+  previously stored verbatim in the ``audit_log.client_id`` column and in the
+  JSON audit logs — including on failed authentication. Audit records now store
+  a non-reversible HMAC fingerprint of the key (peppered with
+  ``AUTH_AUDIT_PEPPER``, falling back to the JWT secret). Audit rows written by
+  older versions still contain the raw key and should be scrubbed out of band.
+- **Authentication now runs before auditing.** A missing, malformed or non-UUID
+  bearer token is rejected up front, so unauthenticated requests no longer open
+  a database session or write an audit row. The 400 returned for a non-UUID key
+  no longer echoes the submitted value back.
+
+Fixed
+-----
+
+- **Audit rows are no longer silently dropped.** Over-length fields (a long
+  ``User-Agent``, an oversized ``Authorization`` header) overflowed the
+  ``audit_log`` varchar columns and aborted the INSERT on PostgreSQL, losing the
+  record entirely. Values are now clamped to their column width before insert.
+  No schema migration is required.
+
+Added
+-----
+
+- **Optional application-layer rate limiting**, as defense in depth alongside
+  the nginx edge limiter. Off by default; enable with ``AUTH_ENABLE_RATE_LIMIT``
+  and install the extra (``pip install auth[ratelimit]``). Point
+  ``AUTH_RATELIMIT_STORAGE_URI`` at a shared store such as ``redis://`` for a
+  limit shared across workers, and set ``AUTH_RATELIMIT_DEFAULT`` to tune it.
+- ``AUTH_AUDIT_PEPPER`` configuration option.
+
+Changed
+-------
+
+- ``AUTH_ENABLE_AUDIT_LOGGING=false`` is now honoured; audit logging was
+  previously always on regardless of the flag.
+
 Version 1.5.1 (2026-07-20)
 ==========================
 

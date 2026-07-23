@@ -2,6 +2,8 @@
 Audit logging for the authorization system
 """
 
+import hashlib
+import hmac
 import json
 import logging
 from datetime import datetime, timezone
@@ -10,6 +12,7 @@ from typing import Any, Dict, Optional
 
 from sqlalchemy import Column, DateTime, Integer, String, Text
 
+from auth.config import get_settings
 from auth.database import SessionLocal
 from auth.models.sql import _SCHEMA, Base
 
@@ -47,13 +50,13 @@ class AuditLog(Base):
 
     id = Column(Integer, primary_key=True, index=True)
     timestamp = Column(DateTime, default=_utcnow, nullable=False)
-    client_id = Column(String(64), index=True, nullable=False)
+    client_id = Column(Text, index=True, nullable=False)
     user = Column(String(64), index=True)
     action = Column(String(50), nullable=False)
-    resource = Column(String(100))
+    resource = Column(Text)
     details = Column(Text)  # JSON string of additional details
     ip_address = Column(String(45))  # Support for IPv6
-    user_agent = Column(String(500))
+    user_agent = Column(Text)
     success = Column(Integer)  # 1 for success, 0 for failure
 
 
@@ -67,6 +70,45 @@ if not audit_logger.handlers:
     formatter = logging.Formatter("%(asctime)s - AUDIT - %(message)s")
     handler.setFormatter(formatter)
     audit_logger.addHandler(handler)
+
+
+# Column widths of the audit_log table (see AuditLog above). Values are clamped
+# to these before insert so an over-length field — an attacker-controlled
+# User-Agent, or an oversized Authorization header — can never abort the INSERT
+# and silently drop the whole audit row on PostgreSQL. Phase C widens these
+# columns to TEXT and relaxes the clamp.
+_AUDIT_MAXLEN = {
+    "client_id": 64,
+    "user": 64,
+    "action": 50,
+    "resource": 100,
+    "ip_address": 45,
+    "user_agent": 500,
+}
+
+
+def _fit(value: Optional[str], column: str) -> Optional[str]:
+    """Clamp a value to its audit column width (no-op for None)."""
+    if value is None:
+        return None
+    return str(value)[: _AUDIT_MAXLEN[column]]
+
+
+def client_fingerprint(token: Optional[str]) -> str:
+    """A stable, non-reversible reference for a client key — safe to store and
+    log in place of the raw key.
+
+    HMAC-SHA256 under a server-side pepper, so reading the audit log neither
+    reveals the key nor lets an attacker confirm a guessed key offline without
+    also holding the pepper. The pepper is ``AUTH_AUDIT_PEPPER`` and falls back
+    to the JWT secret so it is never unsalted.
+    """
+    if not token:
+        return "anonymous"
+    settings = get_settings()
+    pepper = (settings.audit_pepper or settings.jwt_secret_key or "auth").encode()
+    digest = hmac.new(pepper, token.encode(), hashlib.sha256).hexdigest()
+    return "fpr_" + digest[:32]
 
 
 def log_audit_event(
@@ -86,13 +128,13 @@ def log_audit_event(
     try:
         # Create audit log entry
         audit_entry = AuditLog(
-            client_id=client_id,
-            user=user,
-            action=action.value,
-            resource=resource,
+            client_id=_fit(client_id, "client_id"),
+            user=_fit(user, "user"),
+            action=_fit(action.value, "action"),
+            resource=_fit(resource, "resource"),
             details=json.dumps(details) if details else None,
-            ip_address=ip_address,
-            user_agent=user_agent,
+            ip_address=_fit(ip_address, "ip_address"),
+            user_agent=_fit(user_agent, "user_agent"),
             success=1 if success else 0,
         )
 

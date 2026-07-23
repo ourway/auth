@@ -26,6 +26,8 @@ os.environ.setdefault("AUTH_ENABLE_ENCRYPTION", "false")
 os.environ.setdefault("AUTH_ENCRYPTION_KEY", "")
 os.environ.setdefault("AUTH_JWT_SECRET_KEY", "test-secret-key-not-for-production")
 os.environ.setdefault("AUTH_ENABLE_AUDIT_LOGGING", "true")
+os.environ.setdefault("AUTH_AUDIT_PEPPER", "test-pepper-not-for-production")
+os.environ.setdefault("AUTH_ENABLE_RATE_LIMIT", "false")
 os.environ.setdefault("AUTH_DEBUG_MODE", "false")
 
 import pytest  # noqa: E402

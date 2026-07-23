@@ -4,7 +4,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "auth"
-version = "1.5.1"
+version = "2.0.0"
 description = "Authorization for humans"
 readme = {file = "README.rst", content-type = "text/x-rst"}
 requires-python = ">=3.9"
@@ -49,9 +49,21 @@ dependencies = [
 ]
 
 [project.optional-dependencies]
+# Application-layer rate limiting (AUTH_ENABLE_RATE_LIMIT). Optional so the
+# default install pulls no extra packages; the app degrades gracefully to
+# "no app-layer limiting" if it is absent.
+ratelimit = [
+    "flask-limiter>=3.0.0",
+]
+# Database schema migrations (Alembic). Needed to run `alembic upgrade head`
+# on a deployment; not required to import or serve the app.
+migrations = [
+    "alembic>=1.13.0",
+]
 dev = [
     "pytest>=6.0",
     "pytest-cov>=2.0",
+    "alembic>=1.13.0",
     "ruff>=0.0.260",
     "mypy>=1.0",
     "types-requests",
@@ -183,6 +195,10 @@ ignore_missing_imports = true
 
 [[tool.mypy.overrides]]
 module = ["apscheduler.*"]
+ignore_missing_imports = true
+
+[[tool.mypy.overrides]]
+module = ["flask_limiter.*"]
 ignore_missing_imports = true
 
 [[tool.mypy.overrides]]

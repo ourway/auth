@@ -17,6 +17,47 @@ setup_logging()
 logger = logging.getLogger(__name__)
 
 
+def _init_rate_limiter(app, settings):
+    """Attach a Flask-Limiter to the app (best effort, defense in depth).
+
+    Keyed by the client-key fingerprint when authenticated, else by remote IP;
+    public endpoints are exempt. ``settings.ratelimit_storage_uri`` of
+    ``memory://`` is per-worker — point it at redis:// for a shared limit across
+    gunicorn workers. If flask-limiter is not installed the app still boots with
+    limiting off (nginx remains the primary limiter).
+    """
+    try:
+        from flask import request
+        from flask_limiter import Limiter
+        from flask_limiter.util import get_remote_address
+    except ImportError:
+        logger.error(
+            "AUTH_ENABLE_RATE_LIMIT is set but flask-limiter is not installed; "
+            "application-layer rate limiting is OFF."
+        )
+        return
+
+    from auth.audit import client_fingerprint
+
+    def _key():
+        header = request.headers.get("Authorization", "")
+        parts = header.split()
+        if len(parts) == 2 and parts[0].lower() == "bearer":
+            return client_fingerprint(parts[1])
+        return get_remote_address()
+
+    limiter = Limiter(
+        key_func=_key,
+        default_limits=[settings.ratelimit_default],
+        storage_uri=settings.ratelimit_storage_uri,
+        headers_enabled=True,
+    )
+    limiter.request_filter(
+        lambda: request.path in ("/ping", "/health", "/", "/docs", "/llms.txt")
+    )
+    limiter.init_app(app)
+
+
 def create_app():
     # Create Flask app
     app = Flask(__name__)
@@ -29,6 +70,11 @@ def create_app():
             CORS(app)
         else:
             CORS(app, origins=[origin.strip() for origin in raw_origins.split(",")])
+
+    # Application-layer rate limiting (defense in depth; nginx is the primary
+    # limiter at the edge). Disabled unless AUTH_ENABLE_RATE_LIMIT is set.
+    if settings.enable_rate_limit:
+        _init_rate_limiter(app, settings)
 
     # Create tables on startup
     with app.app_context():

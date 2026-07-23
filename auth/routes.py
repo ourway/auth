@@ -4,7 +4,7 @@ Flask routes for authorization service
 
 from functools import wraps
 
-from flask import abort, jsonify, request
+from flask import abort, g, jsonify, request
 
 from auth.audit import AuditAction
 from auth.database import get_db, get_pool_status
@@ -44,39 +44,54 @@ def with_db_session(route_func):
 
 
 def _get_auth_service(db):
+    """Return a tenant-scoped auth service for the current request.
+
+    Authentication (Bearer header parsing + UUID4 validation) is performed once,
+    up front, by the ``_authenticate_api`` ``before_request`` hook registered in
+    ``register_routes``, which stores the validated client key on ``g``. This
+    helper only binds that key to the request's database session.
     """
-    Extracts the Bearer token, validates it, and returns an auth service.
-    Aborts with 400/401 on error.
-    """
-    auth_header = request.headers.get("Authorization")
-    if not auth_header:
-        abort(401, description="Authorization header is missing.")
-
-    parts = auth_header.split()
-    if len(parts) != 2 or parts[0].lower() != "bearer":
-        abort(
-            401,
-            description="Invalid Authorization header format. Must be 'Bearer <token>'.",
-        )
-
-    client_key = parts[1]
-    # Additional validation for client key format
-    if not validate_client_key(client_key):
-        abort(
-            400,
-            description=f"Invalid client key: {client_key}. Client key must be a valid UUID4.",
-        )
-
-    try:
-        # The service init validates the UUID4 format
-        auth_service = AuthorizationService(db, client_key, validate_client=True)
-        return auth_service
-    except ValueError as e:
-        abort(400, description=str(e))
+    client_key = getattr(g, "client_key", None)
+    if not client_key:
+        # Reached only if a route outside the /api/* gate calls this helper.
+        abort(401, description="Authorization required.")
+    return AuthorizationService(db, client_key, validate_client=True)
 
 
 def register_routes(app):
     """Register all routes with the Flask app"""
+
+    @app.before_request
+    def _authenticate_api():
+        """Authenticate every /api/* request before any audit or DB work.
+
+        Runs ahead of each route's ``@with_db_session``/``@audit_log`` chain so
+        that unauthenticated or malformed requests are rejected without opening a
+        database session or writing an audit row. Public routes (/ping, /health,
+        the docs pages) and CORS preflight are exempt.
+        """
+        if request.method == "OPTIONS":
+            return None
+        if not request.path.startswith("/api/"):
+            return None
+
+        auth_header = request.headers.get("Authorization")
+        if not auth_header:
+            abort(401, description="Authorization header is missing.")
+
+        parts = auth_header.split()
+        if len(parts) != 2 or parts[0].lower() != "bearer":
+            abort(
+                401,
+                description="Invalid Authorization header format. Must be 'Bearer <token>'.",
+            )
+
+        client_key = parts[1]
+        if not validate_client_key(client_key):
+            abort(400, description="Invalid client key. Must be a valid UUID4.")
+
+        g.client_key = client_key
+        return None
 
     @app.route("/ping", methods=["GET"])
     def ping():
