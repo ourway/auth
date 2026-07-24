@@ -9,7 +9,7 @@ must still be the ones the API actually exhibits.
 
 import pytest
 
-from auth.docs_page import render_markdown
+from auth.docs_page import render_landing, render_markdown
 from auth.main import create_app
 
 
@@ -103,3 +103,50 @@ def test_membership_check_answers_with_has_permission_key(client):
     response = client.get("/api/membership/alice/engineers", headers=headers)
     assert response.status_code == 200
     assert "has_permission" in response.get_json()["data"]
+
+
+# --- Landing + per-agent guide routes -------------------------------------
+
+
+def test_landing_is_lean_and_indexes_the_guides(client):
+    """`/` is the short landing, not the full reference: it links the guides and
+    is materially shorter than /docs (which keeps the endpoint tables)."""
+    landing = render_landing()
+    assert landing.startswith("# auth")
+    for link in ("/docs", "/llms.txt", "/claude"):
+        assert link in landing, f"landing should point to {link}"
+    # The lean landing must not carry the whole endpoint reference.
+    assert "## 4. Endpoints" not in landing
+    assert len(landing) < len(render_markdown())
+    # served without auth
+    assert client.get("/").status_code == 200
+
+
+def test_docs_serves_the_full_reference(client):
+    """/docs (and /llms.txt) still carry the complete endpoint reference."""
+    body = client.get("/docs").get_data(as_text=True)
+    assert "## 4. Endpoints" in body
+    assert "/api/has_permission/" in body
+
+
+@pytest.mark.parametrize("path", ["/claude", "/opencode", "/codex"])
+def test_agent_guide_routes_serve_markdown_without_auth(client, path):
+    response = client.get(path, headers={"Accept": "*/*"})
+    assert response.status_code == 200
+    assert response.mimetype == "text/markdown"
+
+
+def test_claude_guide_has_the_integration_essentials(client):
+    body = client.get("/claude", headers={"Accept": "*/*"}).get_data(as_text=True)
+    assert "pip install auth" in body
+    assert "api_key=" in body and "service_url=" in body
+    assert "user_has_permission" in body
+    # steers away from misuse
+    assert "Authentication" in body
+
+
+@pytest.mark.parametrize("path", ["/opencode", "/codex"])
+def test_coming_soon_guides_point_to_docs(client, path):
+    body = client.get(path, headers={"Accept": "*/*"}).get_data(as_text=True)
+    assert "coming soon" in body.lower()
+    assert "/docs" in body

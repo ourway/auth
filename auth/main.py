@@ -53,7 +53,8 @@ def _init_rate_limiter(app, settings):
         headers_enabled=True,
     )
     limiter.request_filter(
-        lambda: request.path in ("/ping", "/health", "/", "/docs", "/llms.txt")
+        lambda: request.path
+        in ("/ping", "/health", "/", "/docs", "/llms.txt", "/claude", "/opencode", "/codex")
     )
     limiter.init_app(app)
 
