@@ -312,6 +312,7 @@ curl -X GET \
 | GET | `/api/members/{role}` | Get all members of role |
 | GET | `/api/which_roles_can/{name}` | Get roles with specific permission |
 | GET | `/api/which_users_can/{name}` | Get users with specific permission |
+| POST | `/api/keys/rotate` | Rotate the calling client key (atomic cutover; returns the new key) |
 
 ### Response Format
 

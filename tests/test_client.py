@@ -95,6 +95,36 @@ def test_error_contract_returns_dict_not_raise():
 
 
 @responses.activate
+def test_rotate_key_switches_the_live_client_to_the_new_key():
+    new_key = str(uuid.uuid4())
+    responses.post(
+        f"{BASE}/api/keys/rotate",
+        json={
+            "success": True,
+            "data": {
+                "new_key": new_key,
+                "migrated": {"roles": 1, "memberships": 0, "permissions": 0},
+            },
+        },
+    )
+    with make_client() as client:
+        assert client.api_key == API_KEY
+        result = client.rotate_key()
+    assert result["data"]["new_key"] == new_key
+    # The instance now authenticates as the new key.
+    assert client.api_key == new_key
+    assert client.session.headers["Authorization"] == f"Bearer {new_key}"
+
+
+@responses.activate
+def test_rotate_key_transport_failure_leaves_key_unchanged():
+    with make_client() as client:  # nothing registered -> connection error
+        result = client.rotate_key()
+        assert result["success"] is False and "error" in result
+        assert client.api_key == API_KEY  # not rotated on failure
+
+
+@responses.activate
 def test_http_error_status_becomes_error_dict():
     responses.get(f"{BASE}/api/roles", json={"detail": "boom"}, status=400)
     with make_client() as client:

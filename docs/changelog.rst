@@ -2,6 +2,23 @@
 Changelog
 =========
 
+Version 2.1.0 (2026-07-25)
+==========================
+
+Added
+-----
+
+- **API-key rotation.** ``POST /api/keys/rotate`` (authenticated with the current
+  key) mints a fresh key, atomically moves the caller's whole namespace onto it in
+  a single transaction, and returns the new key. It is an instant *cutover*: the
+  old key is left owning nothing. When field encryption is enabled the bound
+  columns (membership user, permission name, group description) are decrypted under
+  the old key and re-encrypted under the new key in the same transaction, so the
+  new namespace stays equality-queryable. The rotation is recorded as a single
+  ``ROTATE_KEY`` audit event linking the old and new key fingerprints (never the
+  raw keys). The Python client gains ``Client.rotate_key()``, which also switches
+  the live client instance to the returned key. No database migration is required.
+
 Version 2.0.0 (2026-07-23)
 ==========================
 

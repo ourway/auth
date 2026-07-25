@@ -2,11 +2,13 @@
 Flask routes for authorization service
 """
 
+import uuid
 from functools import wraps
 
 from flask import abort, g, jsonify, request
 
-from auth.audit import AuditAction
+from auth.audit import AuditAction, client_fingerprint, log_audit_event
+from auth.config import get_settings
 from auth.database import get_db, get_pool_status
 from auth.decorators import audit_log
 from auth.response_format import (
@@ -415,3 +417,40 @@ def register_routes(app):
             data=format_permission_response(result),
             message=f"Workflow permission check for user '{user}' and workflow '{workflow_name}' completed",
         )
+
+    # API-key management
+    @app.route("/api/keys/rotate", methods=["POST"])
+    @with_db_session
+    def rotate_key(db):
+        """Rotate the caller's client key (atomic cutover).
+
+        Authenticated by the *current* key (the before-request gate already put
+        it on ``g.client_key``). The server mints a fresh UUID4, atomically moves
+        the caller's whole namespace onto it (re-encrypting bound fields when
+        encryption is on), and returns the new key. The old key immediately owns
+        nothing. The returned key is the only copy — the caller must persist it.
+
+        Audited explicitly (not via the ``@audit_log`` decorator) so the record
+        can link the old key's fingerprint to the *new* key's fingerprint, which
+        the decorator — seeing only ``g.client_key`` — cannot capture. Neither
+        raw key is ever written to the audit trail.
+        """
+        old_key = g.client_key
+        new_key = str(uuid.uuid4())
+
+        auth_service = _get_auth_service(db)
+        result = auth_service.rotate_client_key(new_key)
+
+        if get_settings().enable_audit_logging:
+            log_audit_event(
+                client_id=client_fingerprint(old_key),
+                user=None,
+                action=AuditAction.ROTATE_KEY,
+                resource=client_fingerprint(new_key),
+                details={"migrated": result["migrated"]},
+                ip_address=request.remote_addr,
+                user_agent=request.headers.get("User-Agent", ""),
+                success=True,
+            )
+
+        return APIResponse.success(data=result, message="Client key rotated")

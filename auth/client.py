@@ -131,6 +131,7 @@ class EnhancedAuthClient:
             "role": "/api/role/{role}",
             "workflow_users": "/api/workflow/users/{workflow_name}",
             "workflow_permission": "/api/workflow/user/{user}/can_run/{workflow_name}",
+            "rotate_key": "/api/keys/rotate",
         }
 
     def _make_request(self, method: str, endpoint: str, **kwargs) -> Dict[str, Any]:
@@ -336,6 +337,28 @@ class EnhancedAuthClient:
             return self._make_request("DELETE", endpoint)
         except Exception as e:
             return {"error": str(e), "success": False, "data": {"role": role}}
+
+    def rotate_key(self) -> Dict[str, Any]:
+        """Rotate this client's API key (atomic cutover).
+
+        The server mints a fresh key, moves the whole namespace onto it, and
+        returns it in ``data.new_key``. On success this client is updated in
+        place — ``self.api_key`` and the session ``Authorization`` header switch
+        to the new key — so subsequent calls on this instance keep working. The
+        returned key is the ONLY copy: persist ``data.new_key`` (e.g. to your
+        secret store) or you lose access to the namespace.
+        """
+        endpoint = self.endpoints["rotate_key"]
+        try:
+            response = self._make_request("POST", endpoint)
+        except Exception as e:
+            return {"error": str(e), "success": False, "data": {}}
+
+        new_key = (response or {}).get("data", {}).get("new_key")
+        if new_key:
+            self.api_key = new_key
+            self.session.headers["Authorization"] = f"Bearer {new_key}"
+        return response
 
     # Workflow-related methods
     def get_users_for_workflow(self, workflow_name: str) -> Dict[str, Any]:

@@ -111,6 +111,18 @@ Deletes are idempotent: removing a membership or permission that was never there
 still returns `{{"result": true}}`. Creating a role twice also returns `true`.
 Deleting a role a second time is the one exception — it returns `false`.
 
+**Rotating a key is an instant cutover.** `POST /api/keys/rotate`, authenticated
+with your *current* key, mints a fresh key, atomically moves your entire
+namespace onto it, and returns it as `data.new_key`. The moment it returns the
+**old key owns nothing** — it is a move, not a copy — and the returned key is the
+**only copy**, so capture it (it cannot be looked up later). When field
+encryption is on, the encrypted user/permission names are re-encrypted under the
+new key in the same transaction; nothing to do on your side. Rotate while the
+key is idle — a write racing the rotation can be left behind under the old key.
+Threat model: because possession of a key *is* authority, whoever holds your key
+can also rotate it out from under you, so rotate promptly on any suspected leak
+and update every consumer with the returned key.
+
 ## 4. Endpoints
 
 All paths need the `Authorization` header except `/ping` and `/health`.
@@ -165,6 +177,17 @@ Thin aliases over the permission model — a workflow name is just a permission.
 | GET | `/api/workflow/user/<user>/can_run/<workflow>` | wrapped, `data` = `{{"has_permission": true}}` |
 | GET | `/api/workflow/users/<workflow>` | wrapped, `data` = `{{"count": 2, "members": [{{"user": "alice", "role": "engineers"}}]}}` |
 
+### API keys
+
+Rotate the key you authenticate with. The call is authenticated by your
+*current* key (no body, nothing in the path); the server mints a fresh key,
+moves your whole namespace onto it atomically, and returns it. `new_key` is the
+only copy — persist it. See section 3 for the full semantics and threat model.
+
+| Method | Path | Returns |
+|---|---|---|
+| POST | `/api/keys/rotate` | wrapped, `data` = `{{"new_key": "<uuid4>", "migrated": {{"roles": 1, "memberships": 1, "permissions": 1}}}}` |
+
 ### Service
 
 | Method | Path | Auth | Returns |
@@ -216,8 +239,10 @@ Methods mirror the endpoints: `create_role`, `delete_role`, `list_roles`,
 `remove_permission`, `has_permission`, `user_has_permission`,
 `get_user_permissions`, `get_role_permissions`, `get_user_roles`,
 `get_role_members`, `which_roles_can`, `which_users_can`,
-`get_users_for_workflow`, `ping`.
+`get_users_for_workflow`, `rotate_key`, `ping`.
 Each returns the parsed JSON body, so the shapes in section 4 still apply.
+`rotate_key()` also switches the live client (and its session header) to the new
+key on success and returns it — persist `data.new_key`, it is the only copy.
 
 The library can also be used in-process against your own database, bypassing
 HTTP entirely — see https://pypi.org/project/auth/.
@@ -288,6 +313,10 @@ to it.
 `200 {"result": false}`, not a 4xx — check the `result`/`data` field, never just
 the status code. The full reference lists three more surprises like it.
 
+**Leaked a key?** `POST /api/keys/rotate` with your current key mints a fresh one
+and moves your whole namespace onto it in one shot — capture the returned key, it
+is the only copy. See `/docs`.
+
 ## Guides
 
 | Path | For |
@@ -342,6 +371,15 @@ list and response shapes.
   permission iff they belong to a role that holds it. There is no "create user"
   step — everything is implicit — and a role must exist before members or
   permissions attach to it.
+
+## Rotating a key
+
+`auth.rotate_key()` (or `POST /api/keys/rotate`, authenticated with the current
+key) mints a fresh key, atomically moves the whole namespace onto it, and returns
+`data.new_key` — the **only copy**, so persist it to your secret store. It is a
+cutover: the old key instantly owns nothing. The client method also switches the
+live instance (and its session header) to the new key. Rotate on any suspected
+leak, and update every consumer with the returned key.
 
 ## Four contract surprises (they are the design, not bugs)
 
