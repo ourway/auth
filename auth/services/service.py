@@ -42,7 +42,9 @@ class AuthorizationService:
             # the traceback logger. Report only that validation failed.
             raise ValueError("Invalid client key: must be a valid UUID4.")
         self.db = db
-        self.client = client
+        # Canonicalize the key: it is the tenant identifier and the per-tenant
+        # encryption KDF input, so case variants must not fork the namespace.
+        self.client = client.lower()
         self.validate_client = validate_client
 
     def _get_encrypted_user(self, user: str) -> str:
@@ -235,7 +237,9 @@ class AuthorizationService:
                 role,
             )
             self.db.rollback()
-            return False
+            # Do not mask a real DB failure as a legitimate False — re-raise so
+            # the request becomes a 500 and the audit records the failure.
+            raise
 
     def del_role(self, role: str) -> bool:
         """Delete a role"""
@@ -307,7 +311,9 @@ class AuthorizationService:
                 role,
             )
             self.db.rollback()
-            return False
+            # Re-raise a real DB failure (a legitimate "role missing" already
+            # returned False above) so it surfaces as 500 + a failed audit.
+            raise
 
     def del_membership(self, user: str, role: str) -> bool:
         """Remove user from a role"""
@@ -420,7 +426,9 @@ class AuthorizationService:
                 name,
             )
             self.db.rollback()
-            return False
+            # Re-raise a real DB failure (a legitimate "role missing" already
+            # returned False above) so it surfaces as 500 + a failed audit.
+            raise
 
     def del_permission(self, role: str, name: str) -> bool:
         """Remove permission from a role"""

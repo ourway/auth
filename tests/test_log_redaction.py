@@ -23,7 +23,8 @@ def test_write_failure_logs_fingerprint_not_raw_key(caplog):
         svc = AuthorizationService(db, key)
         with patch.object(db, "execute", side_effect=RuntimeError("boom")):
             with caplog.at_level(logging.ERROR):
-                assert svc.add_role("engineers") is False
+                with pytest.raises(RuntimeError):
+                    svc.add_role("engineers")
         assert key not in caplog.text, "raw client key leaked into logs"
         assert client_fingerprint(key) in caplog.text, "expected fingerprint in logs"
     finally:

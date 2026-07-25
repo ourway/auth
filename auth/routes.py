@@ -96,7 +96,11 @@ def register_routes(app):
         if not validate_client_key(client_key):
             abort(400, description="Invalid client key. Must be a valid UUID4.")
 
-        g.client_key = client_key
+        # Canonicalize to lowercase: a UUID4 is case-insensitive, but the raw
+        # string is used verbatim as the tenant identifier AND the encryption KDF
+        # input, so `3F6B...` and `3f6b...` would otherwise be two disjoint
+        # namespaces with different keys. Store one canonical form.
+        g.client_key = client_key.lower()
         return None
 
     @app.route("/ping", methods=["GET"])
