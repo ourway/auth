@@ -2,14 +2,16 @@
 Flask routes for authorization service
 """
 
+import logging
 import uuid
 from functools import wraps
 
 from flask import abort, g, jsonify, request
+from sqlalchemy import text
 
 from auth.audit import AuditAction, client_fingerprint, log_audit_event
 from auth.config import get_settings
-from auth.database import get_db, get_pool_status
+from auth.database import engine, get_db
 from auth.decorators import audit_log
 from auth.response_format import (
     APIResponse,
@@ -26,6 +28,8 @@ from auth.validation import (
     validate_user_name,
     validate_user_role_combination,
 )
+
+logger = logging.getLogger(__name__)
 
 
 def with_db_session(route_func):
@@ -102,21 +106,19 @@ def register_routes(app):
 
     @app.route("/health", methods=["GET"])
     def health():
+        """Public liveness + database-readiness probe.
+
+        Actually round-trips the database (``SELECT 1``) so it reports unhealthy
+        when the DB is unreachable, instead of always claiming healthy. Returns
+        no internal pool details — those are not the public probe's business.
         """
-        Health check endpoint with connection pool statistics
-        Useful for monitoring and debugging in production
-        """
-        pool_stats = get_pool_status()
-        return jsonify({
-            "status": "healthy",
-            "database": {
-                "pool_size": pool_stats.get("pool_size", 0),
-                "checked_out": pool_stats.get("checked_out", 0),
-                "available": pool_stats.get("available", 0),
-                "overflow": pool_stats.get("overflow", 0),
-                "total_connections": pool_stats.get("total_connections", 0),
-            }
-        })
+        try:
+            with engine.connect() as conn:
+                conn.execute(text("SELECT 1"))
+        except Exception:
+            logger.exception("health check failed: database unreachable")
+            return jsonify({"status": "unhealthy"}), 503
+        return jsonify({"status": "healthy"})
 
     @app.route("/api/membership/<user>/<group>", methods=["GET"])
     @with_db_session

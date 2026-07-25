@@ -93,6 +93,23 @@ def test_ping_shape_pinned(client):
 
 
 def test_health_endpoint_shape(client):
-    body = client.get("/health").get_json()
-    assert body["status"] == "healthy"
-    assert "pool_size" in body["database"]
+    resp = client.get("/health")
+    assert resp.status_code == 200
+    body = resp.get_json()
+    assert body == {"status": "healthy"}
+    # The public probe must not leak internal pool details.
+    assert "database" not in body
+
+
+def test_health_reports_unhealthy_when_db_unreachable(client, monkeypatch):
+    """Both directions: /health must fail (503) when the DB round-trip fails,
+    not keep reporting healthy."""
+
+    class _BoomEngine:
+        def connect(self):
+            raise RuntimeError("db down")
+
+    monkeypatch.setattr("auth.routes.engine", _BoomEngine())
+    resp = client.get("/health")
+    assert resp.status_code == 503
+    assert resp.get_json() == {"status": "unhealthy"}

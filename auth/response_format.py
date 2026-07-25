@@ -2,7 +2,6 @@
 Consistent error handling and response formatting for the authorization system
 """
 
-import os
 from datetime import datetime, timezone
 from typing import Any, Dict, Optional, Tuple
 
@@ -75,42 +74,6 @@ class APIResponse:
     def server_error(message: str = "Internal server error") -> Tuple[Response, int]:
         """Create a standardized server error response"""
         return APIResponse.error(message, 500)
-
-
-def handle_exception(e: Exception) -> Tuple[Response, int]:
-    """Handle exceptions and return appropriate error response"""
-    import traceback
-
-    error_msg = str(e)
-    error_code = 500
-
-    # Differentiate between different types of errors
-    if "validation" in error_msg.lower() or "invalid" in error_msg.lower():
-        error_code = 400
-    elif "unauthorized" in error_msg.lower() or "auth" in error_msg.lower():
-        error_code = 401
-    elif "forbidden" in error_msg.lower():
-        error_code = 403
-    elif "not found" in error_msg.lower() or "404" in error_msg.lower():
-        error_code = 404
-
-    # Log the full traceback for debugging
-    print(f"Error: {e}")
-    print(traceback.format_exc())
-
-    return APIResponse.error(
-        message="An error occurred processing your request",
-        code=error_code,
-        details={
-            "error_type": type(e).__name__,
-            "error_message": error_msg,
-            "dev_error": (
-                str(e)
-                if os.getenv("DEBUG", "").lower() == "true"
-                else "Error details hidden"
-            ),
-        },
-    )
 
 
 def format_user_permissions_response(permissions: list) -> dict:

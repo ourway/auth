@@ -193,7 +193,7 @@ only copy — persist it. See section 3 for the full semantics and threat model.
 | Method | Path | Auth | Returns |
 |---|---|---|---|
 | GET | `/ping` | no | `{{"message": "PONG"}}` |
-| GET | `/health` | no | `{{"status": "healthy", "database": {{...pool stats...}}}}` |
+| GET | `/health` | no | `{{"status": "healthy"}}` (503 `{{"status": "unhealthy"}}` if the DB is unreachable) |
 | GET | `/` | no | lean landing page (a guide index) |
 | GET | `/docs` | no | this full reference |
 | GET | `/llms.txt` | no | this full reference, always Markdown |
