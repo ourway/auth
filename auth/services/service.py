@@ -9,6 +9,7 @@ from typing import Any, Dict, List, Optional, Tuple, cast
 from sqlalchemy import Table, func, select, update
 from sqlalchemy.orm import Session
 
+from auth.audit import client_fingerprint
 from auth.encryption import encrypt_sensitive_data
 from auth.models.sql import (
     AuthGroup,
@@ -37,9 +38,9 @@ class AuthorizationService:
 
     def __init__(self, db: Session, client: str, validate_client: bool = True):
         if validate_client and not validate_client_key(client):
-            raise ValueError(
-                f"Invalid client key: {client}. Client key must be a valid UUID4."
-            )
+            # Never echo the raw key (it is the credential) — it would land in
+            # the traceback logger. Report only that validation failed.
+            raise ValueError("Invalid client key: must be a valid UUID4.")
         self.db = db
         self.client = client
         self.validate_client = validate_client
@@ -228,7 +229,11 @@ class AuthorizationService:
             self.db.commit()
             return True
         except Exception:
-            logger.exception("add_role failed (client=%s, role=%r)", self.client, role)
+            logger.exception(
+                "add_role failed (client=%s, role=%r)",
+                client_fingerprint(self.client),
+                role,
+            )
             self.db.rollback()
             return False
 
@@ -297,9 +302,8 @@ class AuthorizationService:
             return True
         except Exception:
             logger.exception(
-                "add_membership failed (client=%s, user=%r, role=%r)",
-                self.client,
-                user,
+                "add_membership failed (client=%s, role=%r)",
+                client_fingerprint(self.client),
                 role,
             )
             self.db.rollback()
@@ -411,7 +415,7 @@ class AuthorizationService:
         except Exception:
             logger.exception(
                 "add_permission failed (client=%s, role=%r, name=%r)",
-                self.client,
+                client_fingerprint(self.client),
                 role,
                 name,
             )
@@ -585,7 +589,9 @@ class AuthorizationService:
                     migrated[label] = int(count)
             self.db.commit()
         except Exception:
-            logger.exception("rotate_client_key failed (old_creator=%s)", old)
+            logger.exception(
+                "rotate_client_key failed (old_creator=%s)", client_fingerprint(old)
+            )
             self.db.rollback()
             raise
 
