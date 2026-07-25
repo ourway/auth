@@ -95,6 +95,25 @@ def test_audit_failure_rolls_back_the_mutation(client):
     assert [r for r in _audit_rows(key) if r.action == "CREATE_ROLE"] == []
 
 
+def test_audit_stores_no_plaintext_user_pii(client):
+    """A3: the managed user is PII (often an email). It must be fingerprinted in
+    the `user` column and inside `resource`, never stored in plaintext."""
+    key = str(uuid.uuid4())
+    user = "alice@example.com"
+    client.post("/api/role/engineers", headers=_h(key))
+    client.post(f"/api/membership/{user}/engineers", headers=_h(key))
+
+    add = [r for r in _audit_rows(key) if r.action == "ADD_MEMBERSHIP"]
+    assert len(add) == 1
+    row = add[0]
+    # user column is a fingerprint, not the raw email
+    assert row.user == client_fingerprint(user)
+    assert user not in (row.user or "")
+    # resource embeds the fingerprint, not the raw email
+    assert user not in (row.resource or "")
+    assert client_fingerprint(user) in (row.resource or "")
+
+
 def test_rotation_success_and_failure_are_audited(client):
     key = str(uuid.uuid4())
     client.post("/api/role/engineers", headers=_h(key))

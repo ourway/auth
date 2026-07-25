@@ -122,9 +122,16 @@ def _build_audit_entry(
     user_agent: Optional[str],
     success: bool,
 ) -> "AuditLog":
+    # The managed user is a human identifier (often an email) — store a
+    # non-reversible fingerprint, never plaintext, matching how the client key is
+    # handled. Auditors correlate by fingerprint and can confirm a known user by
+    # computing its fingerprint. Role/permission/workflow names (the `resource`)
+    # are application identifiers, not PII, and stay readable — except the caller
+    # is responsible for fingerprinting any user embedded in `resource`.
+    user_fp = client_fingerprint(user) if user else None
     return AuditLog(
         client_id=_fit(client_id, "client_id"),
-        user=_fit(user, "user"),
+        user=_fit(user_fp, "user"),
         action=_fit(action.value, "action"),
         resource=_fit(resource, "resource"),
         details=json.dumps(details) if details else None,
@@ -143,12 +150,14 @@ def _emit_structured_log(
     ip_address: Optional[str],
     success: bool,
 ) -> None:
+    # The DB row is the system of record. The log STREAM (journald / SIEM /
+    # shipping) is more widely exposed, so it carries no PII: no raw user and no
+    # resource string (which may embed a user). Only the non-reversible client
+    # fingerprint, the action, and the outcome.
     log_msg: Dict[str, Any] = {
         "type": "audit",
         "client_id": client_id,
-        "user": user,
         "action": action.value,
-        "resource": resource,
         "success": success,
         "timestamp": _utcnow().isoformat(),
     }

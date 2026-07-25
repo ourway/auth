@@ -141,7 +141,7 @@ def register_routes(app):
 
     @app.route("/api/membership/<user>/<group>", methods=["GET"])
     @with_db_session
-    @audit_log(AuditAction.CHECK_MEMBERSHIP, resource_extractor=lambda kwargs: f"{kwargs['user']}:{kwargs['group']}")
+    @audit_log(AuditAction.CHECK_MEMBERSHIP, resource_extractor=lambda kwargs: f"{client_fingerprint(kwargs['user'])}:{kwargs['group']}")
     def check_membership(db, user, group):
         """Check if user is member of a group"""
         # Validate input parameters
@@ -159,7 +159,7 @@ def register_routes(app):
 
     @app.route("/api/membership/<user>/<group>", methods=["POST"])
     @with_db_session
-    @audit_log(AuditAction.ADD_MEMBERSHIP, resource_extractor=lambda kwargs: f"{kwargs['user']}:{kwargs['group']}")
+    @audit_log(AuditAction.ADD_MEMBERSHIP, resource_extractor=lambda kwargs: f"{client_fingerprint(kwargs['user'])}:{kwargs['group']}")
     def add_membership(db, user, group):
         """Add user to a group"""
         # Validate input parameters
@@ -174,7 +174,7 @@ def register_routes(app):
 
     @app.route("/api/membership/<user>/<group>", methods=["DELETE"])
     @with_db_session
-    @audit_log(AuditAction.REMOVE_MEMBERSHIP, resource_extractor=lambda kwargs: f"{kwargs['user']}:{kwargs['group']}")
+    @audit_log(AuditAction.REMOVE_MEMBERSHIP, resource_extractor=lambda kwargs: f"{client_fingerprint(kwargs['user'])}:{kwargs['group']}")
     def remove_membership(db, user, group):
         """Remove user from a group"""
         # Validate input parameters
@@ -243,7 +243,7 @@ def register_routes(app):
 
     @app.route("/api/has_permission/<user>/<name>", methods=["GET"])
     @with_db_session
-    @audit_log(AuditAction.CHECK_PERMISSION, resource_extractor=lambda kwargs: f"{kwargs['user']}:{kwargs['name']}")
+    @audit_log(AuditAction.CHECK_PERMISSION, resource_extractor=lambda kwargs: f"{client_fingerprint(kwargs['user'])}:{kwargs['name']}")
     @sanitize_input
     def check_user_permission(db, user, name):
         """Check if user has permission"""
@@ -264,7 +264,7 @@ def register_routes(app):
 
     @app.route("/api/user_permissions/<user>", methods=["GET"])
     @with_db_session
-    @audit_log(AuditAction.USER_PERMISSIONS, resource_extractor=lambda kwargs: kwargs['user'])
+    @audit_log(AuditAction.USER_PERMISSIONS, resource_extractor=lambda kwargs: client_fingerprint(kwargs['user']))
     @sanitize_input
     def get_user_permissions(db, user):
         """Get all permissions for a user"""
@@ -299,7 +299,7 @@ def register_routes(app):
 
     @app.route("/api/user_roles/<user>", methods=["GET"])
     @with_db_session
-    @audit_log(AuditAction.LIST_MEMBERSHIPS, resource_extractor=lambda kwargs: kwargs['user'])
+    @audit_log(AuditAction.LIST_MEMBERSHIPS, resource_extractor=lambda kwargs: client_fingerprint(kwargs['user']))
     @sanitize_input
     def get_user_roles(db, user):
         """Get all roles for a user"""

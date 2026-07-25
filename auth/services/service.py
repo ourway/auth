@@ -6,7 +6,7 @@ import logging
 import uuid
 from typing import Any, Dict, List, Optional, Tuple, cast
 
-from sqlalchemy import Table, func, select, update
+from sqlalchemy import Table, func, select, text, update
 from sqlalchemy.orm import Session
 
 from auth.audit import client_fingerprint
@@ -61,6 +61,22 @@ class AuthorizationService:
         """Commit only when this service owns the transaction (see __init__)."""
         if self.manage_transaction:
             self.db.commit()
+
+    def _lock_tenant(self) -> None:
+        """Serialize this tenant's writes against key rotation (PostgreSQL).
+
+        A transaction-scoped advisory lock keyed on the tenant, so a rotation and
+        a concurrent write — or a second rotation — for the same tenant cannot
+        interleave. Rotation therefore sees a stable set of rows: none is
+        stranded under the old key, and no concurrent update is clobbered by the
+        re-encrypt/reassign pass. Auto-released at commit/rollback. On SQLite
+        (single writer) it is unnecessary and skipped.
+        """
+        if self.db.get_bind().dialect.name == "postgresql":
+            self.db.execute(
+                text("SELECT pg_advisory_xact_lock(hashtext(:k))"),
+                {"k": self.client},
+            )
 
     def _get_encrypted_user(self, user: str) -> str:
         """Get the encrypted version of a user string for database queries"""
@@ -216,6 +232,7 @@ class AuthorizationService:
         race-condition-free upsert. The unique constraint (creator, role)
         ensures atomicity.
         """
+        self._lock_tenant()
         try:
             table = AuthGroup.__table__
             # Mirror the AuthGroup.description setter: store encrypted.
@@ -258,6 +275,7 @@ class AuthorizationService:
 
     def del_role(self, role: str) -> bool:
         """Delete a role"""
+        self._lock_tenant()
         group = (
             self.db.query(AuthGroup)
             .filter(AuthGroup.creator == self.client, AuthGroup.role == role)
@@ -276,6 +294,7 @@ class AuthorizationService:
         Uses INSERT ... ON CONFLICT (PostgreSQL and SQLite) for
         race-condition-free operations.
         """
+        self._lock_tenant()
         try:
             group_table = AuthGroup.__table__
             group_id = self.db.execute(
@@ -332,6 +351,7 @@ class AuthorizationService:
 
     def del_membership(self, user: str, role: str) -> bool:
         """Remove user from a role"""
+        self._lock_tenant()
         if not self.has_membership(user, role):
             return True
 
@@ -384,6 +404,7 @@ class AuthorizationService:
         Uses INSERT ... ON CONFLICT (PostgreSQL and SQLite) for
         race-condition-free operations.
         """
+        self._lock_tenant()
         if self.has_permission(role, name):
             return True
 
@@ -447,6 +468,7 @@ class AuthorizationService:
 
     def del_permission(self, role: str, name: str) -> bool:
         """Remove permission from a role"""
+        self._lock_tenant()
         if not self.has_permission(role, name):
             return True
 
@@ -565,6 +587,11 @@ class AuthorizationService:
             raise ValueError("new_key must differ from the current key")
 
         from auth.encryption import field_encryption
+
+        # Serialize against concurrent writes/rotation for this tenant so the
+        # scan-then-update pass below sees a stable row set (no stranded insert,
+        # no clobbered update). Held until this transaction commits/rolls back.
+        self._lock_tenant()
 
         old = self.client
         # (result label, table, encrypted column name)

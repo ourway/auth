@@ -17,4 +17,5 @@
 
 - No DB migration: `ROTATE_KEY` is an app-level `AuditAction` enum value written to a `String(50)` column with no check constraint; `creator` is `VARCHAR(64)` and a UUID4 is 36 chars.
 - Junction tables (`membership_groups`, `permission_groups`) carry no `creator` and key off row `id`, so their links follow the reassignment automatically.
-- Concurrency caveat (documented, not eliminated): a write inserted under the old key after the reassignment UPDATE but before commit is not captured — rotate while the key is quiescent.
+- Concurrency: rotation and the mutating writes take a transaction-scoped, per-tenant PostgreSQL advisory lock (`pg_advisory_xact_lock(hashtext(creator))`), so a rotation cannot interleave with a concurrent write or another rotation for the same tenant — the scan-then-reassign pass sees a stable row set (no stranded insert, no clobbered update, no torn state). Residual (inherent to cutover): a write serialized *after* a rotation lands under the now-dead old key; clients switch to the returned key (the client library does so automatically), so operate under the new key once rotation returns.
+- The `ROTATE_KEY` audit row is written in the SAME transaction as the reassignment (atomic); a failed rotation records a `success=false` `ROTATE_KEY` row.
