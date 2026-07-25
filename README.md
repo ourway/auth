@@ -2,6 +2,7 @@
 
 A comprehensive, production-ready authorization system with role-based access control (RBAC), audit logging, encryption, and high availability features.
 
+[![CI](https://github.com/ourway/auth/actions/workflows/ci.yml/badge.svg)](https://github.com/ourway/auth/actions/workflows/ci.yml)
 [![Tests](https://img.shields.io/badge/tests-passing-brightgreen)]()
 [![Python](https://img.shields.io/badge/python-3.9%2B-blue)]()
 [![License](https://img.shields.io/badge/license-MIT-blue)]()
