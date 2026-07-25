@@ -36,7 +36,13 @@ def validate_client_key(client: str) -> bool:
 class AuthorizationService:
     """Authorization service using SQLAlchemy"""
 
-    def __init__(self, db: Session, client: str, validate_client: bool = True):
+    def __init__(
+        self,
+        db: Session,
+        client: str,
+        validate_client: bool = True,
+        manage_transaction: bool = True,
+    ):
         if validate_client and not validate_client_key(client):
             # Never echo the raw key (it is the credential) — it would land in
             # the traceback logger. Report only that validation failed.
@@ -46,6 +52,15 @@ class AuthorizationService:
         # encryption KDF input, so case variants must not fork the namespace.
         self.client = client.lower()
         self.validate_client = validate_client
+        # When True (default; the in-process/library callers) each mutating
+        # method commits its own transaction. The HTTP layer sets this False and
+        # commits once itself, so the mutation and its audit row commit together.
+        self.manage_transaction = manage_transaction
+
+    def _commit(self) -> None:
+        """Commit only when this service owns the transaction (see __init__)."""
+        if self.manage_transaction:
+            self.db.commit()
 
     def _get_encrypted_user(self, user: str) -> str:
         """Get the encrypted version of a user string for database queries"""
@@ -228,7 +243,7 @@ class AuthorizationService:
                 },
             )
             self.db.execute(stmt)
-            self.db.commit()
+            self._commit()
             return True
         except Exception:
             logger.exception(
@@ -251,7 +266,7 @@ class AuthorizationService:
 
         if group and group.is_active:
             group.is_active = False  # type: ignore[assignment]
-            self.db.commit()
+            self._commit()
             return True
         return False
 
@@ -302,7 +317,7 @@ class AuthorizationService:
                 .on_conflict_do_nothing(index_elements=["membership_id", "group_id"])
             )
             self.db.execute(link)
-            self.db.commit()
+            self._commit()
             return True
         except Exception:
             logger.exception(
@@ -340,7 +355,7 @@ class AuthorizationService:
 
         if group in membership.groups:
             membership.groups.remove(group)
-            self.db.commit()
+            self._commit()
 
         return True
 
@@ -416,7 +431,7 @@ class AuthorizationService:
                 .on_conflict_do_nothing(index_elements=["permission_id", "group_id"])
             )
             self.db.execute(link)
-            self.db.commit()
+            self._commit()
             return True
         except Exception:
             logger.exception(
@@ -455,7 +470,7 @@ class AuthorizationService:
 
         if group in permission.groups:
             permission.groups.remove(group)
-            self.db.commit()
+            self._commit()
 
         return True
 
@@ -595,7 +610,7 @@ class AuthorizationService:
                         .values(creator=new_key)
                     )
                     migrated[label] = int(count)
-            self.db.commit()
+            self._commit()
         except Exception:
             logger.exception(
                 "rotate_client_key failed (old_creator=%s)", client_fingerprint(old)

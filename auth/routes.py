@@ -9,7 +9,12 @@ from functools import wraps
 from flask import abort, g, jsonify, request
 from sqlalchemy import text
 
-from auth.audit import AuditAction, client_fingerprint, log_audit_event
+from auth.audit import (
+    AuditAction,
+    client_fingerprint,
+    log_audit_event,
+    record_audit,
+)
 from auth.config import get_settings
 from auth.database import engine, get_db
 from auth.decorators import audit_log
@@ -33,18 +38,24 @@ logger = logging.getLogger(__name__)
 
 
 def with_db_session(route_func):
-    """
-    Decorator to provide a database session to route functions
+    """Provide a request-scoped DB session and own its single transaction.
+
+    The route (and the ``@audit_log`` decorator it wraps) do their work on this
+    session WITHOUT committing; this wrapper commits once at the end, so a
+    mutation and its audit row land in the same transaction — either both commit
+    or both roll back. Any exception rolls the whole thing back.
     """
 
     @wraps(route_func)  # Preserve function metadata to avoid Flask endpoint conflicts
     def wrapper(*args, **kwargs):
         with get_db() as db:
             try:
-                return route_func(db, *args, **kwargs)
-            except Exception as e:
-                db.rollback()  # Rollback any failed transactions
-                raise e
+                result = route_func(db, *args, **kwargs)
+                db.commit()
+                return result
+            except Exception:
+                db.rollback()
+                raise
 
     return wrapper
 
@@ -61,7 +72,11 @@ def _get_auth_service(db):
     if not client_key:
         # Reached only if a route outside the /api/* gate calls this helper.
         abort(401, description="Authorization required.")
-    return AuthorizationService(db, client_key, validate_client=True)
+    # manage_transaction=False: the mutation is committed once by
+    # ``with_db_session``, together with the audit row (see that wrapper).
+    return AuthorizationService(
+        db, client_key, validate_client=True, manage_transaction=False
+    )
 
 
 def register_routes(app):
@@ -443,12 +458,32 @@ def register_routes(app):
         """
         old_key = g.client_key
         new_key = str(uuid.uuid4())
+        audit_on = get_settings().enable_audit_logging
 
         auth_service = _get_auth_service(db)
-        result = auth_service.rotate_client_key(new_key)
+        try:
+            result = auth_service.rotate_client_key(new_key)
+        except Exception as e:
+            # rotate_client_key rolled its work back; record the failed attempt
+            # on a separate session so it is not lost with the request rollback.
+            if audit_on:
+                log_audit_event(
+                    client_id=client_fingerprint(old_key),
+                    user=None,
+                    action=AuditAction.ROTATE_KEY,
+                    resource=client_fingerprint(new_key),
+                    details={"error": str(e)},
+                    ip_address=request.remote_addr,
+                    user_agent=request.headers.get("User-Agent", ""),
+                    success=False,
+                )
+            raise
 
-        if get_settings().enable_audit_logging:
-            log_audit_event(
+        if audit_on:
+            # Same session as the rotation (manage_transaction=False), so the
+            # ROTATE_KEY row commits atomically with the key move.
+            record_audit(
+                db,
                 client_id=client_fingerprint(old_key),
                 user=None,
                 action=AuditAction.ROTATE_KEY,
