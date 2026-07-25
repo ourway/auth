@@ -18,6 +18,23 @@ class DatabaseType(Enum):
     POSTGRESQL = "postgresql"
 
 
+# Values that must never protect a production secret. The audit pepper keys the
+# HMAC that fingerprints client keys in the audit trail; if it is one of these
+# (or empty), the fingerprints are computable by anyone and the audit log's
+# offline-guess resistance is gone. Boot fails closed rather than run weak.
+_KNOWN_WEAK_SECRETS = frozenset(
+    {
+        "",
+        "default_secret_key_for_development",
+        "your_secure_jwt_secret_key_here",
+        "changeme",
+        "change-me",
+        "secret",
+        "password",
+    }
+)
+
+
 class Settings(BaseSettings):
     """Configuration class for the authorization system"""
 
@@ -100,11 +117,33 @@ class Settings(BaseSettings):
     @field_validator("jwt_secret_key")
     @classmethod
     def validate_secret_key(cls, v: str) -> str:
-        if v == "default_secret_key_for_development":
+        if v in _KNOWN_WEAK_SECRETS:
             import logging
             logger = logging.getLogger(__name__)
-            logger.warning("Using default JWT secret key. This should be changed for production!")
+            logger.warning(
+                "AUTH_JWT_SECRET_KEY is a weak/placeholder value. "
+                "Set a strong secret for production."
+            )
         return v
+
+    @model_validator(mode="after")
+    def require_strong_audit_pepper(self) -> "Settings":
+        """Fail closed in production on a weak audit pepper.
+
+        The pepper is ``audit_pepper`` if set, else ``jwt_secret_key`` (the same
+        fallback ``audit.client_fingerprint`` uses). When audit logging is on and
+        we are not in debug mode, refuse to start unless it is a strong, dedicated
+        value — a placeholder pepper makes the audit key-fingerprints computable.
+        """
+        if self.enable_audit_logging and not self.debug_mode:
+            pepper = (self.audit_pepper or self.jwt_secret_key or "").strip()
+            if pepper in _KNOWN_WEAK_SECRETS or len(pepper) < 16:
+                raise ValueError(
+                    "Refusing to start: the audit pepper is unset, a placeholder, "
+                    "or too short. Set AUTH_AUDIT_PEPPER to a strong random value "
+                    "(>= 16 chars), or set AUTH_DEBUG_MODE=true for local use."
+                )
+        return self
 
 
 @lru_cache()

@@ -68,3 +68,6 @@ dependency-grap/
 # issuedb local tracking database
 .issue.db
 .issue.db-*
+
+# test-only env (never a real secret)
+test.env
