@@ -70,6 +70,7 @@ dev = [
     "ruff>=0.0.260",
     "mypy>=1.0",
     "types-requests",
+    "types-waitress",
     "black>=22.0",
     "isort>=5.0",
     "responses>=0.23",
@@ -173,7 +174,9 @@ ensure_newline_before_comments = true
 line_length = 88
 
 [tool.mypy]
-python_version = "3.9"
+# Lowest version current mypy can target; the service deploys on 3.11 and CI
+# also runs 3.12. (Package metadata still advertises >=3.9 for older installs.)
+python_version = "3.10"
 warn_return_any = true
 warn_unused_configs = true
 warn_unused_ignores = true
