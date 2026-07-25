@@ -32,20 +32,23 @@ classifiers = [
     "Programming Language :: Python :: 3.13",
     "Programming Language :: Python :: 3.14",
 ]
+# Upper bounds cap the next major so a surprise breaking release cannot be pulled
+# into an editable/systemd deploy; cryptography is given headroom so security
+# updates are never blocked. Exact, reproducible pins live in requirements.txt
+# (a generated lockfile). PyJWT was dropped with the unused jwt_auth module.
 dependencies = [
-    "flask>=2.0.0",
-    "flask-cors>=3.0.0",
-    "sqlalchemy>=2.0.0",
-    "waitress>=2.0.0",
-    "PyJWT>=2.0.0",
-    "cryptography>=3.0.0",
-    "APScheduler>=3.0.0",
-    "psycopg[binary]>=3.0.0",
-    "pydantic>=2.0.0",
-    "pydantic-settings>=2.0.0",
-    "requests>=2.25.0",
-    "bleach>=5.0.0",
-    "python-json-logger>=3.1.0",
+    "flask>=2.0.0,<4",
+    "flask-cors>=3.0.0,<7",
+    "sqlalchemy>=2.0.0,<3",
+    "waitress>=2.0.0,<4",
+    "cryptography>=3.0.0,<48",
+    "APScheduler>=3.0.0,<4",
+    "psycopg[binary]>=3.0.0,<4",
+    "pydantic>=2.0.0,<3",
+    "pydantic-settings>=2.0.0,<3",
+    "requests>=2.25.0,<3",
+    "bleach>=5.0.0,<7",
+    "python-json-logger>=3.1.0,<4",
 ]
 
 [project.optional-dependencies]

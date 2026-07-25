@@ -22,8 +22,9 @@ if os.environ.get("AUTH_DATABASE_TYPE") != "postgresql":
         allow_module_level=True,
     )
 
-from auth.database import create_tables, engine  # noqa: E402
 from sqlalchemy import text  # noqa: E402
+
+from auth.database import create_tables, engine  # noqa: E402
 
 _LOCK = text("SELECT pg_advisory_xact_lock(hashtext(:k))")
 _TRY = text("SELECT pg_try_advisory_xact_lock(hashtext(:k))")
