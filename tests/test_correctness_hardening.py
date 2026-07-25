@@ -88,6 +88,37 @@ def test_missing_role_write_still_returns_false(client):
     }
 
 
+def test_deleting_a_role_purges_grants_over_the_api(client):
+    """Revoke-by-delete must be durable at the HTTP layer: re-creating a role
+    with the same name must not restore former members/permissions."""
+    key = str(uuid.uuid4())
+    h = {"Authorization": f"Bearer {key}"}
+
+    client.post("/api/role/engineers", headers=h)
+    client.post("/api/permission/engineers/deploy", headers=h)
+    client.post("/api/membership/alice/engineers", headers=h)
+    assert (
+        client.get("/api/has_permission/alice/deploy", headers=h).get_json()["data"][
+            "has_permission"
+        ]
+        is True
+    )
+
+    assert client.delete("/api/role/engineers", headers=h).status_code == 200
+
+    # re-create the same role name (e.g. a different team reusing it)
+    client.post("/api/role/engineers", headers=h)
+
+    assert (
+        client.get("/api/has_permission/alice/deploy", headers=h).get_json()["data"][
+            "has_permission"
+        ]
+        is False
+    ), "former member regained access after the role name was reused"
+    assert client.get("/api/members/engineers", headers=h).get_json()["result"] == []
+    assert client.get("/api/role_permissions/engineers", headers=h).get_json()["data"] == []
+
+
 def test_db_error_surfaces_as_500_through_the_api(client):
     key = str(uuid.uuid4())
     with patch(

@@ -274,7 +274,21 @@ class AuthorizationService:
             raise
 
     def del_role(self, role: str) -> bool:
-        """Delete a role"""
+        """Delete a role and PURGE its grants.
+
+        The group row is soft-deleted, and its membership/permission links are
+        removed so the grants cannot come back. Without the purge, re-creating a
+        role with the same name silently restored every previous member and
+        permission — a privilege-restoration hazard, since deleting a role is
+        how callers revoke access.
+
+        Re-adding a role that is still live is untouched and remains idempotent:
+        callers that bootstrap roles repeatedly keep their members. Only a
+        delete purges.
+
+        The user and permission rows themselves are not deleted — they are
+        tenant-level entities that may still belong to other roles.
+        """
         self._lock_tenant()
         group = (
             self.db.query(AuthGroup)
@@ -283,6 +297,8 @@ class AuthorizationService:
         )
 
         if group and group.is_active:
+            group.memberships.clear()
+            group.permissions.clear()
             group.is_active = False  # type: ignore[assignment]
             self._commit()
             return True

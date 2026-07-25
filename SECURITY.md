@@ -55,6 +55,15 @@ service guarantees; the threat notes are what it deliberately does **not**.
   logging is on and debug is off. Set a strong, dedicated `AUTH_AUDIT_PEPPER`.
 - `debug_mode` is off by default; `.env` must be `chmod 600` and never committed.
 
+### Revocation
+
+- **Deleting a role purges its grants.** `DELETE /api/role/<role>` unlinks the
+  role's members and permissions, so revocation is durable: re-creating a role
+  with the same name yields an empty role and never restores former access.
+  Re-adding a role that still exists remains idempotent (repeat bootstrap keeps
+  its grants). Users and permissions survive the delete — only that role's links
+  are removed — so a user who also belongs to another role keeps that access.
+
 ### Key rotation
 
 - `POST /api/keys/rotate` (authenticated with the current key) mints a fresh key

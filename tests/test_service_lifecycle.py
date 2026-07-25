@@ -91,22 +91,78 @@ def test_delete_semantics_are_idempotent(auth_client):
     assert auth_client.del_permission("temp", "nothing") is True
 
 
-def test_role_resurrection_keeps_members():
-    """Documented behavior: del_role soft-deletes; re-adding the same role
-    resurrects it with its previous members and permissions. Highway's
-    bootstrap relies on add_role being safely repeatable; do not change
-    this without a major version."""
+def test_add_role_is_idempotent_for_a_live_role():
+    """Re-adding a role that still exists must KEEP its members and permissions.
+
+    Callers bootstrap their roles repeatedly (Highway calls add_role on every
+    start), so a repeat add must never wipe grants. This is the half that must
+    not change — see test_deleted_role_does_not_resurrect_grants for the half
+    that must.
+    """
     session = SessionLocal()
     client = Authorization(client=str(uuid.uuid4()), db_session=session)
     try:
         client.add_role("phoenix")
         client.add_membership("alice@example.com", "phoenix")
         client.add_permission("phoenix", "rise")
-        assert client.del_role("phoenix") is True
-        assert client.roles == []
-        assert client.add_role("phoenix") is True
+
+        assert client.add_role("phoenix") is True  # repeat add, role still live
         assert client.has_membership("alice@example.com", "phoenix") is True
         assert client.has_permission("phoenix", "rise") is True
+    finally:
+        session.close()
+
+
+def test_deleted_role_does_not_resurrect_grants():
+    """Deleting a role PURGES its grants: re-creating the same name yields an
+    empty role.
+
+    Deleting a role is how callers revoke access. Previously the grants were
+    only hidden, so reusing the role name silently restored every former member
+    and permission (privilege restoration). Deletion must be durable.
+    """
+    session = SessionLocal()
+    client = Authorization(client=str(uuid.uuid4()), db_session=session)
+    try:
+        client.add_role("phoenix")
+        client.add_membership("alice@example.com", "phoenix")
+        client.add_permission("phoenix", "rise")
+        assert client.user_has_permission("alice@example.com", "rise") is True
+
+        assert client.del_role("phoenix") is True
+        assert client.roles == []
+        # revocation is effective while deleted
+        assert client.user_has_permission("alice@example.com", "rise") is False
+
+        # ...and re-creating the same name does NOT bring the grants back
+        assert client.add_role("phoenix") is True
+        assert client.has_membership("alice@example.com", "phoenix") is False
+        assert client.has_permission("phoenix", "rise") is False
+        assert client.user_has_permission("alice@example.com", "rise") is False
+        assert client.get_role_members("phoenix") == []
+        assert client.get_permissions("phoenix") == []
+    finally:
+        session.close()
+
+
+def test_deleting_one_role_leaves_other_roles_intact():
+    """The purge is scoped to the deleted role: a user in two roles keeps the
+    other role's access, and the user/permission entities survive."""
+    session = SessionLocal()
+    client = Authorization(client=str(uuid.uuid4()), db_session=session)
+    try:
+        client.add_role("temp")
+        client.add_role("keeper")
+        client.add_membership("alice@example.com", "temp")
+        client.add_membership("alice@example.com", "keeper")
+        client.add_permission("temp", "shared")
+        client.add_permission("keeper", "shared")
+
+        assert client.del_role("temp") is True
+
+        assert client.has_membership("alice@example.com", "keeper") is True
+        assert client.has_permission("keeper", "shared") is True
+        assert client.user_has_permission("alice@example.com", "shared") is True
     finally:
         session.close()
 

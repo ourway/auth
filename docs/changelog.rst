@@ -2,6 +2,29 @@
 Changelog
 =========
 
+Version 2.3.0 (2026-07-25)
+==========================
+
+Security
+--------
+
+- **Deleting a role now purges its grants (behavioural change).** ``del_role`` /
+  ``DELETE /api/role/<role>`` previously only soft-deleted the role row and left
+  its membership and permission links intact, so **re-creating a role with the
+  same name silently restored every former member and every former permission** —
+  a privilege-restoration hazard, since deleting a role is how callers revoke
+  access. Deletion now unlinks the role's members and permissions, so revocation
+  is durable and reusing a role name yields an **empty** role.
+
+  Unchanged, and still guaranteed: **re-adding a role that still exists is
+  idempotent** and keeps its grants, so callers that bootstrap the same roles on
+  every start are unaffected. Users and permissions themselves survive a role
+  delete — only that role's links are removed — so a user who also belongs to
+  another role keeps that access.
+
+  *Action required only if you relied on delete-then-recreate to restore access;
+  re-grant explicitly instead.*
+
 Version 2.2.0 (2026-07-25)
 ==========================
 

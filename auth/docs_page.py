@@ -111,6 +111,14 @@ Deletes are idempotent: removing a membership or permission that was never there
 still returns `{{"result": true}}`. Creating a role twice also returns `true`.
 Deleting a role a second time is the one exception — it returns `false`.
 
+**Deleting a role purges its grants; re-adding a live role does not.** Deleting a
+role revokes access durably: its members and permissions are unlinked, so
+creating a role with the same name later gives you an **empty** role, never the
+old members and permissions back. Re-adding a role that still exists is
+unaffected and stays idempotent — bootstrapping the same roles on every start
+keeps their grants. The users and permissions themselves survive a role delete;
+only that role's links go, so a user who is also in another role keeps it.
+
 **Rotating a key is an instant cutover.** `POST /api/keys/rotate`, authenticated
 with your *current* key, mints a fresh key, atomically moves your entire
 namespace onto it, and returns it as `data.new_key`. The moment it returns the
