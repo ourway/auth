@@ -2,6 +2,59 @@
 Changelog
 =========
 
+Version 2.2.0 (2026-07-25)
+==========================
+
+Production-hardening release (bank-grade certification remediation), plus CI and
+documentation. The public HTTP API is unchanged; note the behavioural changes
+under *Changed* and *Security*.
+
+Security
+--------
+
+- **Auditing is now transactional, accurate, and fail-closed.** The audit row is
+  written in the SAME transaction as the mutation (a failed audit rolls the
+  mutation back — a mutation can no longer commit unaudited), recorded ``success``
+  reflects the real operation result (a no-op write is not logged as success),
+  and rotation is audited on success and failure.
+- **No PII in the audit trail.** The managed user is stored as a non-reversible
+  HMAC fingerprint in both the ``user`` column and ``resource``; the log stream
+  carries no user/resource. Role/permission names stay readable.
+- **The raw client key is never logged.** Write/rotate failure paths log a
+  fingerprint, never the credential.
+- **Config fails closed on a weak audit pepper** (when audit logging is on and
+  debug is off): the service refuses to boot with a placeholder/empty pepper.
+- **Per-tenant advisory lock** serializes key rotation against concurrent writes
+  (PostgreSQL), so rotation cannot strand or clobber a concurrent change.
+
+Changed
+-------
+
+- **Database errors are no longer masked as** ``{"result": false}`` — a genuine
+  DB failure now surfaces as HTTP 500 (and a failed audit); ``false`` is reserved
+  for the documented "role does not exist" case.
+- **Client keys are canonicalised to lowercase**, so case-variant UUIDs no longer
+  fork a namespace or its encryption keys.
+- ``/health`` now performs a real database round-trip (reports 503 when the DB is
+  unreachable) and no longer exposes connection-pool internals.
+- The audit ``user`` column now holds a fingerprint, not a raw identifier.
+
+Added
+-----
+
+- **GitHub Actions CI** (``.github/workflows/ci.yml``): ruff + mypy, the SQLite
+  suite on 3.11/3.12, and the PostgreSQL integration suite with encryption on.
+- Encryption-on integration now runs in the default test gate.
+- Concise ``README.md``, ``docs/ARCHITECTURE.md`` (with diagrams),
+  ``CONTRIBUTING.md``, ``SECURITY.md``, and ``MIGRATIONS.md``.
+
+Packaging
+---------
+
+- The long description is now ``README.md`` (Markdown); ``README.rst`` was
+  removed. Dependencies are pinned with upper bounds and a lockfile; the unused
+  ``PyJWT`` dependency was dropped.
+
 Version 2.1.0 (2026-07-25)
 ==========================
 

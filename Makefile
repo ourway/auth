@@ -4,6 +4,7 @@
 # to a system python that lacks the deps. Override any of these if needed,
 # e.g. `make test PYTEST=pytest` when the venv is already activated.
 VENV ?= .venv
+PYTHON ?= $(VENV)/bin/python
 PYTEST ?= $(VENV)/bin/pytest
 BLACK ?= $(VENV)/bin/black
 ISORT ?= $(VENV)/bin/isort
@@ -69,18 +70,18 @@ smoke: ## Build a wheel, install into a fresh venv, run the quick-start
 	bash scripts/smoke_install.sh
 
 build: version-check clean-dist ## Build sdist and wheel
-	python -m pip install --quiet --upgrade build twine
-	python -m build
-	python -m twine check dist/*
+	$(PYTHON) -m pip install --quiet --upgrade build twine
+	$(PYTHON) -m build
+	$(PYTHON) -m twine check dist/*
 
 clean-dist:
 	rm -rf dist/ build/ *.egg-info
 
 publish-test: build smoke ## Upload to TestPyPI
-	python -m twine upload --repository testpypi dist/*
+	$(PYTHON) -m twine upload --repository testpypi dist/*
 
 publish: build smoke ## Upload to PyPI
-	python -m twine upload dist/*
+	$(PYTHON) -m twine upload dist/*
 
 # Clean cache files
 clean: ## Clean cache files
@@ -96,7 +97,7 @@ clean: ## Clean cache files
 
 # Start server
 start-server: ## Start the auth server
-	python -m auth.server
+	$(PYTHON) -m auth.server
 
 # Build Docker image
 build-docker: ## Build the auth server Docker image
@@ -124,7 +125,7 @@ list-keys: ## List available API keys or example data
 # Start server with reTunnel (remote access)
 start-remote: ## Start the auth server with reTunnel for remote access
 	pip install retunnel
-	python -c "from auth.main import app; app.run(host='0.0.0.0', port=11788, threaded=True, debug=False)" & \
+	$(PYTHON) -c "from auth.main import app; app.run(host='0.0.0.0', port=11788, threaded=True, debug=False)" & \
 	sleep 3 && \
 	retunnel http 11788
 
