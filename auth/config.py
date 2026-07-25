@@ -127,23 +127,52 @@ class Settings(BaseSettings):
         return v
 
     @model_validator(mode="after")
-    def require_strong_audit_pepper(self) -> "Settings":
-        """Fail closed in production on a weak audit pepper.
+    def warn_on_weak_audit_pepper(self) -> "Settings":
+        """Warn (never raise) when the effective audit pepper is weak.
 
-        The pepper is ``audit_pepper`` if set, else ``jwt_secret_key`` (the same
-        fallback ``audit.client_fingerprint`` uses). When audit logging is on and
-        we are not in debug mode, refuse to start unless it is a strong, dedicated
-        value — a placeholder pepper makes the audit key-fingerprints computable.
+        Constructing Settings must not fail: ``auth`` is also a client library,
+        and ``pip install auth; from auth import Client`` to talk to a remote
+        service needs no pepper at all. The hard, fail-closed check belongs to
+        the *server* boot path — see :func:`verify_audit_pepper`, called by
+        ``auth.main.create_app``.
         """
-        if self.enable_audit_logging and not self.debug_mode:
-            pepper = (self.audit_pepper or self.jwt_secret_key or "").strip()
-            if pepper in _KNOWN_WEAK_SECRETS or len(pepper) < 16:
-                raise ValueError(
-                    "Refusing to start: the audit pepper is unset, a placeholder, "
-                    "or too short. Set AUTH_AUDIT_PEPPER to a strong random value "
-                    "(>= 16 chars), or set AUTH_DEBUG_MODE=true for local use."
-                )
+        if self.enable_audit_logging and not self.debug_mode and audit_pepper_is_weak(
+            self
+        ):
+            import logging
+
+            logging.getLogger(__name__).warning(
+                "AUTH_AUDIT_PEPPER is unset, a placeholder, or too short; audit "
+                "key fingerprints are not offline-guess resistant. Set a strong "
+                "value before serving traffic."
+            )
         return self
+
+
+def audit_pepper_is_weak(settings: "Settings") -> bool:
+    """Whether the effective audit pepper is unset/placeholder/too short.
+
+    The pepper is ``audit_pepper`` if set, else ``jwt_secret_key`` — the same
+    fallback ``audit.client_fingerprint`` uses.
+    """
+    pepper = (settings.audit_pepper or settings.jwt_secret_key or "").strip()
+    return pepper in _KNOWN_WEAK_SECRETS or len(pepper) < 16
+
+
+def verify_audit_pepper(settings: "Settings") -> None:
+    """Fail closed on a weak audit pepper — called when the SERVER starts.
+
+    A placeholder pepper makes the audit trail's key fingerprints computable, so
+    a server that writes audit rows must not run with one. Importing the package
+    as a library is unaffected (see :meth:`Settings.warn_on_weak_audit_pepper`).
+    """
+    if settings.enable_audit_logging and not settings.debug_mode:
+        if audit_pepper_is_weak(settings):
+            raise ValueError(
+                "Refusing to start: the audit pepper is unset, a placeholder, "
+                "or too short. Set AUTH_AUDIT_PEPPER to a strong random value "
+                "(>= 16 chars), or set AUTH_DEBUG_MODE=true for local use."
+            )
 
 
 @lru_cache()

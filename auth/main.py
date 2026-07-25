@@ -8,7 +8,7 @@ from flask import Flask
 from flask_cors import CORS
 
 from auth.audit import setup_audit_tables
-from auth.config import get_settings
+from auth.config import get_settings, verify_audit_pepper
 from auth.logging_config import setup_logging
 from auth.workflow_checker import initialize_workflow_checker
 
@@ -63,8 +63,13 @@ def create_app():
     # Create Flask app
     app = Flask(__name__)
 
-    # Enable CORS according to configuration (default: all origins)
     settings = get_settings()
+    # Fail closed before serving: a server that writes audit rows must not run
+    # with a placeholder pepper. This lives here, not in Settings, so importing
+    # `auth` as a client library never requires server-side secrets.
+    verify_audit_pepper(settings)
+
+    # Enable CORS according to configuration (default: all origins)
     if settings.allow_cors:
         raw_origins = settings.cors_origins or "*"
         if raw_origins == "*":

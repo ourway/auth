@@ -2,6 +2,21 @@
 Changelog
 =========
 
+Version 2.3.1 (2026-07-25)
+==========================
+
+Fixed
+-----
+
+- **``import auth`` no longer requires server-side secrets.** 2.3.0 enforced the
+  strong-audit-pepper check while constructing ``Settings``, so simply importing
+  the package — e.g. ``pip install auth; from auth import Client`` to talk to a
+  remote auth service — raised ``ValidationError`` unless ``AUTH_AUDIT_PEPPER``
+  was set. The fail-closed check now runs where it belongs, at **server boot**
+  (``auth.main.create_app``), so a server still refuses to start with a
+  placeholder pepper while library and client use import cleanly. Constructing
+  ``Settings`` with a weak pepper now logs a warning instead of raising.
+
 Version 2.3.0 (2026-07-25)
 ==========================
 

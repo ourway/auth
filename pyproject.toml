@@ -4,7 +4,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "auth"
-version = "2.3.0"
+version = "2.3.1"
 description = "Authorization for humans"
 readme = "README.md"
 requires-python = ">=3.9"
@@ -177,6 +177,10 @@ line_length = 88
 # Lowest version current mypy can target; the service deploys on 3.11 and CI
 # also runs 3.12. (Package metadata still advertises >=3.9 for older installs.)
 python_version = "3.10"
+# `python -m build` leaves a copy of the package under build/lib/, which mypy
+# would otherwise report as a duplicate module — so `make build` broke the next
+# `make type-check`. Never type-check build outputs.
+exclude = ['^build/', '^dist/']
 warn_return_any = true
 warn_unused_configs = true
 warn_unused_ignores = true
