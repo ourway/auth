@@ -1,0 +1,75 @@
+# Security
+
+## Reporting a vulnerability
+
+Please report security issues **privately** — do not open a public issue or PR.
+Email **farsheed.ashouri@gmail.com** with a description, reproduction steps, and
+impact. You'll get an acknowledgement and a coordinated fix/disclosure.
+
+## Supported versions
+
+The latest released `2.x` line receives security fixes.
+
+## Security model
+
+`auth` is authorization-only and multi-tenant. The properties below are what the
+service guarantees; the threat notes are what it deliberately does **not**.
+
+### Identity & tenancy
+
+- The **client key** is a UUID4 bearer token that *is* the tenant identity — it
+  is not checked against a stored secret. Possession of a key is full authority
+  over that namespace. Treat it like a password: keep it out of source control,
+  logs, and URLs; scope one key per application.
+- The key is canonicalized to lowercase at the edge, so case variants cannot
+  fork a namespace or its encryption keys.
+- **Tenant isolation**: every read and write is scoped by `creator == client key`.
+  Junction rows are only ever created within a single tenant. No API path can
+  read or mutate another namespace's data.
+
+### Data protection
+
+- **Field encryption at rest** (`AUTH_ENABLE_ENCRYPTION=true`, on in production):
+  `membership.user`, `permission.name`, and `group.description` are encrypted
+  with deterministic, authenticated, **per-tenant** encryption (AES-256-CTR,
+  synthetic-IV `HMAC(hmac_key, plaintext)[:16]`, per-tenant HKDF keys). Identical
+  plaintext in two tenants yields different ciphertext (no cross-tenant
+  correlation). Reads **fail closed** — a tampered, corrupt, or wrong-tenant value
+  is rejected, never returned as garbage.
+- **No secret leakage**: the raw client key, encryption key, and JWT secret are
+  never logged or returned. Failure logs carry only a non-reversible
+  `client_fingerprint`.
+
+### Auditing
+
+- Every state-mutating operation writes an audit row **in the same transaction**
+  as the mutation (fail-closed: a failed audit rolls the mutation back). Recorded
+  `success` reflects whether the write actually took effect.
+- **No PII in the audit trail**: the client key and the managed user are stored
+  as HMAC fingerprints (peppered by `AUTH_AUDIT_PEPPER`); role/permission names
+  are not PII and stay readable. The log stream carries no user/resource.
+
+### Configuration hardening
+
+- The service **refuses to boot** with a weak/placeholder audit pepper when audit
+  logging is on and debug is off. Set a strong, dedicated `AUTH_AUDIT_PEPPER`.
+- `debug_mode` is off by default; `.env` must be `chmod 600` and never committed.
+
+### Key rotation
+
+- `POST /api/keys/rotate` (authenticated with the current key) mints a fresh key
+  and atomically moves the whole namespace onto it, re-encrypting bound fields
+  under the new key. A per-tenant advisory lock serializes rotation against
+  concurrent writes. The returned key is the only copy — persist it.
+
+## Threat notes (by design)
+
+- **Authentication is out of scope.** `auth` trusts the caller already knows who
+  the user is; pair it with whatever authenticates them.
+- **Possession = authority.** A leaked key grants full access to that namespace,
+  and whoever holds it can rotate it away. Rotate promptly on any suspected leak.
+- **Coarse RBAC.** No attribute/row-level rules; encode resource scope in
+  permission names (`doc:123:edit`) only while that stays manageable, otherwise
+  use an ABAC/policy engine.
+- **Edge is the primary rate limiter.** The app-layer limiter is best-effort
+  defense-in-depth; nginx enforces the real per-IP limit.
