@@ -4,14 +4,17 @@ SQLAlchemy-based authorization service
 
 import logging
 import uuid
+from datetime import datetime, timezone
 from typing import Any, Dict, List, Optional, Tuple, cast
 
 from sqlalchemy import Table, func, select, text, update
 from sqlalchemy.orm import Session
 
+from auth.api_keys import generate_api_key, hash_api_key
 from auth.audit import client_fingerprint
 from auth.encryption import encrypt_sensitive_data
 from auth.models.sql import (
+    AuthApiKey,
     AuthGroup,
     AuthMembership,
     AuthPermission,
@@ -20,6 +23,19 @@ from auth.models.sql import (
 )
 
 logger = logging.getLogger(__name__)
+
+# Active per-user API keys allowed per (tenant, user) — bounds namespace abuse
+# while staying far above any legitimate "one key per device/CI job" usage.
+API_KEYS_PER_USER_CAP = 25
+
+# A validate only rewrites last_used_at when it is at least this stale, so the
+# hot path does at most one row-update per key per window.
+_LAST_USED_THROTTLE_SECONDS = 60
+
+
+def _utcnow() -> datetime:
+    """Naive UTC now — matches the DateTime columns (see auth.audit)."""
+    return datetime.now(timezone.utc).replace(tzinfo=None)
 
 
 def validate_client_key(client: str) -> bool:
@@ -549,6 +565,147 @@ class AuthorizationService:
                 return True
         return False
 
+    # --- Per-user API keys (SPEC 0004) -----------------------------------
+
+    @staticmethod
+    def _api_key_meta(row: AuthApiKey) -> Dict[str, Any]:
+        """Listing/metadata view of a key row — never the hash or secret."""
+
+        def iso(dt: Any) -> Optional[str]:
+            return dt.isoformat() if dt else None
+
+        return {
+            "key_id": row.key_id,
+            "key_prefix": row.key_prefix,
+            "label": row.label,
+            "is_active": bool(row.is_active),
+            "created": iso(row.date_created),
+            "revoked_at": iso(row.revoked_at),
+            "expires_at": iso(row.expires_at),
+            "last_used_at": iso(row.last_used_at),
+        }
+
+    def create_api_key(
+        self, user: str, label: Optional[str] = None
+    ) -> Optional[Dict[str, Any]]:
+        """Mint and store an API key for ``user`` in this tenant's namespace.
+
+        Returns the one-time secret plus metadata, or ``None`` when the user
+        already holds ``API_KEYS_PER_USER_CAP`` active keys. The tenant lock
+        serializes against key rotation so the new row cannot strand under a
+        creator that is being moved.
+        """
+        self._lock_tenant()
+        active = (
+            self.db.query(func.count(AuthApiKey.id))
+            .filter(
+                AuthApiKey.creator == self.client,
+                AuthApiKey._user == self._get_encrypted_user(user),
+                AuthApiKey.is_active,
+            )
+            .scalar()
+            or 0
+        )
+        if active >= API_KEYS_PER_USER_CAP:
+            return None
+
+        secret, key_id, key_hash, key_prefix = generate_api_key()
+        row = AuthApiKey(
+            key_id=key_id,
+            creator=self.client,
+            key_hash=key_hash,
+            key_prefix=key_prefix,
+            is_active=True,
+        )
+        row.user = user
+        if label:
+            row.label = label
+        self.db.add(row)
+        self.db.flush()
+        self._commit()
+        return {
+            "api_key": secret,
+            "key_id": key_id,
+            "user": user,
+            "label": label,
+            "key_prefix": key_prefix,
+            "created": row.date_created.isoformat() if row.date_created else None,
+            "expires_at": None,
+        }
+
+    def list_api_keys(self, user: str) -> List[Dict[str, Any]]:
+        """All of ``user``'s keys in this namespace, revoked ones included."""
+        rows = (
+            self.db.query(AuthApiKey)
+            .filter(
+                AuthApiKey.creator == self.client,
+                AuthApiKey._user == self._get_encrypted_user(user),
+            )
+            .order_by(AuthApiKey.id)
+            .all()
+        )
+        return [self._api_key_meta(row) for row in rows]
+
+    def revoke_api_key(self, user: str, key_id: str) -> Optional[str]:
+        """Revoke ``key_id`` for ``user``.
+
+        Returns ``"revoked"``, ``"already_revoked"`` (idempotent repeat), or
+        ``None`` when no such row exists in this namespace — the route maps
+        that to 404 without revealing whether the id exists elsewhere.
+        """
+        self._lock_tenant()
+        row = (
+            self.db.query(AuthApiKey)
+            .filter(
+                AuthApiKey.creator == self.client,
+                AuthApiKey.key_id == key_id.lower(),
+                AuthApiKey._user == self._get_encrypted_user(user),
+            )
+            .first()
+        )
+        if row is None:
+            return None
+        if not row.is_active and row.revoked_at is not None:
+            return "already_revoked"
+        row.is_active = False  # type: ignore[assignment]
+        row.revoked_at = _utcnow()  # type: ignore[assignment]
+        self._commit()
+        return "revoked"
+
+    def validate_api_key(self, api_key: str) -> Dict[str, Any]:
+        """Resolve a presented secret within THIS tenant's namespace.
+
+        Single unique-index probe on the hash. A key that exists under a
+        different tenant answers exactly like one that does not exist, so a
+        foreign tenant cannot probe key existence. Touches ``last_used_at``
+        at most once per throttle window.
+        """
+        row = (
+            self.db.query(AuthApiKey)
+            .filter(AuthApiKey.key_hash == hash_api_key(api_key))
+            .first()
+        )
+        if row is None or row.creator != self.client:
+            return {"valid": False, "reason": "unknown_key"}
+        if not row.is_active:
+            return {"valid": False, "reason": "revoked"}
+        now = _utcnow()
+        if row.expires_at is not None and row.expires_at <= now:
+            return {"valid": False, "reason": "expired"}
+        if (
+            row.last_used_at is None
+            or (now - row.last_used_at).total_seconds() >= _LAST_USED_THROTTLE_SECONDS
+        ):
+            row.last_used_at = now  # type: ignore[assignment]
+            self._commit()
+        return {
+            "valid": True,
+            "user": row.user,
+            "key_id": row.key_id,
+            "label": row.label,
+            "expires_at": row.expires_at.isoformat() if row.expires_at else None,
+        }
+
     # --- Key rotation ----------------------------------------------------
 
     @staticmethod
@@ -581,16 +738,19 @@ class AuthorizationService:
         """Atomically move this client's namespace to a fresh key (cutover).
 
         Reassigns every ``auth_group`` / ``auth_membership`` / ``auth_permission``
-        row from ``creator = self.client`` (the old key) to ``creator = new_key``
-        in a single transaction, then returns the migrated row counts. Junction
-        tables reference row ids and follow automatically, so they need no change.
+        / ``auth_api_key`` row from ``creator = self.client`` (the old key) to
+        ``creator = new_key`` in a single transaction, then returns the migrated
+        row counts. Junction tables reference row ids and follow automatically,
+        so they need no change.
 
         When field encryption is enabled the encrypted columns (``user`` /
-        ``name`` / ``description``) are cryptographically bound to the creator, so
-        each is decrypted under the old key and re-encrypted under the new key in
-        the same pass, keeping the new namespace equality-queryable. When
-        encryption is off the columns are plaintext and a single bulk ``creator``
-        update per table suffices.
+        ``name`` / ``description`` / ``label``) are cryptographically bound to
+        the creator, so each is decrypted under the old key and re-encrypted
+        under the new key in the same pass, keeping the new namespace
+        equality-queryable. When encryption is off the columns are plaintext and
+        a single bulk ``creator`` update per table suffices. Per-user API-key
+        hashes are creator-independent and survive rotation unchanged — issued
+        secrets keep validating under the new tenant key.
 
         The new key is generated by the caller (server-side) and is a fresh
         UUID4, so the target namespace is empty and the ``UNIQUE(creator, ...)``
@@ -610,32 +770,41 @@ class AuthorizationService:
         self._lock_tenant()
 
         old = self.client
-        # (result label, table, encrypted column name)
+        # (result label, table, encrypted column names)
         # __table__ is a Table at runtime; the declarative stubs type it as the
         # broader FromClause, so cast for the DML/column APIs below.
-        targets: List[Tuple[str, Table, str]] = [
-            ("roles", cast(Table, AuthGroup.__table__), "description"),
-            ("memberships", cast(Table, AuthMembership.__table__), "user"),
-            ("permissions", cast(Table, AuthPermission.__table__), "name"),
+        # auth_api_key carries TWO encrypted cells; its key_hash/key_id are
+        # creator-independent on purpose and move untouched, so issued secrets
+        # keep validating under the new tenant key.
+        targets: List[Tuple[str, Table, List[str]]] = [
+            ("roles", cast(Table, AuthGroup.__table__), ["description"]),
+            ("memberships", cast(Table, AuthMembership.__table__), ["user"]),
+            ("permissions", cast(Table, AuthPermission.__table__), ["name"]),
+            ("api_keys", cast(Table, AuthApiKey.__table__), ["user", "label"]),
         ]
         migrated: Dict[str, int] = {}
         try:
-            for label, table, enc_col in targets:
+            for label, table, enc_cols in targets:
                 if field_encryption.enabled and field_encryption.encryptor is not None:
-                    # Re-key each row's encrypted cell (bound to creator), then
-                    # flip creator — both in the same UPDATE.
+                    # Re-key each row's encrypted cells (bound to creator), then
+                    # flip creator — all in the same UPDATE.
                     rows = self.db.execute(
-                        select(table.c.id, table.c[enc_col]).where(
-                            table.c.creator == old
-                        )
+                        select(
+                            table.c.id, *(table.c[col] for col in enc_cols)
+                        ).where(table.c.creator == old)
                     ).fetchall()
-                    for row_id, cell in rows:
+                    for fetched in rows:
+                        row_id = fetched[0]
                         values: Dict[str, Any] = {"creator": new_key}
-                        new_cell = self._rotate_cell(
-                            field_encryption.encryptor, cell, old, new_key
-                        )
-                        if new_cell is not None:
-                            values[enc_col] = new_cell
+                        for offset, col in enumerate(enc_cols, start=1):
+                            new_cell = self._rotate_cell(
+                                field_encryption.encryptor,
+                                fetched[offset],
+                                old,
+                                new_key,
+                            )
+                            if new_cell is not None:
+                                values[col] = new_cell
                         self.db.execute(
                             update(table).where(table.c.id == row_id).values(values)
                         )

@@ -242,3 +242,76 @@ def test_http_error_status_raises_under_raise_on_error():
     with make_client(raise_on_error=True, max_retries=0) as client:
         with pytest.raises(AuthTransportError):
             client.list_roles()
+
+
+SECRET = "rak_" + "a1B2" * 10 + "c3d"  # 43-char payload, display prefix rak_a1B2a1B2
+
+
+@responses.activate
+def test_create_api_key_posts_label_and_uses_no_retry_session():
+    responses.post(
+        f"{BASE}/api/apikeys/user/alice",
+        json={"success": True, "data": {"api_key": SECRET, "key_id": "k"}},
+    )
+    with make_client() as client:
+        result = client.create_api_key("alice", label="laptop")
+        assert result["data"]["api_key"] == SECRET
+        assert responses.calls[0].request.body == b'{"label": "laptop"}'
+        # The create path runs on the dedicated no-retry session: its adapter
+        # carries zero retries, while the main session's adapter retries.
+        no_retry_adapter = client._no_retry.get_adapter("https://x")
+        assert no_retry_adapter.max_retries.total == 0
+        assert client.session.get_adapter("https://x").max_retries.total > 0
+        # Both sessions share one header mapping, so rotate_key updates both.
+        assert client._no_retry.headers is client.session.headers
+
+
+@responses.activate
+def test_create_api_key_without_label_sends_no_body():
+    responses.post(
+        f"{BASE}/api/apikeys/user/alice",
+        json={"success": True, "data": {"api_key": SECRET}},
+    )
+    with make_client() as client:
+        client.create_api_key("alice")
+    assert responses.calls[0].request.body is None
+
+
+@responses.activate
+def test_api_key_lifecycle_methods_hit_expected_endpoints():
+    responses.get(
+        f"{BASE}/api/apikeys/user/alice",
+        json={"success": True, "data": {"count": 0, "keys": []}},
+    )
+    responses.delete(
+        f"{BASE}/api/apikeys/user/alice/kid-1",
+        json={"success": True, "data": {"revoked": True, "already_revoked": False}},
+    )
+    responses.post(
+        f"{BASE}/api/apikeys/validate",
+        json={"success": True, "data": {"valid": True, "user": "alice"}},
+    )
+    with make_client() as client:
+        assert client.list_api_keys("alice")["data"]["count"] == 0
+        assert client.revoke_api_key("alice", "kid-1")["data"]["revoked"] is True
+        validated = client.validate_api_key(SECRET)
+        assert validated["data"]["valid"] is True
+    assert responses.calls[2].request.body == (
+        '{"api_key": "%s"}' % SECRET
+    ).encode()
+
+
+@responses.activate
+def test_validate_api_key_failure_payload_echoes_prefix_never_secret():
+    with make_client() as client:  # nothing registered -> connection error
+        result = client.validate_api_key(SECRET)
+    assert result["success"] is False and result["transport_error"] is True
+    assert result["data"] == {"key_prefix": SECRET[:12]}
+    assert SECRET not in str(result)
+
+
+@responses.activate
+def test_create_api_key_raises_under_raise_on_error():
+    with make_client(raise_on_error=True) as client:
+        with pytest.raises(AuthTransportError):
+            client.create_api_key("alice")

@@ -72,7 +72,12 @@ def test_rotation_reencrypts_and_moves_namespace_over_https_path(client):
     data = resp.get_json()["data"]
     new = data["new_key"]
     assert new != old
-    assert data["migrated"] == {"roles": 1, "memberships": 1, "permissions": 1}
+    assert data["migrated"] == {
+        "roles": 1,
+        "memberships": 1,
+        "permissions": 1,
+        "api_keys": 0,
+    }
 
     # New key: full access preserved — only possible if the encrypted user and
     # permission cells were re-keyed under `new`.

@@ -29,7 +29,7 @@ from auth.encryption import (
     DeterministicEncryption,
     InvalidCiphertextError,
 )
-from auth.models.sql import AuthGroup, AuthMembership, AuthPermission
+from auth.models.sql import AuthApiKey, AuthGroup, AuthMembership, AuthPermission
 
 logger = logging.getLogger("auth.reencrypt")
 
@@ -38,6 +38,8 @@ _TARGETS = [
     (AuthMembership.__table__, "auth_membership", "user"),
     (AuthPermission.__table__, "auth_permission", "name"),
     (AuthGroup.__table__, "auth_group", "description"),
+    (AuthApiKey.__table__, "auth_api_key", "user"),
+    (AuthApiKey.__table__, "auth_api_key", "label"),
 ]
 
 

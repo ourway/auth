@@ -71,6 +71,26 @@ service guarantees; the threat notes are what it deliberately does **not**.
   under the new key. A per-tenant advisory lock serializes rotation against
   concurrent writes. The returned key is the only copy — persist it.
 
+### Per-user API keys
+
+- `/api/apikeys/*` manages keys for a tenant's **users**. Secrets are
+  server-generated (`rak_` + 43 base62 chars, 256-bit), returned **exactly once**
+  at creation, and stored only as a SHA-256 digest — a DB dump reveals nothing
+  usable, and there is no recovery path (revoke + re-create instead). The digest
+  is unpeppered by design: at this entropy offline brute force is not a threat,
+  and a pepper change must never invalidate every issued key.
+- Secrets travel **only in JSON bodies** (validate) or response bodies (create) —
+  never URLs, which are logged by gunicorn/nginx. `user` and `label` cells join
+  the per-tenant field-encryption scheme.
+- **Validation is tenant-scoped**: a key answers only under the client key whose
+  namespace created it; a foreign tenant's key is indistinguishable from an
+  unknown one (`unknown_key`), so key existence cannot be probed across tenants.
+- Per-user keys never authenticate `/api/*` itself — they are subjects of the
+  registry, not bearer credentials for auth. Client-key rotation moves the rows
+  and re-encrypts bound cells while the secrets (hashes) keep validating.
+- At most **25 active keys per (tenant, user)** bounds abuse; create/list/revoke/
+  validate are audited (fingerprints only — never the secret or its hash).
+
 ## Threat notes (by design)
 
 - **Authentication is out of scope.** `auth` trusts the caller already knows who

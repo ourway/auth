@@ -13,6 +13,9 @@ USER_ROLE_NAME_PATTERN = re.compile(r"^[a-zA-Z0-9_-]{1,64}$")
 # User names additionally allow email addresses (the documented usage and
 # what the Python API accepts): @ . +
 USER_NAME_PATTERN = re.compile(r"^[a-zA-Z0-9_.@+-]{1,64}$")
+# API-key labels are display text chosen by the end user; spaces allowed,
+# nothing that could carry markup or path meaning.
+API_KEY_LABEL_PATTERN = re.compile(r"^[a-zA-Z0-9 _.-]{1,64}$")
 
 
 def validate_client_key(client_key: str) -> bool:
@@ -29,6 +32,20 @@ def validate_user_name(user_name: str) -> bool:
     """
     match_result = USER_NAME_PATTERN.match(user_name)
     return bool(match_result)
+
+
+def validate_api_key_label(label: str) -> bool:
+    """
+    Validate a per-user API-key label (display text)
+    """
+    return bool(API_KEY_LABEL_PATTERN.match(label))
+
+
+def validate_key_id(key_id: str) -> bool:
+    """
+    Validate a public API-key id (UUID4 shape, same as client keys)
+    """
+    return bool(CLIENT_KEY_PATTERN.match(key_id))
 
 
 def validate_role_name(role_name: str) -> bool:

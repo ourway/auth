@@ -129,6 +129,19 @@ erDiagram
     text name "encrypted"
     bool is_active
   }
+  AUTH_API_KEY {
+    int id PK
+    string key_id "public uuid4 handle"
+    string creator "tenant"
+    text user "encrypted"
+    string key_hash "sha256(secret), globally unique"
+    string key_prefix "display"
+    text label "encrypted"
+    bool is_active
+    datetime revoked_at
+    datetime expires_at
+    datetime last_used_at
+  }
   AUDIT_LOG {
     int id PK
     text client_id "HMAC fingerprint"
@@ -143,6 +156,15 @@ erDiagram
 
 Uniqueness is `(creator, role)`, `(creator, user)`, `(creator, name)`. Writes are
 race-free `INSERT … ON CONFLICT` upserts against those constraints.
+
+`auth_api_key` (SPEC 0004) is the per-user API-key registry: the secret is
+server-generated (`rak_` + 43 base62), returned once, and stored only as an
+unpeppered SHA-256 (256-bit entropy makes offline attack moot, and no pepper
+rotation can invalidate issued keys). `key_hash` is globally unique — secrets
+are server-minted so cross-tenant collisions cannot occur — giving validate a
+single index probe; `key_hash` excludes `creator` so tenant rotation preserves
+issued secrets. Inserts are plain INSERTs (no natural upsert key); the 25
+active-keys-per-user cap is enforced under the tenant advisory lock.
 
 ## Permission check
 
@@ -179,10 +201,10 @@ sequenceDiagram
   C->>R: POST /api/keys/rotate
   R->>S: rotate_client_key(new = uuid4())
   S->>DB: pg_advisory_xact_lock(tenant)
-  loop groups / memberships / permissions
+  loop groups / memberships / permissions / api keys
     S->>DB: read rows (creator = old)
     Note over S: encryption on → decrypt(old) → encrypt(new)
-    S->>DB: set creator = new (+ re-keyed cell)
+    S->>DB: set creator = new (+ re-keyed cells)
   end
   S-->>R: {new_key, migrated}
   R->>DB: stage ROTATE_KEY audit (old_fpr → new_fpr)
@@ -211,8 +233,8 @@ method self-commits.
 ## Encryption at rest
 
 When `AUTH_ENABLE_ENCRYPTION=true`, the encrypted columns (`membership.user`,
-`permission.name`, `group.description`) use deterministic, authenticated,
-per-tenant encryption: AES-256-CTR with a synthetic IV `= HMAC(hmac_key,
+`permission.name`, `group.description`, `api_key.user`, `api_key.label`) use
+deterministic, authenticated, per-tenant encryption: AES-256-CTR with a synthetic IV `= HMAC(hmac_key,
 plaintext)[:16]`, and per-tenant field keys derived from the master key via HKDF
 keyed on `creator`. Determinism keeps the columns equality-queryable; the
 synthetic IV is re-derived and constant-time checked on read, so a tampered,

@@ -58,6 +58,12 @@ with Client(api_key=KEY, service_url="https://auth.rodmena.app") as c:
 - **Reuse one key.** A new key is a new empty namespace, not an error. Keep the
   key out of source control, logs, and URLs — it is the only thing protecting
   your data. Rotate it with `POST /api/keys/rotate` if it leaks.
+- **Per-user API keys** (2.4.0): `/api/apikeys/user/<user>` (create/list),
+  `/api/apikeys/user/<user>/<key_id>` (revoke), `/api/apikeys/validate`. auth
+  mints `rak_...` secrets for *your users*, shows each exactly once, stores only
+  a hash, and validates them inside your namespace — an identity UI fronts the
+  lifecycle, backends validate then use the RBAC checks. Client methods:
+  `create_api_key`, `list_api_keys`, `revoke_api_key`, `validate_api_key`.
 
 ## Documentation
 

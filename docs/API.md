@@ -544,6 +544,92 @@ curl -H "Authorization: Bearer YOUR-UUID4-KEY" \
 
 ---
 
+### Per-user API Keys
+
+Keys auth manages **for your users** (an identity UI typically fronts these;
+backends call validate, then use the RBAC checks above). The secret is returned
+exactly once at creation — only its SHA-256 is stored. Validation is
+tenant-scoped: a key answers only under the client key that created it. These
+are the only endpoints that read a JSON request body.
+
+#### Create API Key
+Mint a key for a user. At most 25 active keys per user (400 beyond that).
+
+**Endpoint:** `POST /api/apikeys/user/{user}`
+
+**Authentication:** Required
+
+**Parameters:**
+- `user` (path, required): User identifier
+- `label` (body, optional): Display label, `[a-zA-Z0-9 _.-]{1,64}`
+
+**Response (wrapped):**
+```json
+{
+  "success": true,
+  "code": 200,
+  "message": "API key created for user 'alice'. The api_key value is shown only once — store it now.",
+  "data": {
+    "api_key": "rak_<43 base62 chars — SHOWN ONLY ONCE>",
+    "key_id": "0d4bafe0-6a2e-4f5a-9e3c-1f2a3b4c5d6e",
+    "user": "alice",
+    "label": "laptop",
+    "key_prefix": "rak_ab12cd34",
+    "created": "2026-07-30T12:00:00",
+    "expires_at": null
+  },
+  "timestamp": "..."
+}
+```
+
+**Example:**
+```bash
+curl -X POST -H "Authorization: Bearer YOUR-UUID4-KEY" \
+  -H "Content-Type: application/json" -d '{"label": "laptop"}' \
+  http://localhost:5000/api/apikeys/user/alice
+```
+
+#### List API Keys
+Metadata only — never secrets or hashes. Revoked keys included (`is_active: false`).
+
+**Endpoint:** `GET /api/apikeys/user/{user}`
+
+**Authentication:** Required
+
+**Response (wrapped):** `data` = `{"count": 1, "keys": [{"key_id", "key_prefix", "label", "is_active", "created", "revoked_at", "expires_at", "last_used_at"}]}`
+
+#### Revoke API Key
+Idempotent; repeat revokes return `already_revoked: true`. 404 (JSON) when no
+such key exists for that user in your namespace.
+
+**Endpoint:** `DELETE /api/apikeys/user/{user}/{key_id}`
+
+**Authentication:** Required
+
+**Response (wrapped):** `data` = `{"revoked": true, "already_revoked": false}`
+
+#### Validate API Key
+The secret goes in the body — never a URL. Resolvable questions answer 200 with
+`valid` true/false; only a malformed body/secret format is a 400. A key from
+another tenant answers `unknown_key`.
+
+**Endpoint:** `POST /api/apikeys/validate`
+
+**Authentication:** Required (your client key in the Bearer header)
+
+**Body:** `{"api_key": "rak_..."}`
+
+**Response (wrapped):** `data` = `{"valid": true, "user": "alice", "key_id": "...", "label": "laptop", "expires_at": null}` or `{"valid": false, "reason": "revoked" | "expired" | "unknown_key"}`
+
+**Example:**
+```bash
+curl -X POST -H "Authorization: Bearer YOUR-UUID4-KEY" \
+  -H "Content-Type: application/json" -d '{"api_key": "rak_..."}' \
+  http://localhost:5000/api/apikeys/validate
+```
+
+---
+
 ## Error Codes
 
 | Code | Description |

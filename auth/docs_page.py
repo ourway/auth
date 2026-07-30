@@ -131,11 +131,24 @@ Threat model: because possession of a key *is* authority, whoever holds your key
 can also rotate it out from under you, so rotate promptly on any suspected leak
 and update every consumer with the returned key.
 
+**Per-user API keys are separate from your client key.** `/api/apikeys/*`
+manages keys for *your users* (an identity UI creates/lists/revokes them; your
+backends validate them). The `rak_...` secret is returned **exactly once** at
+creation — auth stores only its SHA-256, so a lost secret means revoke and
+re-create. Validation is tenant-scoped: a key answers only under the client key
+whose namespace created it, so the service that validates must use the same
+client key as the UI that creates (`unknown_key` otherwise). These keys never
+authenticate `/api/*` itself — the Bearer header always takes your client key.
+Rotating your client key moves your users' API keys with the namespace; the
+secrets keep validating afterwards.
+
 ## 4. Endpoints
 
 All paths need the `Authorization` header except `/ping` and `/health`.
-`<user>`, `<role>`/`<group>` and `<name>` go in the path, never in a body — no
-endpoint reads a JSON request body.
+`<user>`, `<role>`/`<group>` and `<name>` go in the path, never in a body. The
+only endpoints that read a JSON body are the per-user API-key ones (create's
+optional `label`; validate's `api_key` — secrets never belong in URLs, which
+get logged).
 
 ### Roles
 
@@ -185,7 +198,7 @@ Thin aliases over the permission model — a workflow name is just a permission.
 | GET | `/api/workflow/user/<user>/can_run/<workflow>` | wrapped, `data` = `{{"has_permission": true}}` |
 | GET | `/api/workflow/users/<workflow>` | wrapped, `data` = `{{"count": 2, "members": [{{"user": "alice", "role": "engineers"}}]}}` |
 
-### API keys
+### API keys (tenant key rotation)
 
 Rotate the key you authenticate with. The call is authenticated by your
 *current* key (no body, nothing in the path); the server mints a fresh key,
@@ -194,7 +207,23 @@ only copy — persist it. See section 3 for the full semantics and threat model.
 
 | Method | Path | Returns |
 |---|---|---|
-| POST | `/api/keys/rotate` | wrapped, `data` = `{{"new_key": "<uuid4>", "migrated": {{"roles": 1, "memberships": 1, "permissions": 1}}}}` |
+| POST | `/api/keys/rotate` | wrapped, `data` = `{{"new_key": "<uuid4>", "migrated": {{"roles": 1, "memberships": 1, "permissions": 1, "api_keys": 0}}}}` |
+
+### Per-user API keys
+
+Keys for your *users*, held in your namespace. The `api_key` secret appears
+only in the creating response (auth stores its SHA-256, nothing recoverable).
+Listing shows revoked keys too (`is_active: false`) so a UI can render
+history. Validate answers `valid: false` with a `reason` rather than erroring;
+a key from another tenant is indistinguishable from an unknown one. At most 25
+active keys per user — revoke to free a slot.
+
+| Method | Path | Returns |
+|---|---|---|
+| POST | `/api/apikeys/user/<user>` | optional body `{{"label": "laptop"}}` → wrapped, `data` = `{{"api_key": "rak_<43 chars, shown ONCE>", "key_id": "<uuid4>", "user": "alice", "label": "laptop", "key_prefix": "rak_ab12cd34", "created": "<iso>", "expires_at": null}}` (400 once 25 active keys exist) |
+| GET | `/api/apikeys/user/<user>` | wrapped, `data` = `{{"count": 1, "keys": [{{"key_id": "<uuid4>", "key_prefix": "rak_ab12cd34", "label": "laptop", "is_active": true, "created": "<iso>", "revoked_at": null, "expires_at": null, "last_used_at": "<iso>"}}]}}` |
+| DELETE | `/api/apikeys/user/<user>/<key_id>` | wrapped, `data` = `{{"revoked": true, "already_revoked": false}}` (repeat calls idempotent; 404 JSON if no such key for that user in your namespace) |
+| POST | `/api/apikeys/validate` | body `{{"api_key": "rak_..."}}` → wrapped, `data` = `{{"valid": true, "user": "alice", "key_id": "<uuid4>", "label": "laptop", "expires_at": null}}` or `{{"valid": false, "reason": "revoked" | "expired" | "unknown_key"}}` |
 
 ### Service
 
@@ -220,6 +249,9 @@ happens:
 | user | letters, digits, `_` `-` `.` `@` `+` (so emails work) | 1–64 |
 | role / group | letters, digits, `_` `-` | 1–64 |
 | permission / workflow | letters, digits, `_` `-` | 1–128 |
+| api key (secret) | `rak_` + 43 base62 chars, server-generated | 47 |
+| api-key id (`key_id`) | UUID4 | — |
+| api-key label | letters, digits, space, `_` `.` `-` | 1–64 |
 
 Note the asymmetry: `alice@example.com` is a valid **user**, but `@` and `.` are
 rejected in role and permission names. Slashes are never allowed — a name
@@ -247,10 +279,17 @@ Methods mirror the endpoints: `create_role`, `delete_role`, `list_roles`,
 `remove_permission`, `has_permission`, `user_has_permission`,
 `get_user_permissions`, `get_role_permissions`, `get_user_roles`,
 `get_role_members`, `which_roles_can`, `which_users_can`,
-`get_users_for_workflow`, `rotate_key`, `ping`.
+`get_users_for_workflow`, `rotate_key`, `ping`, and the per-user key lifecycle
+`create_api_key`, `list_api_keys`, `revoke_api_key`, `validate_api_key`.
 Each returns the parsed JSON body, so the shapes in section 4 still apply.
 `rotate_key()` also switches the live client (and its session header) to the new
 key on success and returns it — persist `data.new_key`, it is the only copy.
+`create_api_key(user, label=None)` returns the once-only secret in
+`data.api_key` and deliberately does not retry on transport failure (a blind
+retry could mint a second key nobody saw). On transport failure every method
+returns `{{"error", "success": false, "transport_error": true, ...}}` without
+the answer field — check `success` first, or construct the client with
+`raise_on_error=True` to get an `AuthTransportError` exception instead.
 
 The library can also be used in-process against your own database, bypassing
 HTTP entirely — see https://pypi.org/project/auth/.

@@ -163,18 +163,40 @@ class EnhancedAuthClient:
             "workflow_users": "/api/workflow/users/{workflow_name}",
             "workflow_permission": "/api/workflow/user/{user}/can_run/{workflow_name}",
             "rotate_key": "/api/keys/rotate",
+            "apikeys_user": "/api/apikeys/user/{user}",
+            "apikey_revoke": "/api/apikeys/user/{user}/{key_id}",
+            "apikey_validate": "/api/apikeys/validate",
         }
 
-    def _make_request(self, method: str, endpoint: str, **kwargs) -> Dict[str, Any]:
+        # Built on first use: a session without retries for non-idempotent
+        # calls (create_api_key). Shares the auth headers with the main
+        # session so rotate_key() updates both.
+        self._no_retry: Optional[requests.Session] = None
+
+    def _no_retry_session(self) -> requests.Session:
+        """Session for non-idempotent calls: same auth headers, zero retries."""
+        if self._no_retry is None:
+            session = requests.Session()
+            session.mount("http://", HTTPAdapter(max_retries=0))
+            session.mount("https://", HTTPAdapter(max_retries=0))
+            # Shared mapping, not a copy: rotate_key() must apply to both.
+            session.headers = self.session.headers
+            self._no_retry = session
+        return self._no_retry
+
+    def _make_request(
+        self, method: str, endpoint: str, retry: bool = True, **kwargs
+    ) -> Dict[str, Any]:
         """
         Make an HTTP request with circuit breaker, retry logic, and error handling
         """
         url = urljoin(self.service_url, endpoint)
+        session = self.session if retry else self._no_retry_session()
 
         # Prepare the request function for the circuit breaker
         def request_func():
             try:
-                response = self.session.request(
+                response = session.request(
                     method=method, url=url, timeout=self.timeout, **kwargs
                 )
 
@@ -459,6 +481,68 @@ class EnhancedAuthClient:
             self.session.headers["Authorization"] = f"Bearer {new_key}"
         return response
 
+    # Per-user API keys (SPEC 0004)
+    def create_api_key(
+        self, user: str, label: Optional[str] = None
+    ) -> Dict[str, Any]:
+        """Mint an API key for a user; ``data.api_key`` is shown only once.
+
+        Sent WITHOUT automatic retries: create is not idempotent, and a blind
+        retry after an ambiguous failure could mint a second key whose secret
+        nobody ever saw. On an ambiguous failure, list and revoke instead.
+
+        Transport failure: error dict without the answer field (or
+        ``AuthTransportError`` if ``raise_on_error=True``); check ``success``.
+        """
+        endpoint = self.endpoints["apikeys_user"].format(user=user)
+        payload = {"label": label} if label is not None else None
+        try:
+            return self._make_request("POST", endpoint, retry=False, json=payload)
+        except Exception as e:
+            return self._transport_failure(e, data={"user": user, "label": label})
+
+    def list_api_keys(self, user: str) -> Dict[str, Any]:
+        """List a user's API keys (metadata only; never the secrets).
+
+        Transport failure: error dict without the answer field (or
+        ``AuthTransportError`` if ``raise_on_error=True``); check ``success``.
+        """
+        endpoint = self.endpoints["apikeys_user"].format(user=user)
+        try:
+            return self._make_request("GET", endpoint)
+        except Exception as e:
+            return self._transport_failure(e, data={"user": user})
+
+    def revoke_api_key(self, user: str, key_id: str) -> Dict[str, Any]:
+        """Revoke one of a user's API keys by its public key_id (idempotent).
+
+        Transport failure: error dict without the answer field (or
+        ``AuthTransportError`` if ``raise_on_error=True``); check ``success``.
+        """
+        endpoint = self.endpoints["apikey_revoke"].format(user=user, key_id=key_id)
+        try:
+            return self._make_request("DELETE", endpoint)
+        except Exception as e:
+            return self._transport_failure(e, data={"user": user, "key_id": key_id})
+
+    def validate_api_key(self, api_key: str) -> Dict[str, Any]:
+        """Validate an API-key secret; answers ``data.valid`` true/false.
+
+        The secret travels in the JSON body, never a URL. The failure payload
+        echoes only the display prefix — never the secret itself.
+
+        Transport failure: error dict without the answer field (or
+        ``AuthTransportError`` if ``raise_on_error=True``); check ``success``
+        before reading ``data`` — a missing ``valid`` is an outage, not an
+        invalid key.
+        """
+        try:
+            return self._make_request(
+                "POST", self.endpoints["apikey_validate"], json={"api_key": api_key}
+            )
+        except Exception as e:
+            return self._transport_failure(e, data={"key_prefix": api_key[:12]})
+
     # Workflow-related methods
     def get_users_for_workflow(self, workflow_name: str) -> Dict[str, Any]:
         """Get all users who can run a specific workflow.
@@ -494,6 +578,8 @@ class EnhancedAuthClient:
         """Close the session"""
         if self.session:
             self.session.close()
+        if self._no_retry is not None:
+            self._no_retry.close()
 
     def __enter__(self):
         return self

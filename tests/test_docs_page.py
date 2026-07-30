@@ -80,6 +80,17 @@ def test_documents_every_registered_api_route():
     assert not undocumented, f"routes missing from the docs page: {sorted(undocumented)}"
 
 
+def test_docs_pin_api_key_contract(client):
+    """The served reference must teach the two things a consumer cannot
+    recover from getting wrong: the secret format and its shown-once nature."""
+    body = client.get("/llms.txt").get_data(as_text=True)
+    assert "rak_" in body
+    assert "shown" in body.lower() and "once" in body.lower()
+    assert "/api/apikeys/user" in body
+    assert "/api/apikeys/validate" in body
+    assert "unknown_key" in body
+
+
 def test_writes_to_a_missing_role_return_200_false(client, monkeypatch):
     """The headline gotcha in section 3 — pinned so the docs cannot go stale."""
     import uuid

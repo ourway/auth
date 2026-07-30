@@ -9,6 +9,7 @@ from sqlalchemy import (
     Column,
     DateTime,
     ForeignKey,
+    Index,
     Integer,
     String,
     Table,
@@ -197,3 +198,76 @@ class AuthPermission(Base):
             )
         else:
             self._name = value  # type: ignore[assignment]
+
+
+class AuthApiKey(Base):
+    """Per-user API key registry (SPEC 0004).
+
+    Stores only the SHA-256 of the secret plus a display prefix; ``user`` and
+    ``label`` are field-encrypted like the other tenant-bound cells.
+    ``key_hash`` is globally unique (secrets are server-generated, so a
+    cross-tenant collision cannot occur) and deliberately excludes the
+    creator, so client-key rotation moves these rows without invalidating
+    issued secrets. ``key_id`` is the public opaque handle used in URLs.
+    """
+
+    __tablename__ = "auth_api_key"
+    __table_args__ = (
+        UniqueConstraint("key_hash", name="uq_auth_api_key_key_hash"),
+        UniqueConstraint("key_id", name="uq_auth_api_key_key_id"),
+        Index("ix_auth_api_key_creator_user", "creator", "user"),
+        {
+            "sqlite_autoincrement": True,
+            "schema": _SCHEMA,
+        },
+    )
+
+    id = Column(Integer, primary_key=True, index=True)
+    key_id = Column(String(36), nullable=False)
+    creator = Column(String(64), nullable=False, index=True)
+    _user = Column(
+        "user", Text, nullable=False
+    )  # Potentially encrypted user field (TEXT: see AuthGroup.role)
+    key_hash = Column(String(64), nullable=False)
+    key_prefix = Column(String(16), nullable=False)
+    _label = Column("label", Text)  # Encrypted label field
+    is_active = Column(Boolean, default=True)
+    date_created = Column(DateTime, default=func.now())
+    modified = Column(DateTime, default=func.now(), onupdate=func.now())
+    revoked_at = Column(DateTime)
+    expires_at = Column(DateTime)
+    last_used_at = Column(DateTime)
+
+    @property
+    def user(self) -> Optional[str]:
+        """Decrypt user when accessed"""
+        if self._user:
+            return decrypt_sensitive_data(str(self._user), str(self.creator))
+        return None
+
+    @user.setter
+    def user(self, value: Optional[str]) -> None:
+        """Encrypt user when set"""
+        if value:
+            self._user = encrypt_sensitive_data(  # type: ignore[assignment]
+                value, str(self.creator)
+            )
+        else:
+            self._user = value  # type: ignore[assignment]
+
+    @property
+    def label(self) -> Optional[str]:
+        """Decrypt label when accessed"""
+        if self._label:
+            return decrypt_sensitive_data(str(self._label), str(self.creator))
+        return None
+
+    @label.setter
+    def label(self, value: Optional[str]) -> None:
+        """Encrypt label when set"""
+        if value:
+            self._label = encrypt_sensitive_data(  # type: ignore[assignment]
+                value, str(self.creator)
+            )
+        else:
+            self._label = value  # type: ignore[assignment]
