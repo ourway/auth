@@ -8,9 +8,16 @@ crashed on urllib3 >= 2.0.
 
 import uuid
 
+import pytest
 import responses
 
-from auth.client import Client, EnhancedAuthClient, RetryableHTTPAdapter, _build_retry
+from auth.client import (
+    AuthTransportError,
+    Client,
+    EnhancedAuthClient,
+    RetryableHTTPAdapter,
+    _build_retry,
+)
 
 API_KEY = str(uuid.uuid4())
 BASE = "http://auth.test"
@@ -155,3 +162,83 @@ def test_circuit_breaker_path_still_returns_result():
     )
     assert client.ping() == {"message": "PONG"}
     client.close()
+
+
+def test_pool_params_reach_the_adapter():
+    """Regression (runflow report): pool_connections/pool_maxsize were accepted
+    by the constructor but never passed to the mounted adapter, leaving the
+    pool at urllib3's default 10 regardless of what the caller asked for."""
+    # Known-positive first: a custom value must propagate before the default
+    # asserts below mean anything.
+    with make_client(pool_connections=3, pool_maxsize=7) as client:
+        adapter = client.session.get_adapter("https://x")
+        assert adapter._pool_connections == 3
+        assert adapter._pool_maxsize == 7
+    with make_client() as client:
+        adapter = client.session.get_adapter("https://x")
+        assert adapter._pool_connections == 10
+        assert adapter._pool_maxsize == 64
+    # Both schemes get the same adapter config.
+    with make_client(pool_maxsize=5) as client:
+        assert client.session.get_adapter("http://x")._pool_maxsize == 5
+
+
+@responses.activate
+def test_transport_failure_payload_is_marked():
+    """Failure payloads carry transport_error=True and data WITHOUT the answer
+    field — the unmissable marker runflow asked for."""
+    with make_client() as client:  # nothing registered -> connection error
+        result = client.user_has_permission("alice", "manage_users")
+    assert result["success"] is False
+    assert result["transport_error"] is True
+    assert "error" in result
+    assert result["data"] == {"user": "alice", "name": "manage_users"}
+    assert "has_permission" not in result["data"]
+
+
+@responses.activate
+def test_success_payload_has_no_transport_marker():
+    responses.get(
+        f"{BASE}/api/has_permission/alice/manage_users",
+        json={"success": True, "data": {"has_permission": True}},
+    )
+    with make_client() as client:
+        result = client.user_has_permission("alice", "manage_users")
+    assert result["data"]["has_permission"] is True
+    assert "transport_error" not in result
+
+
+@responses.activate
+def test_raise_on_error_raises_on_transport_failure():
+    # Green first: with a live endpoint the flag changes nothing.
+    responses.get(
+        f"{BASE}/api/has_permission/alice/manage_users",
+        json={"success": True, "data": {"has_permission": True}},
+    )
+    with make_client(raise_on_error=True) as client:
+        ok = client.user_has_permission("alice", "manage_users")
+        assert ok["data"]["has_permission"] is True
+        # Red: unregistered endpoint -> connection error -> raises, never a dict.
+        with pytest.raises(AuthTransportError):
+            client.get_user_permissions("alice")
+        with pytest.raises(AuthTransportError):
+            client.rotate_key()
+    # api_key untouched by the failed rotate.
+    assert client.api_key == API_KEY
+
+
+@responses.activate
+def test_raise_on_error_chains_original_cause():
+    with make_client(raise_on_error=True) as client:
+        with pytest.raises(AuthTransportError) as excinfo:
+            client.ping()
+    assert excinfo.value.__cause__ is not None
+
+
+@responses.activate
+def test_http_error_status_raises_under_raise_on_error():
+    """A 5xx after retries is a transport-level failure too."""
+    responses.get(f"{BASE}/api/roles", json={"detail": "boom"}, status=500)
+    with make_client(raise_on_error=True, max_retries=0) as client:
+        with pytest.raises(AuthTransportError):
+            client.list_roles()

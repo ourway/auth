@@ -3,7 +3,11 @@ __author__ = "Farshid Ashouri"
 from importlib.metadata import PackageNotFoundError, version
 from typing import Optional
 
-from auth.client import Client, EnhancedAuthClient  # Import the new client
+from auth.client import (  # Import the new client
+    AuthTransportError,
+    Client,
+    EnhancedAuthClient,
+)
 from auth.database import SessionLocal
 from auth.services.service import AuthorizationService
 
@@ -94,6 +98,7 @@ class Authorization:
 # Export the new client for users who want enhanced features
 __all__ = [
     "Authorization",
+    "AuthTransportError",
     "Client",
     "EnhancedAuthClient",
     "SessionLocal",

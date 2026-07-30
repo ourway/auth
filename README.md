@@ -48,6 +48,13 @@ with Client(api_key=KEY, service_url="https://auth.rodmena.app") as c:
 - **Two response shapes** — bare `{"result": ...}` and wrapped
   `{"success", "data", ...}`. The API reference says which per endpoint.
 - **Errors below 2xx are HTML**, not JSON. Branch on the status code first.
+- **Python client: check `success` before reading `data`.** On transport
+  failure the client does not raise by default — it returns
+  `{"error", "success": False, "transport_error": True, "data": {...}}` where
+  `data` only echoes your inputs and does NOT contain the answer field
+  (`has_permission`, `count`, ...). Reading `data` blindly turns an outage into
+  a false "no". Pass `Client(..., raise_on_error=True)` to get an
+  `AuthTransportError` exception instead of the error dict.
 - **Reuse one key.** A new key is a new empty namespace, not an error. Keep the
   key out of source control, logs, and URLs — it is the only thing protecting
   your data. Rotate it with `POST /api/keys/rotate` if it leaks.
