@@ -142,6 +142,16 @@ authenticate `/api/*` itself — the Bearer header always takes your client key.
 Rotating your client key moves your users' API keys with the namespace; the
 secrets keep validating afterwards.
 
+**DEPRECATION — bare user strings (decommission target: 3.0.0).** Today any
+`<user>` string answers authorization checks whether or not a key backs it.
+That is being retired: 2.5.0 adds per-tenant opt-in strict mode (a user with no
+active API key answers negatively, reason `user_not_key_backed`, same response
+shapes) plus `POST /api/apikeys/check_permission` (validate + permission check
+in one round trip); 3.0.0 makes strict identity the default. Each phase ships
+only after every consuming platform has confirmed readiness. Migrate now:
+issue keys to your users and derive the user from `/api/apikeys/validate`
+instead of asserting it.
+
 ## 4. Endpoints
 
 All paths need the `Authorization` header except `/ping` and `/health`.

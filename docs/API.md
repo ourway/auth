@@ -552,6 +552,12 @@ exactly once at creation — only its SHA-256 is stored. Validation is
 tenant-scoped: a key answers only under the client key that created it. These
 are the only endpoints that read a JSON request body.
 
+> **Deprecation (target 3.0.0):** authorization checks against user strings that
+> no active API key backs are being decommissioned — 2.5.0 adds opt-in per-tenant
+> strict mode, 3.0.0 makes key-backed users the default, each phase gated on
+> confirmation from every consuming platform. Migrate backends to
+> `validate → user → has_permission` now. See `docs/DEPRECATIONS.md`.
+
 #### Create API Key
 Mint a key for a user. At most 25 active keys per user (400 beyond that).
 

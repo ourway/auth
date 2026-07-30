@@ -64,6 +64,11 @@ with Client(api_key=KEY, service_url="https://auth.rodmena.app") as c:
   a hash, and validates them inside your namespace — an identity UI fronts the
   lifecycle, backends validate then use the RBAC checks. Client methods:
   `create_api_key`, `list_api_keys`, `revoke_api_key`, `validate_api_key`.
+- **DEPRECATED — bare user strings.** Asserting a `<user>` that no validated API
+  key backs is scheduled for decommission: 2.5.0 adds opt-in per-tenant strict
+  mode, **3.0.0 makes key-backed users mandatory** (each phase ships only after
+  every consuming platform confirms). Migrate backends to
+  `validate → user → has_permission` now. Details: [docs/DEPRECATIONS.md](docs/DEPRECATIONS.md).
 
 ## Documentation
 

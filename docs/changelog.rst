@@ -2,6 +2,24 @@
 Changelog
 =========
 
+Unreleased
+==========
+
+Deprecated
+----------
+
+- **Bare user strings in authorization checks** (decommission target: 3.0.0, gated on
+  confirmation from every consuming platform — see ``docs/DEPRECATIONS.md`` and
+  ``SPECS/0008-strict-user-identity.md``). End users must be backed by per-user API
+  keys: backends validate a ``rak_`` key to establish the user, then run permission
+  checks. 2.5.0 will add per-tenant opt-in strict mode (non-key-backed users answer
+  negatively with reason ``user_not_key_backed``) and
+  ``POST /api/apikeys/check_permission`` (validate + permission check in one round
+  trip); 3.0.0 makes strict identity the default. Nothing is enforced in 2.4.x.
+- **Python client legacy transport-failure error dict** (decommission target: 3.0.0,
+  same all-consumers gate — ``SPECS/0007``). Construct with ``raise_on_error=True``
+  and catch ``AuthTransportError`` now; in 3.0.0 raising becomes the only behavior.
+
 Version 2.4.0 (2026-07-30)
 ==========================
 
