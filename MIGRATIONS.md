@@ -32,8 +32,9 @@ configured PostgreSQL schema (`AUTH_DATABASE_SCHEMA`, e.g. `auth_rbac`).
    ```bash
    cd ~/develop/auth
    set -a; . ./.env; set +a
-   MG_DATABASE_URL="$AUTH_POSTGRESQL_URL" .venv/bin/mg apply
-   MG_DATABASE_URL="$AUTH_POSTGRESQL_URL" .venv/bin/mg status
+   # Prod defines AUTH_DATABASE_URL; strip any +psycopg driver suffix.
+   MG_DATABASE_URL="${AUTH_DATABASE_URL/+psycopg/}" .venv/bin/mg apply
+   MG_DATABASE_URL="${AUTH_DATABASE_URL/+psycopg/}" .venv/bin/mg status
    ```
 3. **Verify** the expected tables exist before serving:
    ```
