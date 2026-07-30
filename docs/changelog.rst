@@ -2,6 +2,46 @@
 Changelog
 =========
 
+Version 2.4.0 (2026-07-30)
+==========================
+
+Added
+-----
+
+- **Per-user API keys** (SPEC 0004): ``POST/GET /api/apikeys/user/<user>``,
+  ``DELETE /api/apikeys/user/<user>/<key_id>``, ``POST /api/apikeys/validate``.
+  auth mints ``rak_``-prefixed 256-bit secrets for a tenant's users, returns
+  each exactly once, stores only a SHA-256 digest, and validates them
+  tenant-scoped (a foreign tenant's key answers ``unknown_key``). ``user`` and
+  ``label`` cells join the per-tenant field encryption; create/list/revoke/
+  validate are audited; at most 25 active keys per (tenant, user). These are
+  the API's first JSON-body-reading endpoints — secrets never travel in URLs.
+  Client methods: ``create_api_key`` (no automatic retry — create is not
+  idempotent), ``list_api_keys``, ``revoke_api_key``, ``validate_api_key``.
+- ``Client(..., raise_on_error=True)`` raises the new ``AuthTransportError``
+  on transport failure instead of returning the legacy error dict, and every
+  transport-failure payload now carries ``"transport_error": true`` (reported
+  by RunFlow: the error dict's ``data`` echoes inputs and lacks the answer
+  field, so unchecked reads turned outages into denials).
+- **migretti adopted** for schema migrations (Alembic retired to
+  ``migrations_legacy_alembic/``); first migration ``add_auth_api_key``.
+
+Changed
+-------
+
+- ``POST /api/keys/rotate`` also migrates ``auth_api_key`` rows (re-encrypting
+  bound cells); its ``data.migrated`` gains an additive ``api_keys`` count —
+  the sole observable change to any pre-existing endpoint. Issued user keys
+  keep validating after tenant rotation, under the new tenant key.
+
+Fixed
+-----
+
+- ``EnhancedAuthClient`` now actually passes ``pool_connections`` /
+  ``pool_maxsize`` to its HTTP adapter (they were accepted and silently
+  dropped, pinning the pool at urllib3's default 10); default ``pool_maxsize``
+  raised to 64 (reported by RunFlow).
+
 Version 2.3.1 (2026-07-25)
 ==========================
 
