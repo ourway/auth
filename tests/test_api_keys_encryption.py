@@ -15,8 +15,6 @@ from sqlalchemy import select
 
 from auth.models.sql import AuthApiKey
 
-pytestmark = []
-
 _SHA256_HEX = re.compile(r"^[0-9a-f]{64}$")
 
 
