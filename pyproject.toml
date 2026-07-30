@@ -58,9 +58,11 @@ dependencies = [
 ratelimit = [
     "flask-limiter>=3.0.0",
 ]
-# Database schema migrations (Alembic). Needed to run `alembic upgrade head`
-# on a deployment; not required to import or serve the app.
+# Database schema migrations. migretti (house standard) authors and applies
+# NEW migrations; alembic remains only to read the retired legacy tree in
+# migrations_legacy_alembic/. Not required to import or serve the app.
 migrations = [
+    "migretti>=0.10.0",
     "alembic>=1.13.0",
 ]
 dev = [

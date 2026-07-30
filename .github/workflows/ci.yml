@@ -108,5 +108,9 @@ jobs:
           else:
               raise SystemExit("postgres did not become ready in time")
           PY
+      - name: Apply migretti migrations (proves the SQL and its tracking)
+        run: mg apply
+        env:
+          MG_DATABASE_URL: postgresql://auth_test:auth_test@localhost:5432/auth_test
       - name: Pytest (postgres integration, encryption on)
         run: pytest tests/postgres/ -m postgres -v

@@ -1,0 +1,22 @@
+# migretti configuration (house-standard migration tool — see MIGRATIONS.md).
+#
+# No credentials live in this file. Every real target is selected with the
+# MG_DATABASE_URL environment variable, which takes precedence over the
+# section below:
+#
+#   CI / local docker (matches `make test-postgres`):
+#     MG_DATABASE_URL="postgresql://auth_test:auth_test@127.0.0.1:55432/auth_test" mg apply
+#
+#   Production (constructed from the deployment's .env, never typed inline):
+#     set -a; . ./.env; set +a
+#     MG_DATABASE_URL="$AUTH_POSTGRESQL_URL" mg apply
+#
+# The default section below points at the disposable docker test container
+# (its throwaway credentials are public in the Makefile, not secrets), so a
+# bare `mg status` on a dev machine can never touch production.
+database:
+  host: 127.0.0.1
+  port: 55432
+  user: auth_test
+  password: auth_test
+  dbname: auth_test

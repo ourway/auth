@@ -1,4 +1,9 @@
-"""The Alembic migration stack loads, applies, and reverses cleanly.
+"""The RETIRED Alembic migration stack still loads, applies, and reverses.
+
+Alembic is frozen at its single legacy revision (0001_widen_text, applied in
+production) and lives in migrations_legacy_alembic/; NEW migrations are
+migretti SQL files in migrations/ (see MIGRATIONS.md). These tests keep the
+legacy tree loadable so the recorded history stays reproducible.
 
 On SQLite the widening migration is a no-op (SQLite ignores varchar length), so
 these assert the framework wiring — env.py resolves the app's database, the
@@ -22,7 +27,9 @@ _ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 
 def _config() -> Config:
     cfg = Config(os.path.join(_ROOT, "alembic.ini"))
-    cfg.set_main_option("script_location", os.path.join(_ROOT, "migrations"))
+    cfg.set_main_option(
+        "script_location", os.path.join(_ROOT, "migrations_legacy_alembic")
+    )
     return cfg
 
 

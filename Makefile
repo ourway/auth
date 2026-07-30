@@ -50,6 +50,15 @@ test-postgres: ## Run PostgreSQL integration tests (Docker required)
 		-e POSTGRES_USER=auth_test -e POSTGRES_PASSWORD=auth_test \
 		-e POSTGRES_DB=auth_test -p 127.0.0.1:55432:5432 postgres:16-alpine
 	@until docker exec auth-test-pg pg_isready -U auth_test -q; do sleep 1; done
+	@# The image's init runs a transient server that pg_isready can catch;
+	@# retry the migration until the real server accepts it (a failed connect
+	@# applies nothing, so retrying is safe).
+	@for i in $$(seq 1 30); do \
+		MG_DATABASE_URL="postgresql://auth_test:auth_test@127.0.0.1:55432/auth_test" \
+			$(VENV)/bin/mg apply && break; \
+		[ $$i -eq 30 ] && { docker stop auth-test-pg >/dev/null; exit 1; }; \
+		sleep 1; \
+	done
 	AUTH_DATABASE_TYPE=postgresql \
 	AUTH_DATABASE_URL="postgresql://auth_test:auth_test@127.0.0.1:55432/auth_test" \
 	AUTH_POSTGRESQL_URL= AUTH_SQLITE_PATH= \
