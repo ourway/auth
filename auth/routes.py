@@ -142,6 +142,18 @@ def register_routes(app):
             return jsonify({"status": "unhealthy"}), 503
         return jsonify({"status": "healthy"})
 
+    def _strict_reason(auth_service, user):
+        """Additive reason for negative answers under strict user identity.
+
+        Computed only on negative paths; None whenever strict mode is off or
+        the user is key-backed (i.e. the negative is a genuine denial).
+        """
+        if auth_service.strict_users_enabled() and not auth_service.user_is_key_backed(
+            user
+        ):
+            return "user_not_key_backed"
+        return None
+
     @app.route("/api/membership/<user>/<group>", methods=["GET"])
     @with_db_session
     @audit_log(AuditAction.CHECK_MEMBERSHIP, resource_extractor=lambda kwargs: f"{client_fingerprint(kwargs['user'])}:{kwargs['group']}")
@@ -153,10 +165,17 @@ def register_routes(app):
             return APIResponse.bad_request(error_msg)
 
         auth_service = _get_auth_service(db)  # Use helper
-        result = auth_service.has_membership(user, group)
+        # Strict gate lives here (not in the service) so del_membership's
+        # internal has_membership call keeps working — revocation must never
+        # be blocked by strict mode.
+        reason = _strict_reason(auth_service, user)
+        result = False if reason else auth_service.has_membership(user, group)
+        data = format_permission_response(result)
+        if reason:
+            data["reason"] = reason
 
         return APIResponse.success(
-            data=format_permission_response(result),
+            data=data,
             message=f"Membership check for user '{user}' and group '{group}' completed",
         )
 
@@ -172,6 +191,10 @@ def register_routes(app):
 
         auth_service = _get_auth_service(db)  # Use helper
         result = auth_service.add_membership(user, group)
+        if not result:
+            reason = _strict_reason(auth_service, user)
+            if reason:
+                return jsonify({"result": result, "reason": reason})
 
         return jsonify({"result": result})
 
@@ -259,9 +282,14 @@ def register_routes(app):
 
         auth_service = _get_auth_service(db)  # Use helper
         result = auth_service.user_has_permission(user, name)
+        data = format_permission_response(result)
+        if not result:
+            reason = _strict_reason(auth_service, user)
+            if reason:
+                data["reason"] = reason
 
         return APIResponse.success(
-            data=format_permission_response(result),
+            data=data,
             message=f"Permission check for user '{user}' and permission '{name}' completed",
         )
 
@@ -277,9 +305,14 @@ def register_routes(app):
 
         auth_service = _get_auth_service(db)  # Use helper
         permissions = auth_service.get_user_permissions(user)
+        data = format_user_permissions_response(permissions)
+        if not permissions:
+            reason = _strict_reason(auth_service, user)
+            if reason:
+                data["reason"] = reason
 
         return APIResponse.success(
-            data=format_user_permissions_response(permissions),
+            data=data,
             message=f"Retrieved permissions for user '{user}'",
         )
 
@@ -436,9 +469,14 @@ def register_routes(app):
         auth_service = _get_auth_service(db)
 
         result = auth_service.user_has_permission(user, workflow_name)
+        data = format_permission_response(result)
+        if not result:
+            reason = _strict_reason(auth_service, user)
+            if reason:
+                data["reason"] = reason
 
         return APIResponse.success(
-            data=format_permission_response(result),
+            data=data,
             message=f"Workflow permission check for user '{user}' and workflow '{workflow_name}' completed",
         )
 
@@ -634,3 +672,77 @@ def register_routes(app):
         return APIResponse.success(
             data=result, message="API key validation completed"
         )
+
+    @app.route("/api/apikeys/check_permission", methods=["POST"])
+    @with_db_session
+    @audit_log(
+        AuditAction.CHECK_API_KEY_PERMISSION,
+        resource_extractor=lambda kwargs: "api_key",
+    )
+    def check_api_key_permission(db):
+        """Validate a secret AND answer its subject's permission in one call.
+
+        Body: ``{"api_key": "rak_...", "permission": "<name>"}``. An invalid
+        key answers like validate (``valid: false`` + reason, no permission
+        evaluation); a valid key adds ``has_permission`` for the key's user.
+        The recommended backend pattern under strict user identity.
+        """
+        body = request.get_json(silent=True, force=True)
+        if not isinstance(body, dict):
+            return APIResponse.bad_request(
+                'JSON body required: {"api_key": "rak_...", "permission": "<name>"}'
+            )
+        api_key = body.get("api_key")
+        permission = body.get("permission")
+        if not isinstance(api_key, str) or not API_KEY_PATTERN.match(api_key):
+            return APIResponse.bad_request(
+                "api_key must be a string matching rak_[0-9A-Za-z]{43}"
+            )
+        if not isinstance(permission, str) or not validate_permission_name(
+            permission
+        ):
+            return APIResponse.bad_request(f"Invalid permission name: {permission!r}")
+
+        auth_service = _get_auth_service(db)
+        result = auth_service.check_api_key_permission(api_key, permission)
+        return APIResponse.success(
+            data=result, message="API-key permission check completed"
+        )
+
+    # Tenant settings (SPEC 0010)
+    @app.route("/api/settings", methods=["GET"])
+    @with_db_session
+    @audit_log(
+        AuditAction.GET_SETTINGS, resource_extractor=lambda kwargs: "settings"
+    )
+    def get_tenant_settings(db):
+        """This tenant's settings; defaults when nothing was ever set."""
+        auth_service = _get_auth_service(db)
+        return APIResponse.success(
+            data=auth_service.get_settings(), message="Tenant settings"
+        )
+
+    @app.route("/api/settings", methods=["PUT"])
+    @with_db_session
+    @audit_log(
+        AuditAction.UPDATE_SETTINGS,
+        resource_extractor=lambda kwargs: "strict_users",
+    )
+    def update_tenant_settings(db):
+        """Update tenant settings. Body: ``{"strict_users": true|false}``.
+
+        Enabling strict_users makes authorization decisions answer negatively
+        for users with no live API key (SPEC 0008); disabling restores 2.4.x
+        behavior. Idempotent upsert, audited.
+        """
+        body = request.get_json(silent=True, force=True)
+        if not isinstance(body, dict) or not isinstance(
+            body.get("strict_users"), bool
+        ):
+            return APIResponse.bad_request(
+                'JSON body required: {"strict_users": true|false}'
+            )
+
+        auth_service = _get_auth_service(db)
+        result = auth_service.set_strict_users(body["strict_users"])
+        return APIResponse.success(data=result, message="Tenant settings updated")

@@ -144,13 +144,16 @@ secrets keep validating afterwards.
 
 **DEPRECATION — bare user strings (decommission target: 3.0.0).** Today any
 `<user>` string answers authorization checks whether or not a key backs it.
-That is being retired: 2.5.0 adds per-tenant opt-in strict mode (a user with no
-active API key answers negatively, reason `user_not_key_backed`, same response
-shapes) plus `POST /api/apikeys/check_permission` (validate + permission check
-in one round trip); 3.0.0 makes strict identity the default. Each phase ships
-only after every consuming platform has confirmed readiness. Migrate now:
-issue keys to your users and derive the user from `/api/apikeys/validate`
-instead of asserting it.
+That is being retired. **Since 2.5.0 the opt-in phase is live**: enable strict
+mode with `PUT /api/settings` `{{"strict_users": true}}` and authorization
+decisions about users with no active API key answer negatively (same response
+shapes, additive reason `user_not_key_backed`); membership adds for key-less
+users return `{{"result": false}}` — create the key first, then grant roles.
+Strict mode never blocks key issuance or any delete/revoke path. 3.0.0 makes
+strict identity the default, and ships only after every consuming platform has
+confirmed readiness. Migrate now: issue keys to your users, derive the user
+from `/api/apikeys/validate` — or do both steps in one round trip with
+`POST /api/apikeys/check_permission`.
 
 ## 4. Endpoints
 
@@ -217,7 +220,7 @@ only copy — persist it. See section 3 for the full semantics and threat model.
 
 | Method | Path | Returns |
 |---|---|---|
-| POST | `/api/keys/rotate` | wrapped, `data` = `{{"new_key": "<uuid4>", "migrated": {{"roles": 1, "memberships": 1, "permissions": 1, "api_keys": 0}}}}` |
+| POST | `/api/keys/rotate` | wrapped, `data` = `{{"new_key": "<uuid4>", "migrated": {{"roles": 1, "memberships": 1, "permissions": 1, "api_keys": 0, "settings": 0}}}}` |
 
 ### Per-user API keys
 
@@ -234,6 +237,18 @@ active keys per user — revoke to free a slot.
 | GET | `/api/apikeys/user/<user>` | wrapped, `data` = `{{"count": 1, "keys": [{{"key_id": "<uuid4>", "key_prefix": "rak_ab12cd34", "label": "laptop", "is_active": true, "created": "<iso>", "revoked_at": null, "expires_at": null, "last_used_at": "<iso>"}}]}}` |
 | DELETE | `/api/apikeys/user/<user>/<key_id>` | wrapped, `data` = `{{"revoked": true, "already_revoked": false}}` (repeat calls idempotent; 404 JSON if no such key for that user in your namespace) |
 | POST | `/api/apikeys/validate` | body `{{"api_key": "rak_..."}}` → wrapped, `data` = `{{"valid": true, "user": "alice", "key_id": "<uuid4>", "label": "laptop", "expires_at": null}}` or `{{"valid": false, "reason": "revoked" | "expired" | "unknown_key"}}` |
+| POST | `/api/apikeys/check_permission` | body `{{"api_key": "rak_...", "permission": "deploy"}}` → wrapped, `data` = `{{"valid": true, "user": "alice", "key_id": "<uuid4>", "has_permission": true}}` or the validate-style `{{"valid": false, "reason": ...}}` — validate + permission check in ONE round trip |
+
+### Tenant settings
+
+Per-tenant switches. Today there is one: `strict_users` (see the deprecation
+note in section 3). Enabling it is how you opt in to strict user identity
+before 3.0.0 makes it the default.
+
+| Method | Path | Returns |
+|---|---|---|
+| GET | `/api/settings` | wrapped, `data` = `{{"strict_users": false}}` (defaults when never set) |
+| PUT | `/api/settings` | body `{{"strict_users": true}}` → wrapped, `data` = `{{"strict_users": true}}` (idempotent, audited) |
 
 ### Service
 
@@ -289,8 +304,10 @@ Methods mirror the endpoints: `create_role`, `delete_role`, `list_roles`,
 `remove_permission`, `has_permission`, `user_has_permission`,
 `get_user_permissions`, `get_role_permissions`, `get_user_roles`,
 `get_role_members`, `which_roles_can`, `which_users_can`,
-`get_users_for_workflow`, `rotate_key`, `ping`, and the per-user key lifecycle
-`create_api_key`, `list_api_keys`, `revoke_api_key`, `validate_api_key`.
+`get_users_for_workflow`, `rotate_key`, `ping`, the per-user key lifecycle
+`create_api_key`, `list_api_keys`, `revoke_api_key`, `validate_api_key`,
+`check_api_key_permission`, and tenant settings `get_settings` /
+`set_strict_users`.
 Each returns the parsed JSON body, so the shapes in section 4 still apply.
 `rotate_key()` also switches the live client (and its session header) to the new
 key on success and returns it — persist `data.new_key`, it is the only copy.

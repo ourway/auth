@@ -18,6 +18,7 @@ from auth.models.sql import (
     AuthGroup,
     AuthMembership,
     AuthPermission,
+    AuthTenantSettings,
     membership_groups,
     permission_groups,
 )
@@ -58,6 +59,7 @@ class AuthorizationService:
         client: str,
         validate_client: bool = True,
         manage_transaction: bool = True,
+        strict_users: Optional[bool] = None,
     ):
         if validate_client and not validate_client_key(client):
             # Never echo the raw key (it is the credential) — it would land in
@@ -72,6 +74,10 @@ class AuthorizationService:
         # method commits its own transaction. The HTTP layer sets this False and
         # commits once itself, so the mutation and its audit row commit together.
         self.manage_transaction = manage_transaction
+        # SPEC 0008/0010: None reads the tenant's stored setting (HTTP path);
+        # an explicit bool overrides it for in-process/library callers.
+        self._strict_override = strict_users
+        self._strict_cache: Optional[bool] = None
 
     def _commit(self) -> None:
         """Commit only when this service owns the transaction (see __init__)."""
@@ -150,6 +156,8 @@ class AuthorizationService:
 
     def get_user_permissions(self, user: str) -> List[Dict[str, Any]]:
         """Get all permissions for a user"""
+        if self._strict_blocks(user):
+            return []
         membership = (
             self.db.query(AuthMembership)
             .filter(
@@ -324,8 +332,12 @@ class AuthorizationService:
         """Add user to a role - atomic idempotent upsert.
 
         Uses INSERT ... ON CONFLICT (PostgreSQL and SQLite) for
-        race-condition-free operations.
+        race-condition-free operations. Under strict user identity a user with
+        no live API key cannot be granted membership (create the key first);
+        removal is deliberately NOT strict-gated, so revocation always works.
         """
+        if self._strict_blocks(user):
+            return False
         self._lock_tenant()
         try:
             group_table = AuthGroup.__table__
@@ -547,6 +559,8 @@ class AuthorizationService:
 
     def user_has_permission(self, user: str, name: str) -> bool:
         """Check if user has permission"""
+        if self._strict_blocks(user):
+            return False
         membership = (
             self.db.query(AuthMembership)
             .filter(
@@ -564,6 +578,89 @@ class AuthorizationService:
             if group.is_active and self.has_permission(group.role, name):
                 return True
         return False
+
+    def check_api_key_permission(
+        self, api_key: str, permission: str
+    ) -> Dict[str, Any]:
+        """Validate a secret and answer its subject's permission in one call.
+
+        An invalid key returns the validate result unchanged; a valid key adds
+        the effective-permission answer. The subject is key-backed by
+        construction (this very key just validated), so strict mode never
+        blocks the second half.
+        """
+        validated = self.validate_api_key(api_key)
+        if not validated["valid"]:
+            return validated
+        user = cast(str, validated["user"])
+        return {
+            "valid": True,
+            "user": user,
+            "key_id": validated["key_id"],
+            "has_permission": self.user_has_permission(user, permission),
+        }
+
+    # --- Tenant settings & strict user identity (SPEC 0008/0010) ---------
+
+    def strict_users_enabled(self) -> bool:
+        """Whether strict user identity applies to this tenant.
+
+        Explicit constructor override wins; otherwise the tenant's stored
+        setting is read once per service instance (one PK-adjacent lookup,
+        cached for the request).
+        """
+        if self._strict_override is not None:
+            return self._strict_override
+        if self._strict_cache is None:
+            row = (
+                self.db.query(AuthTenantSettings)
+                .filter(AuthTenantSettings.creator == self.client)
+                .first()
+            )
+            self._strict_cache = bool(row.strict_users) if row else False
+        return self._strict_cache
+
+    def get_settings(self) -> Dict[str, Any]:
+        """This tenant's settings (defaults when no row exists)."""
+        return {"strict_users": self.strict_users_enabled()}
+
+    def set_strict_users(self, enabled: bool) -> Dict[str, Any]:
+        """Upsert this tenant's strict_users flag (serialized vs rotation)."""
+        self._lock_tenant()
+        row = (
+            self.db.query(AuthTenantSettings)
+            .filter(AuthTenantSettings.creator == self.client)
+            .first()
+        )
+        if row is None:
+            row = AuthTenantSettings(creator=self.client, strict_users=enabled)
+            self.db.add(row)
+        else:
+            row.strict_users = enabled  # type: ignore[assignment]
+        self._strict_cache = enabled
+        self._commit()
+        return {"strict_users": enabled}
+
+    def user_is_key_backed(self, user: str) -> bool:
+        """True when the user holds ≥1 active, unexpired API key here."""
+        row = (
+            self.db.query(AuthApiKey.id)
+            .filter(
+                AuthApiKey.creator == self.client,
+                AuthApiKey._user == self._get_encrypted_user(user),
+                AuthApiKey.is_active,
+            )
+            .filter(
+                (AuthApiKey.expires_at.is_(None))
+                | (AuthApiKey.expires_at > _utcnow())
+            )
+            .first()
+        )
+        return row is not None
+
+    def _strict_blocks(self, user: str) -> bool:
+        """Strict mode on AND the user has no live key → decision is negative."""
+        return self.strict_users_enabled() and not self.user_is_key_backed(user)
 
     # --- Per-user API keys (SPEC 0004) -----------------------------------
 
@@ -781,6 +878,7 @@ class AuthorizationService:
             ("memberships", cast(Table, AuthMembership.__table__), ["user"]),
             ("permissions", cast(Table, AuthPermission.__table__), ["name"]),
             ("api_keys", cast(Table, AuthApiKey.__table__), ["user", "label"]),
+            ("settings", cast(Table, AuthTenantSettings.__table__), []),
         ]
         migrated: Dict[str, int] = {}
         try:

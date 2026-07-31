@@ -76,6 +76,7 @@ def test_rotate_moves_the_namespace_to_a_fresh_key(client):
         "memberships": 1,
         "permissions": 1,
         "api_keys": 0,
+        "settings": 0,
     }
 
 
@@ -216,6 +217,7 @@ def test_rotation_reencrypts_bound_cells_when_encryption_is_on(app, monkeypatch)
             "memberships": 1,
             "permissions": 1,
             "api_keys": 1,
+            "settings": 0,
         }
 
         # Nothing left under the old key.

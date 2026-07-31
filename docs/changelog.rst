@@ -2,20 +2,42 @@
 Changelog
 =========
 
-Unreleased
-==========
+Version 2.5.0 (2026-07-31)
+==========================
+
+Added
+-----
+
+- **Opt-in strict user identity** (SPEC 0008 phase 1 / SPEC 0010). New per-tenant
+  settings: ``GET /api/settings`` and ``PUT /api/settings`` with
+  ``{"strict_users": true|false}`` (audited upsert; new ``auth_tenant_settings``
+  table via migretti migration ``add_auth_tenant_settings``). While enabled,
+  authorization decisions about users with **no active API key** answer negatively
+  in the unchanged response shapes with additive reason ``user_not_key_backed``
+  (``has_permission``, membership check, ``user_permissions``, workflow
+  ``can_run``), and membership adds for key-less users return
+  ``{"result": false, "reason": "user_not_key_backed"}``. Key issuance and every
+  delete/revoke path are never strict-gated. Tenants that don't opt in are
+  byte-identical to 2.4.1.
+- ``POST /api/apikeys/check_permission`` — body ``{"api_key", "permission"}``:
+  validates the secret and answers the key-subject's effective permission in one
+  round trip. Client methods: ``check_api_key_permission``, ``get_settings``,
+  ``set_strict_users``.
+
+Changed
+-------
+
+- ``POST /api/keys/rotate`` also migrates the ``auth_tenant_settings`` row (a strict
+  tenant stays strict under its new key); ``data.migrated`` gains an additive
+  ``settings`` count — same declared-delta class as 2.4.0's ``api_keys``.
 
 Deprecated
 ----------
 
 - **Bare user strings in authorization checks** (decommission target: 3.0.0, gated on
   confirmation from every consuming platform — see ``docs/DEPRECATIONS.md`` and
-  ``SPECS/0008-strict-user-identity.md``). End users must be backed by per-user API
-  keys: backends validate a ``rak_`` key to establish the user, then run permission
-  checks. 2.5.0 will add per-tenant opt-in strict mode (non-key-backed users answer
-  negatively with reason ``user_not_key_backed``) and
-  ``POST /api/apikeys/check_permission`` (validate + permission check in one round
-  trip); 3.0.0 makes strict identity the default. Nothing is enforced in 2.4.x.
+  ``SPECS/0008-strict-user-identity.md``). The opt-in phase above IS the migration
+  vehicle; 3.0.0 makes strict identity the default.
 - **Python client legacy transport-failure error dict** (decommission target: 3.0.0,
   same all-consumers gate — ``SPECS/0007``). Construct with ``raise_on_error=True``
   and catch ``AuthTransportError`` now; in 3.0.0 raising becomes the only behavior.

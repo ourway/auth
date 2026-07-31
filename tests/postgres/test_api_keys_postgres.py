@@ -80,6 +80,51 @@ def test_full_lifecycle_on_postgres(client):
     ).get_json()["data"] == {"revoked": True, "already_revoked": True}
 
 
+def test_strict_mode_flow_on_postgres(client):
+    tenant = str(uuid.uuid4())
+    h = _h(tenant)
+    client.post("/api/role/ops", headers=h)
+    client.post("/api/permission/ops/deploy", headers=h)
+    client.post("/api/membership/dana/ops", headers=h)
+
+    # Green baseline before the red means anything.
+    assert (
+        client.get("/api/has_permission/dana/deploy", headers=h).get_json()["data"][
+            "has_permission"
+        ]
+        is True
+    )
+    client.put("/api/settings", headers=h, json={"strict_users": True})
+    blocked = client.get("/api/has_permission/dana/deploy", headers=h).get_json()[
+        "data"
+    ]
+    assert blocked == {"has_permission": False, "reason": "user_not_key_backed"}
+
+    secret = client.post("/api/apikeys/user/dana", headers=h).get_json()["data"][
+        "api_key"
+    ]
+    assert (
+        client.get("/api/has_permission/dana/deploy", headers=h).get_json()["data"][
+            "has_permission"
+        ]
+        is True
+    )
+    combo = client.post(
+        "/api/apikeys/check_permission",
+        headers=h,
+        json={"api_key": secret, "permission": "deploy"},
+    ).get_json()["data"]
+    assert combo["valid"] is True and combo["has_permission"] is True
+
+    # Rotation carries the strict setting with the namespace.
+    rotated = client.post("/api/keys/rotate", headers=h).get_json()["data"]
+    assert rotated["migrated"]["settings"] == 1
+    h_new = _h(rotated["new_key"])
+    assert client.get("/api/settings", headers=h_new).get_json()["data"] == {
+        "strict_users": True
+    }
+
+
 def test_rotation_preserves_keys_on_postgres_with_encryption(client):
     tenant = str(uuid.uuid4())
     secret = client.post(

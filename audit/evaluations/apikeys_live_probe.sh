@@ -97,6 +97,34 @@ check "has_permission wrapped shape" \
 check "write-to-missing-role stays 200/false" \
     "$(req POST /api/membership/probe.user/ghosts "$TENANT_C" | jq -c .)" '{"result":false}'
 
+# --- strict user identity, opt-in phase (SPEC 0010): both directions live
+TENANT_S="$(uuid)"
+req POST /api/role/probers "$TENANT_S" >/dev/null
+req POST /api/permission/probers/probe_things "$TENANT_S" >/dev/null
+req POST /api/membership/strict.user/probers "$TENANT_S" >/dev/null
+check "strict OFF: keyless user answers true (green baseline)" \
+    "$(req GET /api/has_permission/strict.user/probe_things "$TENANT_S" | jq -r '.data.has_permission')" "true"
+check "settings default false" \
+    "$(req GET /api/settings "$TENANT_S" | jq -r '.data.strict_users')" "false"
+req PUT /api/settings "$TENANT_S" '{"strict_users": true}' >/dev/null
+check "strict ON: keyless user blocked with reason" \
+    "$(req GET /api/has_permission/strict.user/probe_things "$TENANT_S" | jq -cS '.data')" \
+    '{"has_permission":false,"reason":"user_not_key_backed"}'
+check "strict ON: membership add for keyless user refused" \
+    "$(req POST /api/membership/other.user/probers "$TENANT_S" | jq -cS .)" \
+    '{"reason":"user_not_key_backed","result":false}'
+STRICT_SECRET=$(req POST "/api/apikeys/user/strict.user" "$TENANT_S" | jq -r .data.api_key)
+check "strict ON: key issuance releases the block (cap works both ways)" \
+    "$(req GET /api/has_permission/strict.user/probe_things "$TENANT_S" | jq -r '.data.has_permission')" "true"
+check "check_permission: one round trip, valid + permitted" \
+    "$(req POST /api/apikeys/check_permission "$TENANT_S" "{\"api_key\": \"$STRICT_SECRET\", \"permission\": \"probe_things\"}" | jq -c '{valid: .data.valid, has_permission: .data.has_permission}')" \
+    '{"valid":true,"has_permission":true}'
+check "check_permission: valid + not permitted is a plain denial" \
+    "$(req POST /api/apikeys/check_permission "$TENANT_S" "{\"api_key\": \"$STRICT_SECRET\", \"permission\": \"not_granted_perm\"}" | jq -r '.data.has_permission')" "false"
+req PUT /api/settings "$TENANT_S" '{"strict_users": false}' >/dev/null
+check "strict OFF again: keyless answers restored" \
+    "$(req GET /api/has_permission/probe.other/probe_things "$TENANT_S" | jq -r '.data.has_permission')" "false"
+
 # --- served docs advertise the new endpoints (the artifact, not the source)
 # Expected version comes from the checkout being probed (override with
 # AUTH_EXPECTED_VERSION when probing a host that runs a different revision).

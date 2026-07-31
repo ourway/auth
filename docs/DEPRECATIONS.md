@@ -21,9 +21,9 @@ permission checks — or, once 2.5.0 ships, does both in one round trip via
 
 | Phase | Version | Behavior |
 |---|---|---|
-| Now | 2.4.0 | Nothing enforced. Issue keys, migrate backends to the validate flow. |
-| Opt-in | 2.5.0 (not yet deployed) | Per-tenant strict mode: authorization decisions about a user with no active key answer negatively (`user_not_key_backed`, same response shapes); `check_permission` endpoint ships. |
-| Default | 3.0.0 | Strict mode is the default: **clients always need a key-backed user.** |
+| Done | 2.4.0 | Nothing enforced. Issue keys, migrate backends to the validate flow. |
+| **Live (opt-in)** | 2.5.0 | Per-tenant strict mode via `PUT /api/settings` `{"strict_users": true}`: authorization decisions about a user with no active key answer negatively (`user_not_key_backed`, same response shapes); `POST /api/apikeys/check_permission` does validate + permission in one round trip. Tenants that don't opt in are byte-identical to 2.4.1. |
+| Default | 3.0.0 | Strict mode is the default: **clients always need a key-backed user.** Ships only after all client confirmations. |
 
 Spec: `SPECS/0008-strict-user-identity.md` · ticket auth#13. Enforcement deploys only
 after all client confirmations are on the ticket ledger.

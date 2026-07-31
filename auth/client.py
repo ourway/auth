@@ -166,6 +166,8 @@ class EnhancedAuthClient:
             "apikeys_user": "/api/apikeys/user/{user}",
             "apikey_revoke": "/api/apikeys/user/{user}/{key_id}",
             "apikey_validate": "/api/apikeys/validate",
+            "apikey_check_permission": "/api/apikeys/check_permission",
+            "settings": "/api/settings",
         }
 
         # Built on first use: a session without retries for non-idempotent
@@ -542,6 +544,60 @@ class EnhancedAuthClient:
             )
         except Exception as e:
             return self._transport_failure(e, data={"key_prefix": api_key[:12]})
+
+    def check_api_key_permission(
+        self, api_key: str, permission: str
+    ) -> Dict[str, Any]:
+        """Validate a secret AND check its subject's permission in one call.
+
+        ``data.valid`` false → the key failed (reason as in validate_api_key);
+        true → ``data.has_permission`` answers for the key's user. The secret
+        travels in the JSON body; failure payloads echo only its prefix.
+
+        Transport failure: error dict without the answer field (or
+        ``AuthTransportError`` if ``raise_on_error=True``); check ``success``
+        before reading ``data`` — a missing ``valid`` is an outage, not a
+        denial.
+        """
+        try:
+            return self._make_request(
+                "POST",
+                self.endpoints["apikey_check_permission"],
+                json={"api_key": api_key, "permission": permission},
+            )
+        except Exception as e:
+            return self._transport_failure(
+                e, data={"key_prefix": api_key[:12], "permission": permission}
+            )
+
+    # Tenant settings (SPEC 0010)
+    def get_settings(self) -> Dict[str, Any]:
+        """This tenant's settings (``data.strict_users``).
+
+        Transport failure: error dict without the answer field (or
+        ``AuthTransportError`` if ``raise_on_error=True``); check ``success``.
+        """
+        try:
+            return self._make_request("GET", self.endpoints["settings"])
+        except Exception as e:
+            return self._transport_failure(e)
+
+    def set_strict_users(self, enabled: bool) -> Dict[str, Any]:
+        """Enable/disable strict user identity for this tenant (idempotent).
+
+        While enabled, authorization decisions about users with no live API
+        key answer negatively (``reason: user_not_key_backed``) — issue keys
+        before flipping this on.
+
+        Transport failure: error dict without the answer field (or
+        ``AuthTransportError`` if ``raise_on_error=True``); check ``success``.
+        """
+        try:
+            return self._make_request(
+                "PUT", self.endpoints["settings"], json={"strict_users": enabled}
+            )
+        except Exception as e:
+            return self._transport_failure(e, data={"strict_users": enabled})
 
     # Workflow-related methods
     def get_users_for_workflow(self, workflow_name: str) -> Dict[str, Any]:

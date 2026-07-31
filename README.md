@@ -65,10 +65,12 @@ with Client(api_key=KEY, service_url="https://auth.rodmena.app") as c:
   lifecycle, backends validate then use the RBAC checks. Client methods:
   `create_api_key`, `list_api_keys`, `revoke_api_key`, `validate_api_key`.
 - **DEPRECATED — bare user strings.** Asserting a `<user>` that no validated API
-  key backs is scheduled for decommission: 2.5.0 adds opt-in per-tenant strict
-  mode, **3.0.0 makes key-backed users mandatory** (each phase ships only after
-  every consuming platform confirms). Migrate backends to
-  `validate → user → has_permission` now. Details: [docs/DEPRECATIONS.md](docs/DEPRECATIONS.md).
+  key backs is scheduled for decommission. The opt-in phase is live (2.5.0):
+  `PUT /api/settings {"strict_users": true}` makes keyless users answer
+  negatively (`user_not_key_backed`), and `POST /api/apikeys/check_permission`
+  does validate + permission in one round trip. **3.0.0 makes key-backed users
+  mandatory** — only after every consuming platform confirms.
+  Details: [docs/DEPRECATIONS.md](docs/DEPRECATIONS.md).
 
 ## Documentation
 

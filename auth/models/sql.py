@@ -271,3 +271,25 @@ class AuthApiKey(Base):
             )
         else:
             self._label = value  # type: ignore[assignment]
+
+
+class AuthTenantSettings(Base):
+    """Per-tenant settings (SPEC 0010). One row per creator; absence of a row
+    means every default. `strict_users` gates SPEC 0008 strict user identity:
+    while true, authorization decisions about users with no live API key
+    answer negatively. Key rotation moves this row with the namespace."""
+
+    __tablename__ = "auth_tenant_settings"
+    __table_args__ = (
+        UniqueConstraint("creator", name="uq_auth_tenant_settings_creator"),
+        {
+            "sqlite_autoincrement": True,
+            "schema": _SCHEMA,
+        },
+    )
+
+    id = Column(Integer, primary_key=True, index=True)
+    creator = Column(String(64), nullable=False)
+    strict_users = Column(Boolean, nullable=False, default=False)
+    date_created = Column(DateTime, default=func.now())
+    modified = Column(DateTime, default=func.now(), onupdate=func.now())

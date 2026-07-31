@@ -315,3 +315,41 @@ def test_create_api_key_raises_under_raise_on_error():
     with make_client(raise_on_error=True) as client:
         with pytest.raises(AuthTransportError):
             client.create_api_key("alice")
+
+
+@responses.activate
+def test_check_api_key_permission_and_settings_methods():
+    responses.post(
+        f"{BASE}/api/apikeys/check_permission",
+        json={
+            "success": True,
+            "data": {"valid": True, "user": "alice", "has_permission": True},
+        },
+    )
+    responses.get(
+        f"{BASE}/api/settings",
+        json={"success": True, "data": {"strict_users": False}},
+    )
+    responses.put(
+        f"{BASE}/api/settings",
+        json={"success": True, "data": {"strict_users": True}},
+    )
+    with make_client() as client:
+        checked = client.check_api_key_permission(SECRET, "deploy")
+        assert checked["data"]["has_permission"] is True
+        assert responses.calls[0].request.body == (
+            '{"api_key": "%s", "permission": "deploy"}' % SECRET
+        ).encode()
+        assert client.get_settings()["data"]["strict_users"] is False
+        flipped = client.set_strict_users(True)
+        assert flipped["data"]["strict_users"] is True
+        assert responses.calls[2].request.body == b'{"strict_users": true}'
+
+
+@responses.activate
+def test_check_api_key_permission_failure_echoes_prefix_never_secret():
+    with make_client() as client:  # nothing registered -> connection error
+        result = client.check_api_key_permission(SECRET, "deploy")
+    assert result["success"] is False and result["transport_error"] is True
+    assert result["data"] == {"key_prefix": SECRET[:12], "permission": "deploy"}
+    assert SECRET not in str(result)

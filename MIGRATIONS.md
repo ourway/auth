@@ -85,6 +85,7 @@ no-ops. (If a restart accidentally runs first, `IF NOT EXISTS` makes the later
 | `0001_widen_text` (pre-migretti) | varchar→TEXT widening | applied in prod 2026-07; source in git history only |
 | `01KYTMDEYFVH43HKR0MQWW1EMP` | add_auth_api_key | per-user API-key registry (SPEC 0004, issuedb #9) |
 | `01KYTQN79R1ZBNDPA3ND9AAA73` | drop_alembic_version | Alembic purge (SPEC 0009, issuedb #14) |
+| `01KYTRKMWNBDDZPN1H0AXRTT5G` | add_auth_tenant_settings | per-tenant settings / strict_users (SPEC 0010, issuedb #15) |
 
 ## Note on `AuditLog.user` width
 

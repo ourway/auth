@@ -77,6 +77,7 @@ def test_rotation_reencrypts_and_moves_namespace_over_https_path(client):
         "memberships": 1,
         "permissions": 1,
         "api_keys": 0,
+        "settings": 0,
     }
 
     # New key: full access preserved — only possible if the encrypted user and
