@@ -70,16 +70,39 @@ sequence top to bottom:
     curl -X POST  -H "Authorization: Bearer $KEY" $BASE/api/permission/engineers/deploy
     # -> {{"result": true}}
 
-    # 3. put a user in the role
+    # 3. issue alice an API key  <- REQUIRED since 3.0.0, see below
+    curl -X POST  -H "Authorization: Bearer $KEY" $BASE/api/apikeys/user/alice
+    # -> {{"success": true, "data": {{"api_key": "rak_...", ...}}}}
+
+    # 4. put a user in the role
     curl -X POST  -H "Authorization: Bearer $KEY" $BASE/api/membership/alice/engineers
     # -> {{"result": true}}
 
-    # 4. ask the question that matters
+    # 5. ask the question that matters
     curl -H "Authorization: Bearer $KEY" $BASE/api/has_permission/alice/deploy
     # -> {{"success": true, "data": {{"has_permission": true}}, ...}}
 
-Users, roles and permissions are created implicitly by the calls above — there
-is no separate "create user" step.
+**Why step 3 exists.** A namespace created after 3.0.0 is **strict** by default:
+a user must hold an API key in your namespace before it can be given a role.
+Skip step 3 and step 4 answers `409 {{"reason": "user_not_key_backed",
+"result": false}}` — a permanent refusal, not a transport fault, so retrying
+never helps. Issuing the key is what makes the user real; you do not have to
+keep the returned secret if you only need the identity to exist.
+
+If your users can never hold auth API keys — you already authenticate them
+yourself, and your "users" are opaque ids — turn strict identity off once for
+your namespace instead, and skip step 3 forever:
+
+    curl -X PUT -H "Authorization: Bearer $KEY" -H "Content-Type: application/json" \
+         -d '{{"strict_users": false}}' $BASE/api/settings
+    # -> {{"success": true, "data": {{"strict_users": false}}, ...}}
+
+That opt-out is audited, per-tenant, and supported indefinitely. Namespaces
+created before 3.0.0 were grandfathered onto it automatically, which is why
+existing integrations saw no change.
+
+Roles and permissions are created implicitly by the calls above — there is no
+separate "create user" step beyond the key in step 3.
 
 ## 3. Read this before you write code
 
@@ -304,8 +327,14 @@ containing `/` changes which route matches and yields 404.
                 service_url="https://auth.rodmena.app") as c:
         c.create_role("engineers")
         c.add_permission("engineers", "deploy")
+        c.create_api_key("alice")          # strict default since 3.0.0
         c.add_membership("alice", "engineers")
         c.user_has_permission("alice", "deploy")
+
+On a namespace created after 3.0.0, `create_api_key` is what makes the user
+real; without it `add_membership` is refused with `409 user_not_key_backed`.
+If your users cannot hold auth keys, call `c.set_strict_users(False)` once for
+the namespace instead and drop that line.
 
 The two constructor arguments are `api_key` (your UUID4 client key) and
 `service_url`. `Client` is an alias of `EnhancedAuthClient`, which adds
@@ -392,9 +421,17 @@ to it.
     BASE=https://auth.rodmena.app
     curl -X POST -H "Authorization: Bearer $KEY" $BASE/api/role/engineers
     curl -X POST -H "Authorization: Bearer $KEY" $BASE/api/permission/engineers/deploy
+    curl -X POST -H "Authorization: Bearer $KEY" $BASE/api/apikeys/user/alice
     curl -X POST -H "Authorization: Bearer $KEY" $BASE/api/membership/alice/engineers
     curl        -H "Authorization: Bearer $KEY" $BASE/api/has_permission/alice/deploy
     # -> {"success": true, "data": {"has_permission": true}, ...}
+
+**Do not drop the `apikeys` line.** A namespace created after 3.0.0 is strict by
+default: a user must hold a key in your namespace before it can be given a role,
+so without it the membership call answers `409 user_not_key_backed`. If your
+users can never hold auth keys, opt the namespace out once instead:
+`curl -X PUT -H "Authorization: Bearer $KEY" -H "Content-Type: application/json"
+-d '{"strict_users": false}' $BASE/api/settings`.
 
 **The one gotcha to remember:** a write to a missing role returns
 `200 {"result": false}`, not a 4xx — check the `result`/`data` field, never just
@@ -472,8 +509,13 @@ here and at `/docs`.
     with Client(api_key=KEY, service_url="https://auth.rodmena.app") as auth:
         auth.create_role("engineers")
         auth.add_permission("engineers", "deploy")
+        auth.create_api_key("alice")                  # strict default since 3.0.0
         auth.add_membership("alice", "engineers")
         auth.user_has_permission("alice", "deploy")   # the gate you check
+
+`create_api_key` is what makes a user real on a namespace created after 3.0.0;
+without it `add_membership` returns `409 user_not_key_backed`. Users that can
+never hold auth keys? Call `auth.set_strict_users(False)` once instead.
 
 Or call the HTTP API directly in any language — `/docs` has the exact endpoint
 list and response shapes.

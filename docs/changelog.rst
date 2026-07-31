@@ -5,10 +5,24 @@ Changelog
 Version 3.0.1 (2026-07-31)
 ==========================
 
-Two consumer-reported defects from the 3.0.0 adoption round. No API change.
+Two consumer-reported defects from the 3.0.0 adoption round, plus a broken
+quickstart found while releasing them. No API change.
 
 Fixed
 -----
+
+- **The documented quickstart could not succeed on a namespace created after
+  3.0.0.** Strict user identity is the default for new namespaces, so the
+  README's third step — granting a membership straight after creating a role —
+  was refused with ``409 {"reason": "user_not_key_backed"}``. The 409 is correct
+  and unchanged; the documentation predated the flip and never taught the step
+  that satisfies it, so every brand-new user hit a wall. README and all three
+  landing-page quickstarts (``/``, ``/claude``, Python client) now issue a
+  per-user API key first, and document the per-tenant opt-out
+  (``PUT /api/settings`` with ``{"strict_users": false}``) for consumers whose
+  users can never hold auth keys. The pre-publish smoke test now mirrors the
+  documented sequence and asserts both directions, so a quickstart that cannot
+  succeed fails the release. SPEC 0015, issuedb #22.
 
 - **Importing ``auth`` in a client-only process no longer prints
   embedded-server secret warnings.** ``python -c "import auth"`` emitted the

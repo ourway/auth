@@ -24,10 +24,31 @@ BASE=https://auth.rodmena.app
 
 curl -X POST -H "Authorization: Bearer $KEY" $BASE/api/role/engineers
 curl -X POST -H "Authorization: Bearer $KEY" $BASE/api/permission/engineers/deploy
+curl -X POST -H "Authorization: Bearer $KEY" $BASE/api/apikeys/user/alice
 curl -X POST -H "Authorization: Bearer $KEY" $BASE/api/membership/alice/engineers
 curl        -H "Authorization: Bearer $KEY" $BASE/api/has_permission/alice/deploy
 # -> {"success": true, "data": {"has_permission": true}, ...}
 ```
+
+**Why the `apikeys` call is in there.** Since 3.0.0 a namespace created from a
+brand-new key is **strict**: a user must hold an API key in your namespace
+before it can be given a role. Omit that line and the membership call answers
+`409 {"reason": "user_not_key_backed", "result": false}` — a permanent refusal,
+so retrying never helps. You need not keep the returned secret if you only want
+the identity to exist.
+
+If your users can never hold auth API keys (you authenticate them yourself and
+your "users" are opaque ids), opt the namespace out once and skip that step
+forever:
+
+```bash
+curl -X PUT -H "Authorization: Bearer $KEY" -H "Content-Type: application/json" \
+     -d '{"strict_users": false}' $BASE/api/settings
+```
+
+The opt-out is audited, per-tenant, and supported indefinitely. Namespaces
+created before 3.0.0 were grandfathered onto it, which is why existing
+integrations saw no change at upgrade.
 
 With the Python client (`pip install auth`):
 
@@ -37,6 +58,7 @@ from auth import Client
 with Client(api_key=KEY, service_url="https://auth.rodmena.app") as c:
     c.create_role("engineers")
     c.add_permission("engineers", "deploy")
+    c.create_api_key("alice")                  # strict default since 3.0.0
     c.add_membership("alice", "engineers")
     c.user_has_permission("alice", "deploy")   # -> {... "has_permission": true}
 ```

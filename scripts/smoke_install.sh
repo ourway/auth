@@ -59,6 +59,16 @@ create_tables(raise_on_error=True)
 client = Authorization(str(uuid.uuid4()))
 assert client.add_role("admin", description="Administrator role") is True
 assert client.add_permission("admin", "manage_users") is True
+
+# A namespace created after 3.0.0 is strict by default: the user must hold a key
+# before it can be given a role. This mirrors the documented quickstart exactly,
+# so a README sequence that cannot succeed fails the release (issuedb #22).
+assert client.add_membership("alice@example.com", "admin") is False, (
+    "expected the strict default to refuse a keyless grant — if this passes, "
+    "the strict-by-default contract regressed"
+)
+issued = client.create_api_key("alice@example.com")
+assert issued and issued.get("api_key", "").startswith("rak_"), issued
 assert client.add_membership("alice@example.com", "admin") is True
 assert client.user_has_permission("alice@example.com", "manage_users") is True
 assert client.get_user_roles("alice@example.com") == [
