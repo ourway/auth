@@ -98,9 +98,13 @@ check "write-to-missing-role stays 200/false" \
     "$(req POST /api/membership/probe.user/ghosts "$TENANT_C" | jq -c .)" '{"result":false}'
 
 # --- served docs advertise the new endpoints (the artifact, not the source)
+# Expected version comes from the checkout being probed (override with
+# AUTH_EXPECTED_VERSION when probing a host that runs a different revision).
+REPO_ROOT="$(cd "$(dirname "$0")/../.." && pwd)"
+EXPECTED_VERSION="${AUTH_EXPECTED_VERSION:-$(grep -Po '(?<=^version = ")[^"]+' "$REPO_ROOT/pyproject.toml")}"
 DOCS=$(curl -fsS "$BASE/llms.txt?cachebust=$(uuid)")
 check "docs list /api/apikeys/user" "$(echo "$DOCS" | grep -c '/api/apikeys/user' | head -1 | awk '{print ($1>0)?1:0}')" "1"
 check "docs list /api/apikeys/validate" "$(echo "$DOCS" | grep -c '/api/apikeys/validate' | head -1 | awk '{print ($1>0)?1:0}')" "1"
-check "docs report 2.4.0" "$(echo "$DOCS" | grep -c '2\.4\.0' | head -1 | awk '{print ($1>0)?1:0}')" "1"
+check "docs report version $EXPECTED_VERSION" "$(echo "$DOCS" | grep -cF "$EXPECTED_VERSION" | head -1 | awk '{print ($1>0)?1:0}')" "1"
 
 echo "== ALL $PASS PROBES PASSED against $BASE =="
