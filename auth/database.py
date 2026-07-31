@@ -1,7 +1,7 @@
-
 """
 SQLAlchemy database session management with enterprise-grade connection pooling
 """
+
 import logging
 import os
 import sqlite3
@@ -14,7 +14,7 @@ from sqlalchemy.engine import Engine, make_url
 from sqlalchemy.orm import Session, sessionmaker
 from sqlalchemy.pool import Pool
 
-from auth.config import DatabaseType, get_settings
+from auth.config import DatabaseType, get_settings, warn_on_weak_secrets
 
 
 def _forced_sslmode(database_url: str) -> Optional[str]:
@@ -36,6 +36,7 @@ def _forced_sslmode(database_url: str) -> Optional[str]:
         return None
     return "require"
 
+
 logger = logging.getLogger(__name__)
 
 
@@ -44,6 +45,7 @@ class SingletonMeta(type):
     Thread-safe Singleton metaclass for database engine
     Ensures only one engine instance exists per process (Gunicorn worker)
     """
+
     _instances: dict[type, object] = {}
     _lock: threading.Lock = threading.Lock()
 
@@ -120,12 +122,10 @@ class DatabaseEngine(metaclass=SingletonMeta):
             pool_timeout=30,  # Wait up to 30s for a connection
             pool_recycle=3600,  # Recycle connections after 1 hour
             pool_pre_ping=True,  # Verify connections before using them
-
             # Performance settings
             echo=False,  # Disable SQL logging in production
             echo_pool=False,  # Disable pool logging (we use events instead)
             isolation_level="READ COMMITTED",  # PostgreSQL default
-
             connect_args=connect_args,
         )
 
@@ -311,6 +311,10 @@ def create_tables(raise_on_error: bool = False):
     from auth.models.sql import Base
 
     settings = get_settings()
+    # An embedded consumer reaching create_tables *is* running the server side
+    # of auth, so weak server secrets are actionable for them here (they are
+    # not for a client-only consumer, which never gets this far).
+    warn_on_weak_secrets(settings)
     try:
         if (
             settings.database_type == DatabaseType.POSTGRESQL
@@ -321,12 +325,98 @@ def create_tables(raise_on_error: bool = False):
                     text(f'CREATE SCHEMA IF NOT EXISTS "{settings.database_schema}"')
                 )
         Base.metadata.create_all(bind=engine, checkfirst=True)
+        _reconcile_text_columns(engine)
         _grandfather_strict_users(engine)
         logger.info("Tables created successfully.")
     except Exception:
         logger.exception("create_tables failed")
         if raise_on_error:
             raise
+
+
+def _reconcile_text_columns(target_engine: Engine) -> None:
+    """Widen live ``character varying`` columns to TEXT where the current models
+    declare :class:`~sqlalchemy.Text` (issuedb #21).
+
+    ``create_all(checkfirst=True)`` creates missing tables but never ALTERs an
+    existing one, so an embedded database created by a pre-2.x version keeps the
+    narrow ``varchar`` widths those versions declared. Encryption made several of
+    those columns hold ciphertext far longer than the plaintext they used to, so
+    the mismatch surfaces as ``StringDataRightTruncation`` on write — highway hit
+    exactly this on ``auth_membership.user`` (varchar(64)) when a longer email
+    was encrypted, inside ``add_membership`` (agent-mail thr-d99bb6c79b894ff69f16).
+
+    Only columns the models declare as Text are touched. A bounded ``String`` is
+    a deliberate width — ``audit_log.user`` is a 64-char fingerprint, not a user
+    identifier — and is left alone. PostgreSQL only: SQLite does not enforce
+    varchar length, so there is nothing to reconcile there.
+
+    Non-raising, like everything else in ``create_tables``: a runtime role
+    without DDL rights must still be able to start the app.
+    """
+    from sqlalchemy import Text, inspect, text
+
+    import auth.audit  # noqa: F401  (registers AuditLog in Base.metadata)
+    from auth.models.sql import Base
+
+    if target_engine.dialect.name != "postgresql":
+        return
+
+    settings = get_settings()
+    schema = settings.database_schema or None
+    inspector = inspect(target_engine)
+    try:
+        existing_tables = set(inspector.get_table_names(schema=schema))
+    except Exception:
+        logger.exception("text-column reconciliation could not list tables")
+        return
+
+    widened: list[str] = []
+    for table in Base.metadata.sorted_tables:
+        if table.name not in existing_tables:
+            continue
+        wanted = {c.name for c in table.columns if isinstance(c.type, Text)}
+        if not wanted:
+            continue
+        try:
+            live = inspector.get_columns(table.name, schema=schema)
+        except Exception:
+            logger.exception(
+                "text-column reconciliation could not inspect %s", table.name
+            )
+            continue
+        for col in live:
+            if col["name"] not in wanted:
+                continue
+            # VARCHAR carries a length; TEXT does not. Anything already
+            # unbounded needs no ALTER, which keeps this pass a no-op on a
+            # database that already matches the models.
+            if getattr(col["type"], "length", None) is None:
+                continue
+            qualified = f'"{schema}".' if schema else ""
+            stmt = (
+                f'ALTER TABLE {qualified}"{table.name}" '
+                f'ALTER COLUMN "{col["name"]}" TYPE TEXT'
+            )
+            try:
+                with target_engine.begin() as conn:
+                    conn.execute(text(stmt))
+                widened.append(f"{table.name}.{col['name']}")
+            except Exception:
+                logger.exception(
+                    "could not widen %s.%s to TEXT; a pre-2.x column width "
+                    "remains and long encrypted values may fail to write",
+                    table.name,
+                    col["name"],
+                )
+
+    if widened:
+        logger.warning(
+            "widened %d pre-2.x varchar column(s) to TEXT to match the current "
+            "models: %s",
+            len(widened),
+            ", ".join(widened),
+        )
 
 
 # Marker creator recording that the one-shot 3.0.0 grandfathering pass ran on
@@ -381,9 +471,7 @@ def _grandfather_strict_users(target_engine: Engine) -> None:
             )
         )
         conn.execute(
-            settings_t.insert().values(
-                creator=GRANDFATHER_MARKER, strict_users=False
-            )
+            settings_t.insert().values(creator=GRANDFATHER_MARKER, strict_users=False)
         )
     logger.info("strict_users grandfathering pass completed (one-shot).")
 

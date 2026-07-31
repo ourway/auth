@@ -8,7 +8,7 @@ from flask import Flask
 from flask_cors import CORS
 
 from auth.audit import setup_audit_tables
-from auth.config import get_settings, verify_audit_pepper
+from auth.config import get_settings, verify_audit_pepper, warn_on_weak_secrets
 from auth.logging_config import setup_logging
 from auth.workflow_checker import initialize_workflow_checker
 
@@ -54,7 +54,16 @@ def _init_rate_limiter(app, settings):
     )
     limiter.request_filter(
         lambda: request.path
-        in ("/ping", "/health", "/", "/docs", "/llms.txt", "/claude", "/opencode", "/codex")
+        in (
+            "/ping",
+            "/health",
+            "/",
+            "/docs",
+            "/llms.txt",
+            "/claude",
+            "/opencode",
+            "/codex",
+        )
     )
     limiter.init_app(app)
 
@@ -68,6 +77,9 @@ def create_app():
     # with a placeholder pepper. This lives here, not in Settings, so importing
     # `auth` as a client library never requires server-side secrets.
     verify_audit_pepper(settings)
+    # Same reason these are here and not in Settings: a client-only consumer
+    # signs no JWTs, so the weak-secret warnings belong to the server boot.
+    warn_on_weak_secrets(settings)
 
     # Enable CORS according to configuration (default: all origins)
     if settings.allow_cors:
@@ -85,6 +97,7 @@ def create_app():
     # Create tables on startup
     with app.app_context():
         from auth.database import create_tables
+
         create_tables()
         setup_audit_tables()  # Set up audit tables
         initialize_workflow_checker()  # Initialize workflow permission checker
@@ -118,9 +131,8 @@ app = create_app()
 
 if __name__ == "__main__":
     from auth.config import get_settings
+
     settings = get_settings()
     app.run(
-        host=settings.server_host,
-        port=settings.server_port,
-        debug=settings.debug_mode
+        host=settings.server_host, port=settings.server_port, debug=settings.debug_mode
     )

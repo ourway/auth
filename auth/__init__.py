@@ -44,6 +44,15 @@ class Authorization:
         db_session=None,
         strict_users: Optional[bool] = None,
     ):
+        # Constructing this wrapper means running auth embedded, against a real
+        # database — the one embedded path that never goes through create_app.
+        # Weak server secrets are actionable here; on a bare `import auth` by a
+        # client-only consumer they are not, which is why they are not emitted
+        # at import time (issuedb #20).
+        from auth.config import get_settings, warn_on_weak_secrets
+
+        warn_on_weak_secrets(get_settings())
+
         self.client = client
         # Use provided session or create a new one
         self.db = db_session if db_session else SessionLocal()

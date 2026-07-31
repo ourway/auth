@@ -2,6 +2,37 @@
 Changelog
 =========
 
+Version 3.0.1 (2026-07-31)
+==========================
+
+Two consumer-reported defects from the 3.0.0 adoption round. No API change.
+
+Fixed
+-----
+
+- **Importing ``auth`` in a client-only process no longer prints
+  embedded-server secret warnings.** ``python -c "import auth"`` emitted the
+  weak-``AUTH_JWT_SECRET_KEY`` and weak-``AUTH_AUDIT_PEPPER`` lines to stderr,
+  because importing the package builds the database engine singleton, which
+  constructs ``Settings``, whose validators warned. A consumer that only talks
+  to a remote service signs no JWTs and writes no audit rows, so neither line
+  was actionable — and both landed in *that consumer's* boot logs, reading as
+  their misconfiguration. The warnings now fire from the paths that actually use
+  the secrets: ``create_app`` (server boot), ``create_tables`` and the
+  ``Authorization`` wrapper (embedded), at most once per process. The
+  fail-closed ``verify_audit_pepper`` check at server boot is unchanged.
+  Reported independently by tokengate and runflow. SPEC 0013, issuedb #20.
+- **``create_tables()`` reconciles pre-2.x ``varchar`` columns to ``TEXT``.**
+  ``create_all(checkfirst=True)`` never ALTERs an existing table, so embedded
+  databases created by pre-2.x versions kept narrow ``varchar`` widths where the
+  current models declare ``Text``. Encrypted values of longer identifiers
+  overflow them, raising ``StringDataRightTruncation`` on write — highway hit
+  this on ``auth_membership.user`` inside ``add_membership``. A reconciliation
+  pass now widens exactly those columns on PostgreSQL. Columns whose models
+  declare a bounded ``String`` are untouched: ``audit_log.user`` is a 64-char
+  fingerprint by design. The pass is idempotent and non-raising, so a runtime
+  role without DDL rights still starts. SPEC 0014, issuedb #21.
+
 Version 3.0.0 (2026-07-31)
 ==========================
 

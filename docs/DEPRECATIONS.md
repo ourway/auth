@@ -74,3 +74,38 @@ behavior when the service is unreachable.
 
 Spec: `SPECS/0007-decomm-legacy-transport-errors.md` · ticket auth#12. Same
 all-consumers-confirm gate, tracked independently of deprecation 1.
+
+## 3. Embedded databases created before 2.x: narrow `varchar` columns (auto-reconciled in 3.0.1)
+
+**Applies to:** embedded consumers only (you call `create_tables()` against your own
+PostgreSQL). Hosted REST consumers are unaffected.
+
+`Base.metadata.create_all(checkfirst=True)` creates missing tables but **never ALTERs an
+existing one**. A database first created by a pre-2.x version therefore keeps the narrow
+`varchar` widths that version declared, even though the current models declare `Text` for
+those columns. Encryption made several of them hold ciphertext considerably longer than
+the plaintext they used to, so the mismatch surfaces at write time as
+`StringDataRightTruncation` — most visibly on `auth_membership.user` inside
+`add_membership`, when a longer identifier is encrypted.
+
+**SHIPPED in 3.0.1:** `create_tables()` now runs a reconciliation pass that widens live
+`character varying` columns to `TEXT` wherever the current model metadata declares `Text`.
+It is idempotent (a matching database gets no `ALTER`s), PostgreSQL-only (SQLite does not
+enforce varchar length), schema-aware, and non-raising — a runtime role without DDL rights
+logs the failure and still starts.
+
+Columns whose models declare a **bounded** `String` are deliberately left alone.
+`audit_log.user` stays `varchar(64)`: it stores a fitted fingerprint, not a user
+identifier, and widening it would erase an intentional bound.
+
+If your runtime role lacks DDL rights, apply the equivalent by hand once, as a DBA:
+
+```sql
+ALTER TABLE auth_membership ALTER COLUMN "user" TYPE TEXT;
+```
+
+…and likewise for any column the startup log names in its
+`could not widen …` warning.
+
+Reported by highway (agent-mail `thr-d99bb6c79b894ff69f16`) after reconciling seven such
+columns by hand. Spec: `SPECS/0014-text-column-reconciliation.md` · ticket auth#21.

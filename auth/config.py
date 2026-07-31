@@ -1,4 +1,3 @@
-
 """
 Centralized configuration management for the authorization system
 """
@@ -7,7 +6,7 @@ import os
 from enum import Enum
 from functools import lru_cache
 
-from pydantic import Field, field_validator, model_validator
+from pydantic import Field, model_validator
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
 
@@ -39,16 +38,13 @@ class Settings(BaseSettings):
     """Configuration class for the authorization system"""
 
     model_config = SettingsConfigDict(
-        env_file=".env",
-        env_file_encoding="utf-8",
-        extra="ignore",
-        env_prefix="AUTH_"
+        env_file=".env", env_file_encoding="utf-8", extra="ignore", env_prefix="AUTH_"
     )
 
     # Database settings
     database_type: DatabaseType = DatabaseType.SQLITE
     database_url: str = Field("", validate_default=True)
-    sqlite_path: str = Field(default= "~/.auth.sqlite3")
+    sqlite_path: str = Field(default="~/.auth.sqlite3")
     postgresql_url: str = ""
 
     # JWT settings
@@ -122,39 +118,10 @@ class Settings(BaseSettings):
             )
         return self
 
-    @field_validator("jwt_secret_key")
-    @classmethod
-    def validate_secret_key(cls, v: str) -> str:
-        if v in _KNOWN_WEAK_SECRETS:
-            import logging
-            logger = logging.getLogger(__name__)
-            logger.warning(
-                "AUTH_JWT_SECRET_KEY is a weak/placeholder value. "
-                "Set a strong secret for production."
-            )
-        return v
 
-    @model_validator(mode="after")
-    def warn_on_weak_audit_pepper(self) -> "Settings":
-        """Warn (never raise) when the effective audit pepper is weak.
-
-        Constructing Settings must not fail: ``auth`` is also a client library,
-        and ``pip install auth; from auth import Client`` to talk to a remote
-        service needs no pepper at all. The hard, fail-closed check belongs to
-        the *server* boot path — see :func:`verify_audit_pepper`, called by
-        ``auth.main.create_app``.
-        """
-        if self.enable_audit_logging and not self.debug_mode and audit_pepper_is_weak(
-            self
-        ):
-            import logging
-
-            logging.getLogger(__name__).warning(
-                "AUTH_AUDIT_PEPPER is unset, a placeholder, or too short; audit "
-                "key fingerprints are not offline-guess resistant. Set a strong "
-                "value before serving traffic."
-            )
-        return self
+def jwt_secret_is_weak(settings: "Settings") -> bool:
+    """Whether the configured JWT signing secret is a known placeholder."""
+    return settings.jwt_secret_key in _KNOWN_WEAK_SECRETS
 
 
 def audit_pepper_is_weak(settings: "Settings") -> bool:
@@ -167,12 +134,55 @@ def audit_pepper_is_weak(settings: "Settings") -> bool:
     return pepper in _KNOWN_WEAK_SECRETS or len(pepper) < 16
 
 
+_weak_secret_warnings_emitted = False
+
+
+def warn_on_weak_secrets(settings: "Settings") -> None:
+    """Warn (never raise) about weak server secrets, at most once per process.
+
+    Call this from the paths that actually *use* these secrets — server boot and
+    the embedded entry points — never from ``Settings`` construction. ``auth`` is
+    also a client library: ``pip install auth; from auth import Client`` to talk
+    to a remote service signs no JWTs and writes no audit rows, so these
+    warnings are unactionable for such a consumer. Emitting them at import time
+    put two secrets-shaped lines in every REST consumer's boot logs, where they
+    read as *that consumer's* misconfiguration and train operators to ignore
+    secret warnings (tokengate report thr-b7e8b0c2c7914d56b6f1, runflow note
+    thr-44794b4bbb6448c2bc01).
+
+    The hard, fail-closed pepper check remains :func:`verify_audit_pepper`.
+    """
+    global _weak_secret_warnings_emitted
+    if _weak_secret_warnings_emitted:
+        return
+    _weak_secret_warnings_emitted = True
+
+    import logging
+
+    logger = logging.getLogger(__name__)
+    if jwt_secret_is_weak(settings):
+        logger.warning(
+            "AUTH_JWT_SECRET_KEY is a weak/placeholder value. "
+            "Set a strong secret for production."
+        )
+    if (
+        settings.enable_audit_logging
+        and not settings.debug_mode
+        and audit_pepper_is_weak(settings)
+    ):
+        logger.warning(
+            "AUTH_AUDIT_PEPPER is unset, a placeholder, or too short; audit "
+            "key fingerprints are not offline-guess resistant. Set a strong "
+            "value before serving traffic."
+        )
+
+
 def verify_audit_pepper(settings: "Settings") -> None:
     """Fail closed on a weak audit pepper — called when the SERVER starts.
 
     A placeholder pepper makes the audit trail's key fingerprints computable, so
     a server that writes audit rows must not run with one. Importing the package
-    as a library is unaffected (see :meth:`Settings.warn_on_weak_audit_pepper`).
+    as a library is unaffected (see :func:`warn_on_weak_secrets`).
     """
     if settings.enable_audit_logging and not settings.debug_mode:
         if audit_pepper_is_weak(settings):
@@ -186,5 +196,3 @@ def verify_audit_pepper(settings: "Settings") -> None:
 @lru_cache()
 def get_settings() -> Settings:
     return Settings()  # type: ignore[call-arg]
-
-
