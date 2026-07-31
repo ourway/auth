@@ -406,12 +406,23 @@ is the only copy. See `/docs`.
 
 ## Per-user API keys & strict identity
 
-auth also manages **API keys for your end users** (since 2.4):
-`POST /api/apikeys/user/<user>` mints a `rak_...` secret — shown exactly once,
-only its SHA-256 is stored — and your backend resolves it back to the user with
-`POST /api/apikeys/validate`, or validates AND checks a permission in one round
-trip with `POST /api/apikeys/check_permission`. Revoking a key cuts that user's
-access end to end.
+auth also manages **API keys for your end users** (since 2.4). Same
+`Authorization: Bearer <your-client-key>` header as every `/api/` call; the
+path names the END USER the key is for (methods are uppercase — `-X POST`):
+
+    curl -X POST -H "Authorization: Bearer $KEY" \\
+         $BASE/api/apikeys/user/alice
+    # -> {"data": {"api_key": "rak_<43 chars — shown ONCE, store it>", ...}}
+
+    curl -X POST -H "Authorization: Bearer $KEY" \\
+         -H "Content-Type: application/json" \\
+         -d '{"api_key": "rak_..."}' $BASE/api/apikeys/validate
+    # -> {"data": {"valid": true, "user": "alice", ...}}
+
+The secret is shown exactly once — only its SHA-256 is stored. Validate AND
+check a permission in one round trip with `POST /api/apikeys/check_permission`
+(body: `{"api_key": ..., "permission": ...}`). Revoking a key
+(`DELETE /api/apikeys/user/alice/<key_id>`) cuts that user's access end to end.
 
 Since **3.0.0, new tenants are strict by default**: authorization decisions
 answer only for key-backed users (create the key first, then grant roles — a
