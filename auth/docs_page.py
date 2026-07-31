@@ -404,6 +404,24 @@ the status code. The full reference lists three more surprises like it.
 and moves your whole namespace onto it in one shot — capture the returned key, it
 is the only copy. See `/docs`.
 
+## Per-user API keys & strict identity
+
+auth also manages **API keys for your end users** (since 2.4):
+`POST /api/apikeys/user/<user>` mints a `rak_...` secret — shown exactly once,
+only its SHA-256 is stored — and your backend resolves it back to the user with
+`POST /api/apikeys/validate`, or validates AND checks a permission in one round
+trip with `POST /api/apikeys/check_permission`. Revoking a key cuts that user's
+access end to end.
+
+Since **3.0.0, new tenants are strict by default**: authorization decisions
+answer only for key-backed users (create the key first, then grant roles — a
+key-less grant answers **409** `user_not_key_backed`), and
+`PUT /api/settings {"strict_users": false}` is the audited per-tenant opt-out
+for platforms that authenticate their own users. Tenants that existed before
+3.0.0 were grandfathered with an explicit opt-out row and saw no change. The
+Python client raises `AuthTransportError` on transport failure (3.0) — an
+outage can never read as a denial. Full detail: `/docs` sections 3–6.
+
 ## Guides
 
 | Path | For |
@@ -467,6 +485,19 @@ key) mints a fresh key, atomically moves the whole namespace onto it, and return
 cutover: the old key instantly owns nothing. The client method also switches the
 live instance (and its session header) to the new key. Rotate on any suspected
 leak, and update every consumer with the returned key.
+
+## Per-user API keys & strict identity
+
+`auth.create_api_key("alice")` mints a `rak_...` secret for an end user
+(returned exactly once — hand it to that user; auth stores only its SHA-256);
+`auth.validate_api_key(secret)` resolves it back to the user;
+`auth.check_api_key_permission(secret, "deploy")` does validate + permission in
+one call. **Since 3.0.0 new tenants are strict by default:** create the user's
+key BEFORE granting roles (a key-less grant answers 409, reason
+`user_not_key_backed`), or opt the tenant out with
+`auth.set_strict_users(False)` if your app authenticates its own users. On
+transport failure every client method raises `AuthTransportError` — map it to
+your unavailable/503 path, never to a permission denial.
 
 ## Four contract surprises (they are the design, not bugs)
 
