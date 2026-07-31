@@ -19,10 +19,11 @@ configured PostgreSQL schema (`AUTH_DATABASE_SCHEMA`, e.g. `auth_rbac`).
   selected via `MG_DATABASE_URL`). Every migration must mirror what the
   SQLAlchemy models would emit and use `IF NOT EXISTS`, so the boot-time
   `create_all(checkfirst=True)` and `mg apply` converge in either order.
-- **Legacy Alembic** is retired: its single revision (`0001_widen_text`,
-  applied in production) is frozen in `migrations_legacy_alembic/` for history
-  and stays loadable (`tests/test_migrations.py`). Never author new Alembic
-  revisions.
+- **Alembic is fully purged** (2.4.1): no tree, no config, no dependency. Its
+  single historical revision (`0001_widen_text`, a varchar→TEXT widening that
+  production already carries) exists in **git history only**, and the
+  `alembic_version` tracking table is dropped by migration
+  `drop_alembic_version`.
 
 ## Provisioning / upgrading (operator, with a DDL-capable role)
 
@@ -81,8 +82,9 @@ no-ops. (If a restart accidentally runs first, `IF NOT EXISTS` makes the later
 
 | id | name | notes |
 |---|---|---|
-| `0001_widen_text` (alembic, retired) | varchar→TEXT widening | applied in prod; frozen in `migrations_legacy_alembic/` |
+| `0001_widen_text` (pre-migretti) | varchar→TEXT widening | applied in prod 2026-07; source in git history only |
 | `01KYTMDEYFVH43HKR0MQWW1EMP` | add_auth_api_key | per-user API-key registry (SPEC 0004, issuedb #9) |
+| `01KYTQN79R1ZBNDPA3ND9AAA73` | drop_alembic_version | Alembic purge (SPEC 0009, issuedb #14) |
 
 ## Note on `AuditLog.user` width
 

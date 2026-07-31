@@ -4,7 +4,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "auth"
-version = "2.4.0"
+version = "2.4.1"
 description = "Authorization for humans"
 readme = "README.md"
 requires-python = ">=3.9"
@@ -58,17 +58,15 @@ dependencies = [
 ratelimit = [
     "flask-limiter>=3.0.0",
 ]
-# Database schema migrations. migretti (house standard) authors and applies
-# NEW migrations; alembic remains only to read the retired legacy tree in
-# migrations_legacy_alembic/. Not required to import or serve the app.
+# Database schema migrations (migretti, SQL-first house standard). Not
+# required to import or serve the app.
 migrations = [
     "migretti>=0.10.0",
-    "alembic>=1.13.0",
 ]
 dev = [
     "pytest>=6.0",
     "pytest-cov>=2.0",
-    "alembic>=1.13.0",
+    "migretti>=0.10.0",
     "ruff>=0.0.260",
     "mypy>=1.0",
     "types-requests",

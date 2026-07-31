@@ -503,26 +503,23 @@ def create_user_with_role(session: Session, user_data: dict, role: str):
 
 ### Database Migration
 
-Integrate Auth migrations with your migration system:
+Integrate Auth migrations with your migration system (auth itself uses
+**migretti**, SQL-first — `mg create <name>` then fill the up/down sections):
 
-```bash
-# Alembic migration example
-# migrations/versions/xxx_add_auth_tables.py
+```sql
+-- migration: add_auth_tables
+-- migrate: up
+-- Auth tables are created automatically when the first Authorization
+-- instance (or the server) starts: create_all(checkfirst=True).
+SELECT 1;
 
-from alembic import op
-from auth.models.sql import Base
-
-def upgrade():
-    # Auth tables will be created automatically
-    # when first Authorization instance is created
-    pass
-
-def downgrade():
-    op.drop_table('permission_groups')
-    op.drop_table('membership_groups')
-    op.drop_table('auth_permission')
-    op.drop_table('auth_membership')
-    op.drop_table('auth_group')
+-- migrate: down
+DROP TABLE IF EXISTS permission_groups;
+DROP TABLE IF EXISTS membership_groups;
+DROP TABLE IF EXISTS auth_api_key;
+DROP TABLE IF EXISTS auth_permission;
+DROP TABLE IF EXISTS auth_membership;
+DROP TABLE IF EXISTS auth_group;
 ```
 
 ---

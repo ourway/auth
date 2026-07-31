@@ -78,9 +78,10 @@ All jobs must be green. See [SPECS/0002-github-ci.md](SPECS/0002-github-ci.md).
 
 ## Migrations
 
-New PostgreSQL migrations use **migretti** (SQL-first), not Alembic — see
+PostgreSQL migrations use **migretti** (SQL-first) — see
 [MIGRATIONS.md](MIGRATIONS.md). Schema *creation* stays with `create_all` at boot;
-migrations own *changes*.
+migrations own *changes*. (The project's pre-migretti history lives in git
+history only.)
 
 ## Commits & pull requests
 

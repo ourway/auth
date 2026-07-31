@@ -6,7 +6,7 @@ bind = "127.0.0.1:4000"
 backlog = 2048
 
 # Worker processes
-workers = 8
+workers = 2
 worker_class = "sync"
 worker_connections = 1000
 timeout = 30

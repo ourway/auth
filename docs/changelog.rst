@@ -20,6 +20,21 @@ Deprecated
   same all-consumers gate — ``SPECS/0007``). Construct with ``raise_on_error=True``
   and catch ``AuthTransportError`` now; in 3.0.0 raising becomes the only behavior.
 
+Version 2.4.1 (2026-07-31)
+==========================
+
+Removed
+-------
+
+- **Alembic, entirely.** The frozen legacy tree, ``alembic.ini``, the legacy
+  round-trip test, and the ``alembic`` entries in the ``migrations``/``dev``
+  extras are gone; migration ``drop_alembic_version`` removes the
+  ``alembic_version`` tracking table from deployments (its down restores the
+  table and its single recorded revision). The one historical revision
+  (``0001_widen_text``) lives in git history only. ``pip install
+  auth[migrations]`` now installs migretti alone. No runtime or API behavior
+  changes.
+
 Version 2.4.0 (2026-07-30)
 ==========================
 

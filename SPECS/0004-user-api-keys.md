@@ -46,6 +46,8 @@
 12. The schema change shall ship as the project's first migretti migration (Alembic retired to a
     legacy path), with SQL mirroring the SQLAlchemy model so `create_all(checkfirst=True)` and
     `mg apply` converge in either order.
+    *(Addendum 2026-07-31: the legacy path itself was subsequently purged — SPEC 0009 /
+    issuedb #14; pre-migretti history is git-history-only.)*
 
 ## Notes
 
