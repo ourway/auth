@@ -155,7 +155,12 @@ adds for key-less subjects answer **409** `{{"result": false, "reason":
 success; check `result` on writes regardless). Create the key first, then grant
 roles: key creation committing before the grant is a contract, with no eventual
 consistency in between. Strict mode never blocks key issuance or any
-delete/revoke path. 3.0.0 makes strict identity the default — the audited
+delete/revoke path. The `reason` field is **stable contract** (only ever
+present on strict blocks). A strict block on read decisions is an **HTTP
+200** — transport-failure handling (retries, breakers, fallbacks) will not
+fire on it; tenants that deliberately hold `strict_users: false` should assert
+that value in their deploy/health checks so an unexpected flip alarms instead
+of silently zeroing entitlements. 3.0.0 makes strict identity the default — the audited
 per-tenant opt-out survives for platforms that authenticate their own callers —
 and ships only after every consuming platform has confirmed readiness. Migrate
 now: issue keys to your users, derive the user from `/api/apikeys/validate` —

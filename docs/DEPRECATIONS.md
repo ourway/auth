@@ -40,6 +40,21 @@ consistency in the strict check. `POST /api/apikeys/user/<user>` returns success
 after the key row commits; a subsequent membership write or decision check — same
 request or later — sees the key.
 
+**The `reason` field is stable contract.** `"user_not_key_backed"` will not be renamed,
+dropped, or re-scoped short of a major version with its own bus-notice-and-confirm
+cycle. It appears ONLY on strict blocks — a key-backed user lacking a permission stays
+a plain denial — so it is the one signal separating "strict mode changed the answer"
+from "this user genuinely has no entitlements". Note that strict mode adds a NEW,
+per-user cause to what was previously a deploy-time-only silent path (missing role):
+check `result` and `reason` on writes, always.
+
+**A strict block on read decisions is an HTTP 200.** It is not a transport failure, not
+a 4xx, not an exception — retries, circuit breakers, and stale-cache fallbacks will NOT
+fire on it. If your tenant deliberately holds `strict_users: false`, your safety rests
+on that one remote boolean: assert `GET /api/settings` → `strict_users: false` in your
+deploy verification and health checks, so an unexpected flip surfaces as an alarm
+rather than as every customer simultaneously losing entitlements.
+
 Spec: `SPECS/0008-strict-user-identity.md` · ticket auth#13. Enforcement deploys only
 after all client confirmations are on the ticket ledger.
 
