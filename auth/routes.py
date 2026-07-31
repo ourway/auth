@@ -194,7 +194,13 @@ def register_routes(app):
         if not result:
             reason = _strict_reason(auth_service, user)
             if reason:
-                return jsonify({"result": result, "reason": reason})
+                # 409, not 200-with-false: two consumers independently showed
+                # that a refused grant answering 200 gets written past
+                # (raise_for_status passes, result goes unchecked) and turns
+                # strict mode into silent dead-key provisioning. Strict mode is
+                # opt-in, so the shape may differ there; the documented
+                # missing-role 200-false below is untouched.
+                return jsonify({"result": False, "reason": reason}), 409
 
         return jsonify({"result": result})
 

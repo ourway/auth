@@ -134,9 +134,19 @@ def test_strict_blocks_membership_add_but_never_removal(client):
     _seed_rbac(client, key, user="bob")  # bob is a member while strict is off
     client.put("/api/settings", headers=h, json={"strict_users": True})
 
-    # Adds for keyless users are refused with the 200-false convention.
-    add = client.post("/api/membership/carol/engineers", headers=h).get_json()
-    assert add == {"result": False, "reason": "user_not_key_backed"}
+    # Adds for keyless users are refused with an unmissable 409 (a 200 here
+    # was shown by two consumers to be silently written past).
+    add = client.post("/api/membership/carol/engineers", headers=h)
+    assert add.status_code == 409
+    assert add.get_json() == {"result": False, "reason": "user_not_key_backed"}
+    # The documented missing-role no-op keeps its 200-false shape even in
+    # strict tenants — only the key-less refusal is a 409.
+    ghost_role = client.post("/api/membership/carol/ghosts", headers=h)
+    assert ghost_role.status_code == 409  # carol is still key-less: strict wins
+    client.post("/api/apikeys/user/dave", headers=h)
+    keyed_ghost = client.post("/api/membership/dave/ghosts", headers=h)
+    assert keyed_ghost.status_code == 200
+    assert keyed_ghost.get_json() == {"result": False}
 
     # Removal is NEVER strict-gated: revocation must always work.
     rm = client.delete("/api/membership/bob/engineers", headers=h).get_json()

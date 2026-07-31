@@ -147,13 +147,19 @@ secrets keep validating afterwards.
 That is being retired. **Since 2.5.0 the opt-in phase is live**: enable strict
 mode with `PUT /api/settings` `{{"strict_users": true}}` and authorization
 decisions about users with no active API key answer negatively (same response
-shapes, additive reason `user_not_key_backed`); membership adds for key-less
-users return `{{"result": false}}` — create the key first, then grant roles.
-Strict mode never blocks key issuance or any delete/revoke path. 3.0.0 makes
-strict identity the default, and ships only after every consuming platform has
-confirmed readiness. Migrate now: issue keys to your users, derive the user
-from `/api/apikeys/validate` — or do both steps in one round trip with
-`POST /api/apikeys/check_permission`.
+shapes, additive reason `user_not_key_backed`). Gated decisions: has_permission,
+the membership check, user_permissions (answers `count: 0` + reason), workflow
+can_run. NOT gated: user_roles, members and every other listing. Membership
+adds for key-less subjects answer **409** `{{"result": false, "reason":
+"user_not_key_backed"}}` (since 2.5.1 — a refused grant must not look like
+success; check `result` on writes regardless). Create the key first, then grant
+roles: key creation committing before the grant is a contract, with no eventual
+consistency in between. Strict mode never blocks key issuance or any
+delete/revoke path. 3.0.0 makes strict identity the default — the audited
+per-tenant opt-out survives for platforms that authenticate their own callers —
+and ships only after every consuming platform has confirmed readiness. Migrate
+now: issue keys to your users, derive the user from `/api/apikeys/validate` —
+or do both steps in one round trip with `POST /api/apikeys/check_permission`.
 
 ## 4. Endpoints
 

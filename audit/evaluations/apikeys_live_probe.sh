@@ -110,8 +110,11 @@ req PUT /api/settings "$TENANT_S" '{"strict_users": true}' >/dev/null
 check "strict ON: keyless user blocked with reason" \
     "$(req GET /api/has_permission/strict.user/probe_things "$TENANT_S" | jq -cS '.data')" \
     '{"has_permission":false,"reason":"user_not_key_backed"}'
-check "strict ON: membership add for keyless user refused" \
-    "$(req POST /api/membership/other.user/probers "$TENANT_S" | jq -cS .)" \
+REFUSAL=$(curl -sS -X POST -H "Authorization: Bearer $TENANT_S" \
+    -w '|%{http_code}' "$BASE/api/membership/other.user/probers")
+check "strict ON: membership add for keyless user is 409" "${REFUSAL##*|}" "409"
+check "strict ON: 409 body carries the reason" \
+    "$(echo "${REFUSAL%|*}" | jq -cS .)" \
     '{"reason":"user_not_key_backed","result":false}'
 STRICT_SECRET=$(req POST "/api/apikeys/user/strict.user" "$TENANT_S" | jq -r .data.api_key)
 check "strict ON: key issuance releases the block (cap works both ways)" \

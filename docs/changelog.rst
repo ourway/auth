@@ -2,6 +2,24 @@
 Changelog
 =========
 
+Version 2.5.1 (2026-07-31)
+==========================
+
+Changed
+-------
+
+- **Strict-mode membership refusal is now HTTP 409** with body
+  ``{"result": false, "reason": "user_not_key_backed"}`` (was 200-with-false).
+  Adopted after two consumers independently showed that a refused grant
+  answering 200 gets written past (``raise_for_status()`` passes, ``result``
+  goes unchecked), turning strict mode into silent dead-key provisioning.
+  Strict mode is opt-in with no adopters yet, so the shape could still change
+  safely; non-strict tenants are byte-identical (the documented missing-role
+  ``200 {"result": false}`` is untouched). Docs now state explicitly which
+  endpoints strict mode gates (``user_permissions`` is gated; ``user_roles``
+  and all listings are not) and that key-creation-before-grant ordering is a
+  transactional contract.
+
 Version 2.5.0 (2026-07-31)
 ==========================
 

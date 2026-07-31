@@ -19,6 +19,11 @@
    check, `user_permissions`, workflow `can_run`, or a membership add is asked about a
    user with no active, unexpired API key, the service shall answer negatively in the
    existing response shape with additive reason `user_not_key_backed`.
+   *(Refined in 2.5.1, issuedb #16, after independent reports from sponsorsignal and
+   runflow: the membership-ADD refusal answers HTTP **409** with
+   `{"result": false, "reason": "user_not_key_backed"}` so status-only callers cannot
+   read a refused grant as success. Read-decision shapes are unchanged; non-strict
+   tenants are unchanged, including the documented missing-role 200-false.)*
 4. When `strict_users` is false or unset, all behavior shall be byte-identical to
    2.4.1.
 5. The service shall expose `POST /api/apikeys/check_permission` with JSON
