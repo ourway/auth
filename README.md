@@ -63,7 +63,10 @@ with Client(api_key=KEY, service_url="https://auth.rodmena.app") as c:
   mints `rak_...` secrets for *your users*, shows each exactly once, stores only
   a hash, and validates them inside your namespace — an identity UI fronts the
   lifecycle, backends validate then use the RBAC checks. Client methods:
-  `create_api_key`, `list_api_keys`, `revoke_api_key`, `validate_api_key`.
+  `create_api_key`, `list_api_keys`, `revoke_api_key`, `validate_api_key`,
+  `check_api_key_permission` (validate + permission in one round trip), plus
+  `get_settings`/`set_strict_users`. All of these also exist on the in-process
+  `Authorization` wrapper for embedded consumers.
 - **DEPRECATED — bare user strings.** Asserting a `<user>` that no validated API
   key backs is scheduled for decommission. The opt-in phase is live (2.5.0):
   `PUT /api/settings {"strict_users": true}` makes keyless users answer

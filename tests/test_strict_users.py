@@ -301,6 +301,51 @@ def test_settings_update_is_audited(client):
         session.close()
 
 
+def test_authorization_wrapper_embedded_strict_flow():
+    """Embedded consumers (Authorization wrapper) get REST-identical strict
+    semantics: same setting row, same gates, same release-on-key-issuance."""
+    import uuid as _uuid
+
+    from auth import Authorization
+    from auth.database import SessionLocal
+    from auth.main import create_app
+
+    create_app()
+    tenant = str(_uuid.uuid4())
+    db = SessionLocal()
+    try:
+        wrapper = Authorization(client=tenant, db_session=db)
+        assert wrapper.add_role("ops") is True
+        assert wrapper.add_permission("ops", "deploy") is True
+        assert wrapper.add_membership("erin", "ops") is True
+        assert wrapper.user_has_permission("erin", "deploy") is True
+
+        assert wrapper.get_settings() == {"strict_users": False}
+        wrapper.set_strict_users(True)
+        # Fresh wrapper (no per-instance cache) sees the flip and blocks.
+        strict = Authorization(client=tenant, db_session=db)
+        assert strict.user_has_permission("erin", "deploy") is False
+
+        created = strict.create_api_key("erin", label="svc erin")
+        assert created is not None and created["api_key"].startswith("rak_")
+        assert strict.user_has_permission("erin", "deploy") is True
+        checked = strict.check_api_key_permission(created["api_key"], "deploy")
+        assert checked["valid"] is True and checked["has_permission"] is True
+        assert strict.list_api_keys("erin")[0]["label"] == "svc erin"
+        assert (
+            strict.revoke_api_key("erin", created["key_id"]) == "revoked"
+        )
+        assert strict.validate_api_key(created["api_key"]) == {
+            "valid": False,
+            "reason": "revoked",
+        }
+        # Explicit per-instance override pins behavior regardless of the row.
+        pinned_off = Authorization(client=tenant, db_session=db, strict_users=False)
+        assert pinned_off.user_has_permission("erin", "deploy") is True
+    finally:
+        db.close()
+
+
 def test_in_process_service_override_param():
     """Library callers pin strict behavior explicitly, DB row ignored."""
     import uuid as _uuid

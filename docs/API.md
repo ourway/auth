@@ -634,6 +634,41 @@ curl -X POST -H "Authorization: Bearer YOUR-UUID4-KEY" \
   http://localhost:5000/api/apikeys/validate
 ```
 
+#### Check API Key Permission (one round trip)
+Validates the secret AND answers its subject's effective permission.
+
+**Endpoint:** `POST /api/apikeys/check_permission`
+
+**Authentication:** Required
+
+**Body:** `{"api_key": "rak_...", "permission": "deploy"}`
+
+**Response (wrapped):** `data` = `{"valid": true, "user": "alice", "key_id": "...", "has_permission": true}`; invalid keys answer exactly like Validate (`{"valid": false, "reason": ...}`, no permission evaluation).
+
+---
+
+### Tenant Settings & Strict User Identity
+
+One switch today: `strict_users` (see docs/DEPRECATIONS.md for the decommission
+timeline; 3.0.0 flips the default while this per-tenant opt-out survives).
+
+#### Get Settings
+**Endpoint:** `GET /api/settings` — **Response (wrapped):** `data` = `{"strict_users": false}` (defaults when never set)
+
+#### Update Settings
+**Endpoint:** `PUT /api/settings` — **Body:** `{"strict_users": true|false}` (audited, idempotent upsert)
+
+While `strict_users` is true for your tenant, decisions about users with no
+active API key answer negatively with additive, stable `reason:
+"user_not_key_backed"`: `has_permission`, the membership check,
+`user_permissions` (`count: 0`), workflow `can_run` — and a membership ADD for
+a key-less subject answers **HTTP 409** `{"result": false, "reason":
+"user_not_key_backed"}`. Listings (`user_roles`, `members`, `roles`, ...) are
+never filtered, and key issuance plus every delete/revoke path are never
+gated. A strict block on read endpoints is an HTTP **200** — transport-failure
+handling does not cover it. Key-creation-before-grant ordering is a
+transactional contract.
+
 ---
 
 ## Error Codes
@@ -644,6 +679,7 @@ curl -X POST -H "Authorization: Bearer YOUR-UUID4-KEY" \
 | 400 | Bad Request - Invalid input parameters |
 | 401 | Unauthorized - Missing or invalid authentication |
 | 404 | Not Found - Resource does not exist |
+| 409 | Conflict - strict-mode membership grant refused (`user_not_key_backed`) |
 | 500 | Internal Server Error |
 
 ## Rate Limiting

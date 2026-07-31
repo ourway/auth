@@ -3,17 +3,38 @@
 SQLAlchemy database session management with enterprise-grade connection pooling
 """
 import logging
+import os
 import sqlite3
 import threading
 from contextlib import contextmanager
 from typing import Generator, Optional
 
 from sqlalchemy import create_engine, event, pool
-from sqlalchemy.engine import Engine
+from sqlalchemy.engine import Engine, make_url
 from sqlalchemy.orm import Session, sessionmaker
 from sqlalchemy.pool import Pool
 
 from auth.config import DatabaseType, get_settings
+
+
+def _forced_sslmode(database_url: str) -> Optional[str]:
+    """The sslmode to force via connect_args, or None to leave it alone.
+
+    Secure-by-default SSL for remote hosts — but never overriding an explicit
+    caller choice. connect_args beat URL conninfo in psycopg, so forcing
+    sslmode here would silently discard a ``?sslmode=...`` the caller wrote
+    (highway report, agent-mail thr-7745c815fd0a425cabac). Precedence:
+    URL sslmode param > PGSSLMODE env > require-for-remote. The host is
+    decided by component comparison, not URL substring — a URL carrying
+    ``?fallback_application_name=localhost`` must not skip SSL.
+    """
+    url = make_url(database_url)
+    if "sslmode" in url.query or os.environ.get("PGSSLMODE"):
+        return None
+    host = (url.host or "").lower()
+    if host in ("localhost", "127.0.0.1", "::1"):
+        return None
+    return "require"
 
 logger = logging.getLogger(__name__)
 
@@ -86,9 +107,9 @@ class DatabaseEngine(metaclass=SingletonMeta):
             "options": "-c statement_timeout=30000",  # 30 seconds
         }
 
-        # Enable SSL for remote connections
-        if "localhost" not in database_url and "127.0.0.1" not in database_url:
-            connect_args["sslmode"] = "require"
+        forced = _forced_sslmode(database_url)
+        if forced:
+            connect_args["sslmode"] = forced
 
         return create_engine(
             database_url,

@@ -91,6 +91,26 @@ service guarantees; the threat notes are what it deliberately does **not**.
 - At most **25 active keys per (tenant, user)** bounds abuse; create/list/revoke/
   validate are audited (fingerprints only — never the secret or its hash).
 
+### Strict user identity (opt-in; 3.0.0 default with surviving opt-out)
+
+- `PUT /api/settings {"strict_users": true}` (audited) makes authorization
+  decisions answer negatively for subjects holding no live API key — revocation
+  becomes end-to-end: revoke a user's last key and their answers turn negative
+  immediately. The `reason: "user_not_key_backed"` field is **stable contract**
+  and appears only on strict blocks; a refused membership grant is an HTTP 409
+  so it can never be read as success. Enforcement lives at decision points in
+  the service layer (identical for REST and embedded callers); listings, key
+  issuance, and every delete/revoke path are never gated. Tenants that perform
+  their own end-user authentication (machine/synthetic subjects) legitimately
+  hold `strict_users: false` — the per-tenant opt-out survives the 3.0.0
+  default flip. See docs/DEPRECATIONS.md.
+
+### Transport security (embedded mode)
+
+- The PostgreSQL engine defaults `sslmode=require` for remote hosts, decided by
+  host-component comparison; an explicit URL `?sslmode=...` or `PGSSLMODE` is
+  always honored and never overridden (precedence fixed in 2.5.2).
+
 ## Threat notes (by design)
 
 - **Authentication is out of scope.** `auth` trusts the caller already knows who

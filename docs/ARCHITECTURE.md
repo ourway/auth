@@ -142,6 +142,11 @@ erDiagram
     datetime expires_at
     datetime last_used_at
   }
+  AUTH_TENANT_SETTINGS {
+    int id PK
+    string creator "tenant, unique"
+    bool strict_users "SPEC 0008 gate, default false"
+  }
   AUDIT_LOG {
     int id PK
     text client_id "HMAC fingerprint"
@@ -170,7 +175,12 @@ active-keys-per-user cap is enforced under the tenant advisory lock.
 
 `GET /api/has_permission/<user>/<name>` — true iff the user belongs to any role
 holding the permission. Every query is scoped by `creator`, and the effective
-check re-scopes at each hop.
+check re-scopes at each hop. When the tenant's `auth_tenant_settings.strict_users`
+is true (SPEC 0008/0010), decision endpoints first require the user to hold ≥1
+active, unexpired API key — a key-less subject answers negatively with stable
+reason `user_not_key_backed` (membership ADDs answer 409); listings and every
+delete/revoke path are never gated. Enforcement lives in `AuthorizationService`,
+so embedded (in-process) consumers get semantics identical to the REST layer.
 
 ```mermaid
 flowchart TD

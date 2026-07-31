@@ -2,6 +2,34 @@
 Changelog
 =========
 
+Version 2.5.2 (2026-07-31)
+==========================
+
+Fixed
+-----
+
+- **Embedded engine no longer overrides the caller's sslmode** (reported by
+  Highway). ``auth.database`` used to force ``sslmode=require`` for any URL
+  failing a *substring* test on "localhost", silently discarding an explicit
+  ``?sslmode=...`` (connect_args beat URL conninfo in psycopg). Precedence is
+  now: URL ``sslmode`` param > ``PGSSLMODE`` env > secure-by-default
+  ``require`` for genuinely remote hosts, with the host decided by component
+  comparison (``?fallback_application_name=localhost`` no longer skips SSL).
+
+Added
+-----
+
+- The in-process ``Authorization`` wrapper now exposes the full 2.5.x surface
+  for embedded consumers: ``strict_users`` constructor override,
+  ``get_settings``/``set_strict_users``, and the per-user API-key lifecycle
+  (``create_api_key``, ``list_api_keys``, ``revoke_api_key``,
+  ``validate_api_key``, ``check_api_key_permission``) — strict semantics are
+  identical to the REST layer (enforcement lives in ``AuthorizationService``).
+- Docs: API.md documents the settings endpoints, ``check_permission``, the
+  strict gate list and the 409 refusal; ARCHITECTURE.md and SECURITY.md cover
+  ``auth_tenant_settings`` and the strict model; release tags are now pushed
+  for every published version.
+
 Version 2.5.1 (2026-07-31)
 ==========================
 
