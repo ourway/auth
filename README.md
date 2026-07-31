@@ -68,9 +68,10 @@ with Client(api_key=KEY, service_url="https://auth.rodmena.app") as c:
   key backs is scheduled for decommission. The opt-in phase is live (2.5.0):
   `PUT /api/settings {"strict_users": true}` makes keyless users answer
   negatively (`user_not_key_backed`), and `POST /api/apikeys/check_permission`
-  does validate + permission in one round trip. **3.0.0 makes key-backed users
-  mandatory** — only after every consuming platform confirms.
-  Details: [docs/DEPRECATIONS.md](docs/DEPRECATIONS.md).
+  does validate + permission in one round trip. **3.0.0 makes strict identity
+  the default** (the audited per-tenant opt-out survives for validated
+  machine-subject architectures) — and ships only after every consuming
+  platform confirms. Details: [docs/DEPRECATIONS.md](docs/DEPRECATIONS.md).
 
 ## Documentation
 

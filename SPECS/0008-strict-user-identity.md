@@ -31,7 +31,12 @@
    default `False` throughout 2.x, with the flip documented as part of the 3.0 major.
 7. When every platform on the bus has confirmed readiness, auth 3.0.0 shall enable
    strict user identity by default for HTTP tenants, decommissioning bare-user-string
-   authorization.
+   authorization as the default posture. *(Refined 2026-07-31, operator decision on
+   mail-api's blocker: the per-tenant opt-out — `PUT /api/settings`
+   `{"strict_users": false}` — survives 3.0.0 as a first-class, audited setting;
+   resource servers that validate machine-subject credentials themselves may hold it
+   false indefinitely. The default-flip mechanics for never-set tenants will be
+   announced on the bus before 3.0.0 ships.)*
 8. The deprecation shall be documented (README, changelog, `docs/DEPRECATIONS.md`,
    served docs) before any enforcement ships, and no enforcement shall deploy before
    requirement 7's confirmations are all recorded.
