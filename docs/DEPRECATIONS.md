@@ -17,13 +17,13 @@ validated identity from a typo or a forged one.
 permission checks — or, once 2.5.0 ships, does both in one round trip via
 `POST /api/apikeys/check_permission`.
 
-**Timeline**
+**Timeline — completed**
 
 | Phase | Version | Behavior |
 |---|---|---|
 | Done | 2.4.0 | Nothing enforced. Issue keys, migrate backends to the validate flow. |
-| **Live (opt-in)** | 2.5.x | Per-tenant strict mode via `PUT /api/settings` `{"strict_users": true}`: authorization decisions about a user with no active key answer negatively (`user_not_key_backed`, same response shapes); `POST /api/apikeys/check_permission` does validate + permission in one round trip. Since 2.5.1, a membership ADD refused for a key-less subject answers **HTTP 409** `{"result": false, "reason": "user_not_key_backed"}` so it cannot be mistaken for success. Tenants that don't opt in are byte-identical to 2.4.1. |
-| Default | 3.0.0 | Strict mode becomes the **default**. The per-tenant opt-out (`PUT /api/settings` `{"strict_users": false}`) survives as a first-class, audited setting — resource servers that validate machine-subject credentials themselves (e.g. mail-api's keyed-hash subjects) may hold it false indefinitely. Ships only after all client confirmations. |
+| Done (opt-in) | 2.5.x | Per-tenant strict mode via `PUT /api/settings` `{"strict_users": true}`; `POST /api/apikeys/check_permission` does validate + permission in one round trip. Since 2.5.1, a membership ADD refused for a key-less subject answers **HTTP 409**. |
+| **SHIPPED** | 3.0.0 | Strict mode is the **default for tenants with no stored setting** (`AUTH_STRICT_USERS_DEFAULT`, true). **Flip mechanics: every creator existing before 3.0.0 was grandfathered with an explicit `strict_users: false` row** — written by migration in our deployment and by a one-shot, marker-guarded pass in `create_tables()` on embedded databases — so the flip reaches ONLY tenants created after 3.0.0. The per-tenant opt-out survives as a first-class, audited setting; machine-subject architectures hold it false indefinitely. Embedded consumers not yet key-backed may also set `AUTH_STRICT_USERS_DEFAULT=false` process-wide. |
 
 **Which endpoints strict mode gates — exact list** (asked by consumers; this is the
 contract): decisions are gated — `has_permission`, the membership check,
@@ -67,9 +67,10 @@ field, so unchecked readers turn outages into denials.
 **New method (available since 2.4.0):** `Client(..., raise_on_error=True)` raises
 `auth.AuthTransportError`; legacy payloads now carry `"transport_error": true`.
 
-**In 3.0.0:** raising becomes the only behavior; the error-dict return is removed. The
-REST API is unaffected — this is client-library behavior when the service is
-unreachable.
+**SHIPPED in 3.0.0:** raising is the only behavior; the error-dict return is removed.
+The `raise_on_error` constructor argument remains accepted as a deprecated no-op so 2.x
+constructor calls keep working. The REST API is unaffected — this is client-library
+behavior when the service is unreachable.
 
 Spec: `SPECS/0007-decomm-legacy-transport-errors.md` · ticket auth#12. Same
 all-consumers-confirm gate, tracked independently of deprecation 1.

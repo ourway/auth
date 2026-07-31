@@ -321,11 +321,71 @@ def create_tables(raise_on_error: bool = False):
                     text(f'CREATE SCHEMA IF NOT EXISTS "{settings.database_schema}"')
                 )
         Base.metadata.create_all(bind=engine, checkfirst=True)
+        _grandfather_strict_users(engine)
         logger.info("Tables created successfully.")
     except Exception:
         logger.exception("create_tables failed")
         if raise_on_error:
             raise
+
+
+# Marker creator recording that the one-shot 3.0.0 grandfathering pass ran on
+# this database. Reserved — never use it as a real tenant identifier.
+GRANDFATHER_MARKER = "__meta:grandfathered-3.0__"
+
+
+def _grandfather_strict_users(target_engine: Engine) -> None:
+    """One-shot 3.0.0 flip protection (SPEC 0012): write explicit
+    ``strict_users = false`` rows for every creator that exists on this
+    database, then record a marker so the pass never runs again.
+
+    3.0.0 makes no-settings-row tenants strict by default; this pass is what
+    guarantees that flip reaches ONLY tenants created after it ran — every
+    pre-existing tenant keeps its behavior as an explicit, auditable opt-out
+    it can change later. Runs inside create_tables so embedded consumers get
+    the same protection our deployment gets from the migretti migration
+    (both are marker-guarded, so they compose idempotently).
+    """
+    from typing import cast
+
+    from sqlalchemy import Table, literal, select, union
+
+    from auth.models.sql import (
+        AuthApiKey,
+        AuthGroup,
+        AuthMembership,
+        AuthPermission,
+        AuthTenantSettings,
+    )
+
+    settings_t = cast(Table, AuthTenantSettings.__table__)
+    with target_engine.begin() as conn:
+        marker_exists = conn.execute(
+            select(settings_t.c.id).where(settings_t.c.creator == GRANDFATHER_MARKER)
+        ).first()
+        if marker_exists:
+            return
+        creators = union(
+            *(
+                select(t.__table__.c.creator)
+                for t in (AuthGroup, AuthMembership, AuthPermission, AuthApiKey)
+            )
+        ).subquery()
+        already = select(settings_t.c.creator)
+        conn.execute(
+            settings_t.insert().from_select(
+                ["creator", "strict_users"],
+                select(creators.c.creator, literal(False)).where(
+                    creators.c.creator.notin_(already)
+                ),
+            )
+        )
+        conn.execute(
+            settings_t.insert().values(
+                creator=GRANDFATHER_MARKER, strict_users=False
+            )
+        )
+    logger.info("strict_users grandfathering pass completed (one-shot).")
 
 
 def log_pool_stats():

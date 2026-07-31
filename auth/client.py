@@ -3,7 +3,8 @@ Enhanced client library with connection pooling, retry logic, and circuit breake
 """
 
 import json
-from typing import Any, Dict, Optional
+import warnings
+from typing import Any, Dict, NoReturn, Optional
 from urllib.parse import urljoin
 
 import requests
@@ -21,10 +22,11 @@ _RETRY_METHODS = ["HEAD", "GET", "OPTIONS", "POST", "PUT", "DELETE"]
 class AuthTransportError(Exception):
     """The client could not get an answer from the auth service.
 
-    Raised instead of the legacy error-dict return when the client is
-    constructed with ``raise_on_error=True``. Distinguishes "we could not
-    ask" (connection failure, exhausted retries, open circuit breaker) from
-    a genuine negative answer such as ``has_permission: false``.
+    Raised by every client method on transport failure (connection failure,
+    exhausted retries, open circuit breaker, non-2xx status) since 3.0.0.
+    Distinguishes "we could not ask" from a genuine negative answer such as
+    ``has_permission: false`` — map it to your unavailable/503 path, never
+    to a denial.
     """
 
 
@@ -70,17 +72,12 @@ class RetryableHTTPAdapter(HTTPAdapter):
 class EnhancedAuthClient:
     """Enhanced client with connection pooling, retry logic, and circuit breaker.
 
-    Error contract: methods do not raise by default. On transport failure
-    (connection error, exhausted retries, open circuit breaker) they return::
-
-        {"error": "<message>", "success": False, "transport_error": True,
-         "data": {...the call's input arguments...}}
-
-    ``data`` echoes the inputs and does NOT contain the answer field
-    (``has_permission``, ``count``, ...), so reading it without checking
-    ``success`` turns an outage into a false negative. Either check
-    ``success`` first, or construct with ``raise_on_error=True`` to make
-    every method raise :class:`AuthTransportError` on transport failure.
+    Error contract (3.0.0): every method raises :class:`AuthTransportError`
+    on transport failure — connection error, exhausted retries, open circuit
+    breaker, or a non-2xx status. A transport failure can therefore never
+    reach your authorization logic as a value: catch the exception and map it
+    to your unavailable/503 path, never to a denial. Success payloads are
+    unchanged from 2.x.
     """
 
     def __init__(
@@ -92,7 +89,7 @@ class EnhancedAuthClient:
         pool_maxsize: int = 64,
         timeout: int = 30,
         circuit_breaker_enabled: bool = True,
-        raise_on_error: bool = False,
+        raise_on_error: Optional[bool] = None,
     ):
         """
         Initialize the enhanced client
@@ -107,14 +104,22 @@ class EnhancedAuthClient:
                 as transport failures under load)
             timeout: Request timeout in seconds
             circuit_breaker_enabled: Whether circuit breaker is enabled
-            raise_on_error: When True, methods raise AuthTransportError on
-                transport failure instead of returning the legacy error dict
+            raise_on_error: DEPRECATED no-op kept so 2.x constructor calls
+                keep working — since 3.0.0 the client ALWAYS raises
+                AuthTransportError on transport failure
         """
+        if raise_on_error is not None:
+            warnings.warn(
+                "raise_on_error is deprecated and ignored: since auth 3.0.0 "
+                "the client always raises AuthTransportError on transport "
+                "failure.",
+                DeprecationWarning,
+                stacklevel=2,
+            )
         self.api_key = api_key
         self.service_url = service_url
         self.timeout = timeout
         self.circuit_breaker_enabled = circuit_breaker_enabled
-        self.raise_on_error = raise_on_error
 
         # Create session with connection pooling
         self.session = requests.Session()
@@ -233,30 +238,22 @@ class EnhancedAuthClient:
 
     def _transport_failure(
         self, exc: Exception, data: Optional[Dict[str, Any]] = None
-    ) -> Dict[str, Any]:
-        """Report a transport-level failure per the configured policy.
+    ) -> NoReturn:
+        """Raise :class:`AuthTransportError` for a transport-level failure.
 
-        Either raises :class:`AuthTransportError` (``raise_on_error=True``) or
-        returns the legacy error payload, marked ``transport_error: True``.
-        The payload's ``data`` only echoes call inputs — it never contains the
-        queried answer field, which is why callers must check ``success``.
+        Since 3.0.0 this ALWAYS raises — the 2.x error-dict return (an
+        answer-shaped payload without the answer field) is gone, so an outage
+        can never be misread as a denial. ``data`` is accepted for call-site
+        compatibility and intentionally unused: inputs like key material must
+        never ride on an exception.
         """
-        if self.raise_on_error:
-            raise AuthTransportError(str(exc)) from exc
-        payload: Dict[str, Any] = {
-            "error": str(exc),
-            "success": False,
-            "transport_error": True,
-        }
-        if data is not None:
-            payload["data"] = data
-        return payload
+        raise AuthTransportError(str(exc)) from exc
 
     def ping(self) -> Dict[str, Any]:
         """Health check.
 
-        Transport failure: error dict without the answer field (or
-        ``AuthTransportError`` if ``raise_on_error=True``); check ``success``.
+        Transport failure raises :class:`AuthTransportError` — map it to
+        your unavailable/503 path, never to a denial.
         """
         try:
             return self._make_request("GET", self.endpoints["ping"])
@@ -266,8 +263,8 @@ class EnhancedAuthClient:
     def add_membership(self, user: str, group: str) -> Dict[str, Any]:
         """Add user to a group.
 
-        Transport failure: error dict without the answer field (or
-        ``AuthTransportError`` if ``raise_on_error=True``); check ``success``.
+        Transport failure raises :class:`AuthTransportError` — map it to
+        your unavailable/503 path, never to a denial.
         """
         endpoint = self.endpoints["membership"].format(user=user, group=group)
         try:
@@ -278,8 +275,8 @@ class EnhancedAuthClient:
     def remove_membership(self, user: str, group: str) -> Dict[str, Any]:
         """Remove user from a group.
 
-        Transport failure: error dict without the answer field (or
-        ``AuthTransportError`` if ``raise_on_error=True``); check ``success``.
+        Transport failure raises :class:`AuthTransportError` — map it to
+        your unavailable/503 path, never to a denial.
         """
         endpoint = self.endpoints["membership"].format(user=user, group=group)
         try:
@@ -290,8 +287,8 @@ class EnhancedAuthClient:
     def has_membership(self, user: str, group: str) -> Dict[str, Any]:
         """Check if user is member of a group.
 
-        Transport failure: error dict without the answer field (or
-        ``AuthTransportError`` if ``raise_on_error=True``); check ``success``.
+        Transport failure raises :class:`AuthTransportError` — map it to
+        your unavailable/503 path, never to a denial.
         """
         endpoint = self.endpoints["membership"].format(user=user, group=group)
         try:
@@ -302,8 +299,8 @@ class EnhancedAuthClient:
     def add_permission(self, group: str, name: str) -> Dict[str, Any]:
         """Add permission to a group.
 
-        Transport failure: error dict without the answer field (or
-        ``AuthTransportError`` if ``raise_on_error=True``); check ``success``.
+        Transport failure raises :class:`AuthTransportError` — map it to
+        your unavailable/503 path, never to a denial.
         """
         endpoint = self.endpoints["permission"].format(group=group, name=name)
         try:
@@ -314,8 +311,8 @@ class EnhancedAuthClient:
     def remove_permission(self, group: str, name: str) -> Dict[str, Any]:
         """Remove permission from a group.
 
-        Transport failure: error dict without the answer field (or
-        ``AuthTransportError`` if ``raise_on_error=True``); check ``success``.
+        Transport failure raises :class:`AuthTransportError` — map it to
+        your unavailable/503 path, never to a denial.
         """
         endpoint = self.endpoints["permission"].format(group=group, name=name)
         try:
@@ -326,8 +323,8 @@ class EnhancedAuthClient:
     def has_permission(self, group: str, name: str) -> Dict[str, Any]:
         """Check if group has permission.
 
-        Transport failure: error dict without the answer field (or
-        ``AuthTransportError`` if ``raise_on_error=True``); check ``success``.
+        Transport failure raises :class:`AuthTransportError` — map it to
+        your unavailable/503 path, never to a denial.
         """
         endpoint = self.endpoints["permission"].format(group=group, name=name)
         try:
@@ -338,10 +335,8 @@ class EnhancedAuthClient:
     def user_has_permission(self, user: str, name: str) -> Dict[str, Any]:
         """Check if user has permission.
 
-        Transport failure: error dict without the answer field (or
-        ``AuthTransportError`` if ``raise_on_error=True``); check ``success``
-        before reading ``data`` — a missing ``has_permission`` is an outage,
-        not a denial.
+        Transport failure raises :class:`AuthTransportError` — map it to
+        your unavailable/503 path, never to a denial.
         """
         endpoint = self.endpoints["has_permission"].format(user=user, name=name)
         try:
@@ -352,10 +347,8 @@ class EnhancedAuthClient:
     def get_user_permissions(self, user: str) -> Dict[str, Any]:
         """Get all permissions for a user.
 
-        Transport failure: error dict without the answer field (or
-        ``AuthTransportError`` if ``raise_on_error=True``); check ``success``
-        before reading ``data`` — a missing ``count`` is an outage, not an
-        unknown user.
+        Transport failure raises :class:`AuthTransportError` — map it to
+        your unavailable/503 path, never to a denial.
         """
         endpoint = self.endpoints["user_permissions"].format(user=user)
         try:
@@ -366,8 +359,8 @@ class EnhancedAuthClient:
     def get_role_permissions(self, role: str) -> Dict[str, Any]:
         """Get all permissions for a role.
 
-        Transport failure: error dict without the answer field (or
-        ``AuthTransportError`` if ``raise_on_error=True``); check ``success``.
+        Transport failure raises :class:`AuthTransportError` — map it to
+        your unavailable/503 path, never to a denial.
         """
         endpoint = self.endpoints["role_permissions"].format(role=role)
         try:
@@ -378,8 +371,8 @@ class EnhancedAuthClient:
     def get_user_roles(self, user: str) -> Dict[str, Any]:
         """Get all roles for a user.
 
-        Transport failure: error dict without the answer field (or
-        ``AuthTransportError`` if ``raise_on_error=True``); check ``success``.
+        Transport failure raises :class:`AuthTransportError` — map it to
+        your unavailable/503 path, never to a denial.
         """
         endpoint = self.endpoints["user_roles"].format(user=user)
         try:
@@ -390,8 +383,8 @@ class EnhancedAuthClient:
     def get_role_members(self, role: str) -> Dict[str, Any]:
         """Get all members of a role.
 
-        Transport failure: error dict without the answer field (or
-        ``AuthTransportError`` if ``raise_on_error=True``); check ``success``.
+        Transport failure raises :class:`AuthTransportError` — map it to
+        your unavailable/503 path, never to a denial.
         """
         endpoint = self.endpoints["role_members"].format(role=role)
         try:
@@ -402,8 +395,8 @@ class EnhancedAuthClient:
     def list_roles(self) -> Dict[str, Any]:
         """List all roles.
 
-        Transport failure: error dict without the answer field (or
-        ``AuthTransportError`` if ``raise_on_error=True``); check ``success``.
+        Transport failure raises :class:`AuthTransportError` — map it to
+        your unavailable/503 path, never to a denial.
         """
         try:
             return self._make_request("GET", self.endpoints["roles"])
@@ -413,8 +406,8 @@ class EnhancedAuthClient:
     def which_roles_can(self, name: str) -> Dict[str, Any]:
         """Get roles that can perform an action.
 
-        Transport failure: error dict without the answer field (or
-        ``AuthTransportError`` if ``raise_on_error=True``); check ``success``.
+        Transport failure raises :class:`AuthTransportError` — map it to
+        your unavailable/503 path, never to a denial.
         """
         endpoint = self.endpoints["which_roles_can"].format(name=name)
         try:
@@ -425,8 +418,8 @@ class EnhancedAuthClient:
     def which_users_can(self, name: str) -> Dict[str, Any]:
         """Get users that can perform an action.
 
-        Transport failure: error dict without the answer field (or
-        ``AuthTransportError`` if ``raise_on_error=True``); check ``success``.
+        Transport failure raises :class:`AuthTransportError` — map it to
+        your unavailable/503 path, never to a denial.
         """
         endpoint = self.endpoints["which_users_can"].format(name=name)
         try:
@@ -437,8 +430,8 @@ class EnhancedAuthClient:
     def create_role(self, role: str) -> Dict[str, Any]:
         """Create a new role.
 
-        Transport failure: error dict without the answer field (or
-        ``AuthTransportError`` if ``raise_on_error=True``); check ``success``.
+        Transport failure raises :class:`AuthTransportError` — map it to
+        your unavailable/503 path, never to a denial.
         """
         endpoint = self.endpoints["role"].format(role=role)
         try:
@@ -449,8 +442,8 @@ class EnhancedAuthClient:
     def delete_role(self, role: str) -> Dict[str, Any]:
         """Delete a role.
 
-        Transport failure: error dict without the answer field (or
-        ``AuthTransportError`` if ``raise_on_error=True``); check ``success``.
+        Transport failure raises :class:`AuthTransportError` — map it to
+        your unavailable/503 path, never to a denial.
         """
         endpoint = self.endpoints["role"].format(role=role)
         try:
@@ -468,8 +461,8 @@ class EnhancedAuthClient:
         returned key is the ONLY copy: persist ``data.new_key`` (e.g. to your
         secret store) or you lose access to the namespace.
 
-        Transport failure: error dict without the answer field (or
-        ``AuthTransportError`` if ``raise_on_error=True``); check ``success``.
+        Transport failure raises :class:`AuthTransportError` — map it to
+        your unavailable/503 path, never to a denial.
         """
         endpoint = self.endpoints["rotate_key"]
         try:
@@ -493,8 +486,8 @@ class EnhancedAuthClient:
         retry after an ambiguous failure could mint a second key whose secret
         nobody ever saw. On an ambiguous failure, list and revoke instead.
 
-        Transport failure: error dict without the answer field (or
-        ``AuthTransportError`` if ``raise_on_error=True``); check ``success``.
+        Transport failure raises :class:`AuthTransportError` — map it to
+        your unavailable/503 path, never to a denial.
         """
         endpoint = self.endpoints["apikeys_user"].format(user=user)
         payload = {"label": label} if label is not None else None
@@ -506,8 +499,8 @@ class EnhancedAuthClient:
     def list_api_keys(self, user: str) -> Dict[str, Any]:
         """List a user's API keys (metadata only; never the secrets).
 
-        Transport failure: error dict without the answer field (or
-        ``AuthTransportError`` if ``raise_on_error=True``); check ``success``.
+        Transport failure raises :class:`AuthTransportError` — map it to
+        your unavailable/503 path, never to a denial.
         """
         endpoint = self.endpoints["apikeys_user"].format(user=user)
         try:
@@ -518,8 +511,8 @@ class EnhancedAuthClient:
     def revoke_api_key(self, user: str, key_id: str) -> Dict[str, Any]:
         """Revoke one of a user's API keys by its public key_id (idempotent).
 
-        Transport failure: error dict without the answer field (or
-        ``AuthTransportError`` if ``raise_on_error=True``); check ``success``.
+        Transport failure raises :class:`AuthTransportError` — map it to
+        your unavailable/503 path, never to a denial.
         """
         endpoint = self.endpoints["apikey_revoke"].format(user=user, key_id=key_id)
         try:
@@ -530,13 +523,11 @@ class EnhancedAuthClient:
     def validate_api_key(self, api_key: str) -> Dict[str, Any]:
         """Validate an API-key secret; answers ``data.valid`` true/false.
 
-        The secret travels in the JSON body, never a URL. The failure payload
-        echoes only the display prefix — never the secret itself.
+        The secret travels in the JSON body, never a URL, and never rides
+        on an exception.
 
-        Transport failure: error dict without the answer field (or
-        ``AuthTransportError`` if ``raise_on_error=True``); check ``success``
-        before reading ``data`` — a missing ``valid`` is an outage, not an
-        invalid key.
+        Transport failure raises :class:`AuthTransportError` — map it to
+        your unavailable/503 path, never to a denial.
         """
         try:
             return self._make_request(
@@ -552,12 +543,10 @@ class EnhancedAuthClient:
 
         ``data.valid`` false → the key failed (reason as in validate_api_key);
         true → ``data.has_permission`` answers for the key's user. The secret
-        travels in the JSON body; failure payloads echo only its prefix.
+        travels in the JSON body and never rides on an exception.
 
-        Transport failure: error dict without the answer field (or
-        ``AuthTransportError`` if ``raise_on_error=True``); check ``success``
-        before reading ``data`` — a missing ``valid`` is an outage, not a
-        denial.
+        Transport failure raises :class:`AuthTransportError` — map it to
+        your unavailable/503 path, never to a denial.
         """
         try:
             return self._make_request(
@@ -574,8 +563,8 @@ class EnhancedAuthClient:
     def get_settings(self) -> Dict[str, Any]:
         """This tenant's settings (``data.strict_users``).
 
-        Transport failure: error dict without the answer field (or
-        ``AuthTransportError`` if ``raise_on_error=True``); check ``success``.
+        Transport failure raises :class:`AuthTransportError` — map it to
+        your unavailable/503 path, never to a denial.
         """
         try:
             return self._make_request("GET", self.endpoints["settings"])
@@ -589,8 +578,8 @@ class EnhancedAuthClient:
         key answer negatively (``reason: user_not_key_backed``) — issue keys
         before flipping this on.
 
-        Transport failure: error dict without the answer field (or
-        ``AuthTransportError`` if ``raise_on_error=True``); check ``success``.
+        Transport failure raises :class:`AuthTransportError` — map it to
+        your unavailable/503 path, never to a denial.
         """
         try:
             return self._make_request(
@@ -603,8 +592,8 @@ class EnhancedAuthClient:
     def get_users_for_workflow(self, workflow_name: str) -> Dict[str, Any]:
         """Get all users who can run a specific workflow.
 
-        Transport failure: error dict without the answer field (or
-        ``AuthTransportError`` if ``raise_on_error=True``); check ``success``.
+        Transport failure raises :class:`AuthTransportError` — map it to
+        your unavailable/503 path, never to a denial.
         """
         endpoint = self.endpoints["workflow_users"].format(workflow_name=workflow_name)
         try:
@@ -617,8 +606,8 @@ class EnhancedAuthClient:
     ) -> Dict[str, Any]:
         """Check if a user can run a specific workflow.
 
-        Transport failure: error dict without the answer field (or
-        ``AuthTransportError`` if ``raise_on_error=True``); check ``success``.
+        Transport failure raises :class:`AuthTransportError` — map it to
+        your unavailable/503 path, never to a denial.
         """
         endpoint = self.endpoints["workflow_permission"].format(
             user=user, workflow_name=workflow_name

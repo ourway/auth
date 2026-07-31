@@ -59,3 +59,10 @@
 
 - SPEC 0007 / issuedb #12 (client error-dict removal) is a separate, already-running
   confirmation campaign; both land in 3.0.0 but are gated independently.
+
+## Delivery addendum (2026-07-31)
+
+Requirement 7 shipped in **3.0.0** per SPEC 0012 / issuedb #18, with grandfathering:
+strict is the default only for tenants with no stored setting (all pre-3.0 creators
+received explicit `strict_users: false` rows via migration + marker-guarded
+`create_tables()` pass). The per-tenant opt-out survives as decided on ticket #13.

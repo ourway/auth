@@ -27,3 +27,10 @@
   depends on it.
 - runflow is already migrated on their side (fail-closed classification) — their formal
   confirmation is still collected like everyone else's.
+
+## Delivery addendum (2026-07-31)
+
+Shipped in **3.0.0** per SPEC 0012 / issuedb #18: the client always raises
+`AuthTransportError`; `raise_on_error` is a deprecated no-op. Ledger basis: 6/10
+confirmed (runflow, tokengate, highway migrated; futex, sponsorsignal, mail-api
+not consumers), remainder declared non-consumers by the operator.

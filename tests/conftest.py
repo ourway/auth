@@ -29,6 +29,10 @@ os.environ.setdefault("AUTH_ENABLE_AUDIT_LOGGING", "true")
 os.environ.setdefault("AUTH_AUDIT_PEPPER", "test-pepper-not-for-production")
 os.environ.setdefault("AUTH_ENABLE_RATE_LIMIT", "false")
 os.environ.setdefault("AUTH_DEBUG_MODE", "false")
+# The legacy suites model GRANDFATHERED tenants (explicit-false reality of
+# every pre-3.0 consumer). The 3.0.0 strict default for no-row tenants is
+# covered explicitly in tests/test_strict_default.py.
+os.environ.setdefault("AUTH_STRICT_USERS_DEFAULT", "false")
 
 import pytest  # noqa: E402
 

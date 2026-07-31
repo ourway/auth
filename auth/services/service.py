@@ -617,7 +617,15 @@ class AuthorizationService:
                 .filter(AuthTenantSettings.creator == self.client)
                 .first()
             )
-            self._strict_cache = bool(row.strict_users) if row else False
+            if row is not None:
+                self._strict_cache = bool(row.strict_users)
+            else:
+                # 3.0.0: tenants with no stored setting follow the server
+                # default (strict). Pre-3.0 tenants never reach this branch —
+                # grandfathering wrote them explicit false rows.
+                from auth.config import get_settings
+
+                self._strict_cache = bool(get_settings().strict_users_default)
         return self._strict_cache
 
     def get_settings(self) -> Dict[str, Any]:

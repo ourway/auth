@@ -91,14 +91,13 @@ def test_create_role_and_membership_paths():
 
 
 @responses.activate
-def test_error_contract_returns_dict_not_raise():
-    """Transport failures come back as {'error':..., 'success': False} dicts."""
+def test_error_contract_always_raises():
+    """3.0.0: transport failures raise AuthTransportError, never a dict."""
     with make_client() as client:
-        result = client.list_roles()  # nothing registered -> connection error
-        membership = client.add_membership("alice", "admin")
-    assert result["success"] is False and "error" in result
-    assert membership["success"] is False
-    assert membership["data"] == {"user": "alice", "group": "admin"}
+        with pytest.raises(AuthTransportError):
+            client.list_roles()  # nothing registered -> connection error
+        with pytest.raises(AuthTransportError):
+            client.add_membership("alice", "admin")
 
 
 @responses.activate
@@ -124,19 +123,19 @@ def test_rotate_key_switches_the_live_client_to_the_new_key():
 
 
 @responses.activate
-def test_rotate_key_transport_failure_leaves_key_unchanged():
+def test_rotate_key_transport_failure_raises_and_leaves_key_unchanged():
     with make_client() as client:  # nothing registered -> connection error
-        result = client.rotate_key()
-        assert result["success"] is False and "error" in result
+        with pytest.raises(AuthTransportError):
+            client.rotate_key()
         assert client.api_key == API_KEY  # not rotated on failure
 
 
 @responses.activate
-def test_http_error_status_becomes_error_dict():
+def test_http_error_status_raises():
     responses.get(f"{BASE}/api/roles", json={"detail": "boom"}, status=400)
     with make_client() as client:
-        result = client.list_roles()
-    assert result["success"] is False
+        with pytest.raises(AuthTransportError):
+            client.list_roles()
 
 
 @responses.activate
@@ -184,16 +183,12 @@ def test_pool_params_reach_the_adapter():
 
 
 @responses.activate
-def test_transport_failure_payload_is_marked():
-    """Failure payloads carry transport_error=True and data WITHOUT the answer
-    field — the unmissable marker runflow asked for."""
+def test_transport_failure_cannot_reach_callers_as_a_value():
+    """3.0.0 removes the answer-shaped error dict entirely (SPEC 0007)."""
     with make_client() as client:  # nothing registered -> connection error
-        result = client.user_has_permission("alice", "manage_users")
-    assert result["success"] is False
-    assert result["transport_error"] is True
-    assert "error" in result
-    assert result["data"] == {"user": "alice", "name": "manage_users"}
-    assert "has_permission" not in result["data"]
+        with pytest.raises(AuthTransportError) as excinfo:
+            client.user_has_permission("alice", "manage_users")
+    assert excinfo.value.__cause__ is not None
 
 
 @responses.activate
@@ -209,37 +204,45 @@ def test_success_payload_has_no_transport_marker():
 
 
 @responses.activate
-def test_raise_on_error_raises_on_transport_failure():
-    # Green first: with a live endpoint the flag changes nothing.
+def test_success_path_then_failure_raises():
+    # Green first: a live endpoint answers normally.
     responses.get(
         f"{BASE}/api/has_permission/alice/manage_users",
         json={"success": True, "data": {"has_permission": True}},
     )
-    with make_client(raise_on_error=True) as client:
+    with make_client() as client:
         ok = client.user_has_permission("alice", "manage_users")
         assert ok["data"]["has_permission"] is True
-        # Red: unregistered endpoint -> connection error -> raises, never a dict.
+        # Red: unregistered endpoint -> connection error -> raises.
         with pytest.raises(AuthTransportError):
             client.get_user_permissions("alice")
-        with pytest.raises(AuthTransportError):
-            client.rotate_key()
-    # api_key untouched by the failed rotate.
-    assert client.api_key == API_KEY
+
+
+def test_raise_on_error_kwarg_is_deprecated_noop():
+    """2.x constructor calls keep working; the kwarg only warns."""
+    with pytest.warns(DeprecationWarning):
+        client = EnhancedAuthClient(
+            api_key=API_KEY,
+            service_url=BASE,
+            circuit_breaker_enabled=False,
+            raise_on_error=True,
+        )
+    client.close()
+    with pytest.warns(DeprecationWarning):
+        client = EnhancedAuthClient(
+            api_key=API_KEY,
+            service_url=BASE,
+            circuit_breaker_enabled=False,
+            raise_on_error=False,
+        )
+    client.close()
 
 
 @responses.activate
-def test_raise_on_error_chains_original_cause():
-    with make_client(raise_on_error=True) as client:
-        with pytest.raises(AuthTransportError) as excinfo:
-            client.ping()
-    assert excinfo.value.__cause__ is not None
-
-
-@responses.activate
-def test_http_error_status_raises_under_raise_on_error():
+def test_http_5xx_raises():
     """A 5xx after retries is a transport-level failure too."""
     responses.get(f"{BASE}/api/roles", json={"detail": "boom"}, status=500)
-    with make_client(raise_on_error=True, max_retries=0) as client:
+    with make_client(max_retries=0) as client:
         with pytest.raises(AuthTransportError):
             client.list_roles()
 
@@ -302,17 +305,16 @@ def test_api_key_lifecycle_methods_hit_expected_endpoints():
 
 
 @responses.activate
-def test_validate_api_key_failure_payload_echoes_prefix_never_secret():
+def test_validate_api_key_failure_raises_and_never_leaks_secret():
     with make_client() as client:  # nothing registered -> connection error
-        result = client.validate_api_key(SECRET)
-    assert result["success"] is False and result["transport_error"] is True
-    assert result["data"] == {"key_prefix": SECRET[:12]}
-    assert SECRET not in str(result)
+        with pytest.raises(AuthTransportError) as excinfo:
+            client.validate_api_key(SECRET)
+    assert SECRET not in str(excinfo.value)
 
 
 @responses.activate
-def test_create_api_key_raises_under_raise_on_error():
-    with make_client(raise_on_error=True) as client:
+def test_create_api_key_failure_raises():
+    with make_client() as client:
         with pytest.raises(AuthTransportError):
             client.create_api_key("alice")
 
@@ -347,9 +349,8 @@ def test_check_api_key_permission_and_settings_methods():
 
 
 @responses.activate
-def test_check_api_key_permission_failure_echoes_prefix_never_secret():
+def test_check_api_key_permission_failure_raises_and_never_leaks_secret():
     with make_client() as client:  # nothing registered -> connection error
-        result = client.check_api_key_permission(SECRET, "deploy")
-    assert result["success"] is False and result["transport_error"] is True
-    assert result["data"] == {"key_prefix": SECRET[:12], "permission": "deploy"}
-    assert SECRET not in str(result)
+        with pytest.raises(AuthTransportError) as excinfo:
+            client.check_api_key_permission(SECRET, "deploy")
+    assert SECRET not in str(excinfo.value)

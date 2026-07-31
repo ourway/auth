@@ -88,7 +88,9 @@ check "old tenant key -> unknown_key" \
     "$(req POST /api/apikeys/validate "$TENANT_B" "{\"api_key\": \"$SECRET_B\"}" | jq -r '.data.reason')" "unknown_key"
 
 # --- backward compat: the classic RBAC flow, byte-shape as documented
+# (an explicitly opted-out tenant — the grandfathered/2.x shape since 3.0.0)
 TENANT_C="$(uuid)"
+req PUT /api/settings "$TENANT_C" '{"strict_users": false}' >/dev/null
 check "create_role bare shape" "$(req POST /api/role/probers "$TENANT_C" | jq -c .)" '{"result":true}'
 check "add_permission bare shape" "$(req POST /api/permission/probers/probe_things "$TENANT_C" | jq -c .)" '{"result":true}'
 check "add_membership bare shape" "$(req POST /api/membership/probe.user/probers "$TENANT_C" | jq -c .)" '{"result":true}'
@@ -97,14 +99,17 @@ check "has_permission wrapped shape" \
 check "write-to-missing-role stays 200/false" \
     "$(req POST /api/membership/probe.user/ghosts "$TENANT_C" | jq -c .)" '{"result":false}'
 
-# --- strict user identity, opt-in phase (SPEC 0010): both directions live
+# --- strict user identity (SPEC 0010/0012): both directions live
 TENANT_S="$(uuid)"
+check "3.0 default: fresh tenant reports strict_users true" \
+    "$(req GET /api/settings "$TENANT_S" | jq -r '.data.strict_users')" "true"
+req PUT /api/settings "$TENANT_S" '{"strict_users": false}' >/dev/null
 req POST /api/role/probers "$TENANT_S" >/dev/null
 req POST /api/permission/probers/probe_things "$TENANT_S" >/dev/null
 req POST /api/membership/strict.user/probers "$TENANT_S" >/dev/null
-check "strict OFF: keyless user answers true (green baseline)" \
+check "opted-out: keyless user answers true (green baseline)" \
     "$(req GET /api/has_permission/strict.user/probe_things "$TENANT_S" | jq -r '.data.has_permission')" "true"
-check "settings default false" \
+check "settings shows explicit false" \
     "$(req GET /api/settings "$TENANT_S" | jq -r '.data.strict_users')" "false"
 req PUT /api/settings "$TENANT_S" '{"strict_users": true}' >/dev/null
 check "strict ON: keyless user blocked with reason" \
@@ -127,6 +132,19 @@ check "check_permission: valid + not permitted is a plain denial" \
 req PUT /api/settings "$TENANT_S" '{"strict_users": false}' >/dev/null
 check "strict OFF again: keyless answers restored" \
     "$(req GET /api/has_permission/probe.other/probe_things "$TENANT_S" | jq -r '.data.has_permission')" "false"
+
+# --- 3.0 new world: a fresh tenant is strict by default, end to end
+TENANT_N="$(uuid)"
+req POST /api/role/newops "$TENANT_N" >/dev/null
+req POST /api/permission/newops/new_thing "$TENANT_N" >/dev/null
+NREF=$(curl -sS -X POST -H "Authorization: Bearer $TENANT_N" \
+    -w '|%{http_code}' "$BASE/api/membership/newbie/newops")
+check "new tenant: keyless grant refused 409 by default" "${NREF##*|}" "409"
+req POST /api/apikeys/user/newbie "$TENANT_N" >/dev/null
+check "new tenant: key first, then grant works" \
+    "$(req POST /api/membership/newbie/newops "$TENANT_N" | jq -r .result)" "true"
+check "new tenant: decision green after key+grant" \
+    "$(req GET /api/has_permission/newbie/new_thing "$TENANT_N" | jq -r '.data.has_permission')" "true"
 
 # --- served docs advertise the new endpoints (the artifact, not the source)
 # Expected version comes from the checkout being probed (override with

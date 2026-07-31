@@ -142,29 +142,30 @@ authenticate `/api/*` itself — the Bearer header always takes your client key.
 Rotating your client key moves your users' API keys with the namespace; the
 secrets keep validating afterwards.
 
-**DEPRECATION — bare user strings (decommission target: 3.0.0).** Today any
-`<user>` string answers authorization checks whether or not a key backs it.
-That is being retired. **Since 2.5.0 the opt-in phase is live**: enable strict
-mode with `PUT /api/settings` `{{"strict_users": true}}` and authorization
-decisions about users with no active API key answer negatively (same response
-shapes, additive reason `user_not_key_backed`). Gated decisions: has_permission,
-the membership check, user_permissions (answers `count: 0` + reason), workflow
-can_run. NOT gated: user_roles, members and every other listing. Membership
-adds for key-less subjects answer **409** `{{"result": false, "reason":
-"user_not_key_backed"}}` (since 2.5.1 — a refused grant must not look like
-success; check `result` on writes regardless). Create the key first, then grant
-roles: key creation committing before the grant is a contract, with no eventual
-consistency in between. Strict mode never blocks key issuance or any
-delete/revoke path. The `reason` field is **stable contract** (only ever
-present on strict blocks). A strict block on read decisions is an **HTTP
-200** — transport-failure handling (retries, breakers, fallbacks) will not
-fire on it; tenants that deliberately hold `strict_users: false` should assert
-that value in their deploy/health checks so an unexpected flip alarms instead
-of silently zeroing entitlements. 3.0.0 makes strict identity the default — the audited
-per-tenant opt-out survives for platforms that authenticate their own callers —
-and ships only after every consuming platform has confirmed readiness. Migrate
-now: issue keys to your users, derive the user from `/api/apikeys/validate` —
-or do both steps in one round trip with `POST /api/apikeys/check_permission`.
+**STRICT USER IDENTITY — the default since 3.0.0.** A tenant namespace
+created after 3.0.0 requires key-backed users: authorization decisions about
+users with no active API key answer negatively (same response shapes,
+additive reason `user_not_key_backed`). Every tenant that existed before
+3.0.0 was **grandfathered** with an explicit `strict_users: false` row —
+nothing changed for them at upgrade — and the audited per-tenant opt-out
+(`PUT /api/settings` `{{"strict_users": false}}`) survives indefinitely for
+platforms that authenticate their own callers. Gated decisions:
+has_permission, the membership check, user_permissions (answers `count: 0` +
+reason), workflow can_run. NOT gated: user_roles, members and every other
+listing. Membership adds for key-less subjects answer **409**
+`{{"result": false, "reason": "user_not_key_backed"}}` — a refused grant must
+not look like success; check `result` on writes regardless. Create the key
+first, then grant roles: key creation committing before the grant is a
+contract, with no eventual consistency in between. Strict mode never blocks
+key issuance or any delete/revoke path. The `reason` field is **stable
+contract** (only ever present on strict blocks). A strict block on read
+decisions is an **HTTP 200** — transport-failure handling (retries, breakers,
+fallbacks) will not fire on it; tenants that deliberately hold
+`strict_users: false` should assert that value in their deploy/health checks
+so an unexpected flip alarms instead of silently zeroing entitlements. The
+recommended backend flow: issue keys to your users, derive the user from
+`/api/apikeys/validate` — or do both steps in one round trip with
+`POST /api/apikeys/check_permission`.
 
 ## 4. Endpoints
 
@@ -324,10 +325,11 @@ Each returns the parsed JSON body, so the shapes in section 4 still apply.
 key on success and returns it — persist `data.new_key`, it is the only copy.
 `create_api_key(user, label=None)` returns the once-only secret in
 `data.api_key` and deliberately does not retry on transport failure (a blind
-retry could mint a second key nobody saw). On transport failure every method
-returns `{{"error", "success": false, "transport_error": true, ...}}` without
-the answer field — check `success` first, or construct the client with
-`raise_on_error=True` to get an `AuthTransportError` exception instead.
+retry could mint a second key nobody saw). **Since 3.0.0 every method raises
+`AuthTransportError` on transport failure** — the 2.x answer-shaped error
+dict is gone, so an outage can never be misread as a denial. Catch it and map
+it to your unavailable/503 path; the deprecated `raise_on_error` constructor
+argument is accepted as a no-op so 2.x code keeps constructing.
 
 The library can also be used in-process against your own database, bypassing
 HTTP entirely — see https://pypi.org/project/auth/.

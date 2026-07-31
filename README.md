@@ -48,13 +48,11 @@ with Client(api_key=KEY, service_url="https://auth.rodmena.app") as c:
 - **Two response shapes** — bare `{"result": ...}` and wrapped
   `{"success", "data", ...}`. The API reference says which per endpoint.
 - **Errors below 2xx are HTML**, not JSON. Branch on the status code first.
-- **Python client: check `success` before reading `data`.** On transport
-  failure the client does not raise by default — it returns
-  `{"error", "success": False, "transport_error": True, "data": {...}}` where
-  `data` only echoes your inputs and does NOT contain the answer field
-  (`has_permission`, `count`, ...). Reading `data` blindly turns an outage into
-  a false "no". Pass `Client(..., raise_on_error=True)` to get an
-  `AuthTransportError` exception instead of the error dict.
+- **Python client: transport failures raise `AuthTransportError`** (3.0.0).
+  The 2.x answer-shaped error dict is gone — an outage can never be misread
+  as a denial. Catch the exception and map it to your unavailable/503 path,
+  never to a permission denial. The old `raise_on_error` constructor argument
+  is a deprecated no-op, so 2.x code keeps constructing.
 - **Reuse one key.** A new key is a new empty namespace, not an error. Keep the
   key out of source control, logs, and URLs — it is the only thing protecting
   your data. Rotate it with `POST /api/keys/rotate` if it leaks.
@@ -67,14 +65,15 @@ with Client(api_key=KEY, service_url="https://auth.rodmena.app") as c:
   `check_api_key_permission` (validate + permission in one round trip), plus
   `get_settings`/`set_strict_users`. All of these also exist on the in-process
   `Authorization` wrapper for embedded consumers.
-- **DEPRECATED — bare user strings.** Asserting a `<user>` that no validated API
-  key backs is scheduled for decommission. The opt-in phase is live (2.5.0):
-  `PUT /api/settings {"strict_users": true}` makes keyless users answer
-  negatively (`user_not_key_backed`), and `POST /api/apikeys/check_permission`
-  does validate + permission in one round trip. **3.0.0 makes strict identity
-  the default** (the audited per-tenant opt-out survives for validated
-  machine-subject architectures) — and ships only after every consuming
-  platform confirms. Details: [docs/DEPRECATIONS.md](docs/DEPRECATIONS.md).
+- **Strict user identity is the default for NEW tenants (3.0.0).** A tenant
+  namespace created after 3.0.0 requires key-backed users for authorization
+  decisions (`user_not_key_backed` answers; key-less membership grants answer
+  409) — create the user's API key first, then grant roles. Every tenant that
+  existed before 3.0.0 was **grandfathered** with an explicit
+  `strict_users: false` row (nothing changed for them at upgrade), and the
+  audited per-tenant opt-out (`PUT /api/settings {"strict_users": false}`)
+  survives indefinitely for validated machine-subject architectures.
+  Details: [docs/DEPRECATIONS.md](docs/DEPRECATIONS.md).
 
 ## Documentation
 

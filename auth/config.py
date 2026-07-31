@@ -82,6 +82,14 @@ class Settings(BaseSettings):
     enable_encryption: bool = False
     encryption_key: str = ""
 
+    # Strict user identity (SPEC 0008/0012). Applies ONLY to tenants with no
+    # auth_tenant_settings row: 3.0.0 defaults them to strict (key-backed
+    # users required for authorization decisions). Tenants existing before
+    # 3.0.0 are grandfathered with explicit false rows (migration +
+    # create_tables pass), so this reaches new tenants only. Embedded
+    # consumers not yet key-backed can set AUTH_STRICT_USERS_DEFAULT=false.
+    strict_users_default: bool = True
+
     # Schema settings (for PostgreSQL multi-tenancy)
     database_schema: str = ""  # Optional schema name (e.g., "auth_rbac" for Highway)
 

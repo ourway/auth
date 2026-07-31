@@ -63,6 +63,7 @@ test-postgres: ## Run PostgreSQL integration tests (Docker required)
 	AUTH_DATABASE_URL="postgresql://auth_test:auth_test@127.0.0.1:55432/auth_test" \
 	AUTH_POSTGRESQL_URL= AUTH_SQLITE_PATH= \
 	AUTH_DATABASE_SCHEMA=auth_rbac \
+	AUTH_STRICT_USERS_DEFAULT=false \
 	AUTH_ENABLE_ENCRYPTION=true \
 	AUTH_ENCRYPTION_KEY=test-pg-encryption-key-1234 \
 	AUTH_JWT_SECRET_KEY=test-secret \

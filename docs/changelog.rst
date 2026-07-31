@@ -2,6 +2,31 @@
 Changelog
 =========
 
+Version 3.0.0 (2026-07-31)
+==========================
+
+The two decommissions announced on the platform bus (SPEC 0007, SPEC 0008),
+shipped after every consuming platform confirmed or was declared a
+non-consumer by the operator. Mechanics: SPEC 0012.
+
+Changed (breaking)
+------------------
+
+- **Client: transport failures always raise ``AuthTransportError``.** The 2.x
+  answer-shaped error dict (``{"error", "success": False, ...}``) is removed —
+  an outage can never again be misread as a denial. The ``raise_on_error``
+  constructor argument is retained as a deprecated no-op so 2.x constructor
+  calls keep working (it warns).
+- **Strict user identity is the default for tenants with no stored setting**
+  (new ``AUTH_STRICT_USERS_DEFAULT``, default true). **Grandfathering:** every
+  creator existing before 3.0.0 receives an explicit ``strict_users: false``
+  row — via migretti migration ``grandfather_strict_users`` in our deployment
+  and via a one-shot, marker-guarded pass in ``create_tables()`` on embedded
+  databases — so NO existing tenant's behavior changes at upgrade; the flip
+  reaches only namespaces created after 3.0.0. The audited per-tenant opt-out
+  survives indefinitely. Embedded consumers that have not adopted key-backed
+  users yet should pin ``auth<3`` or set ``AUTH_STRICT_USERS_DEFAULT=false``.
+
 Version 2.5.2 (2026-07-31)
 ==========================
 

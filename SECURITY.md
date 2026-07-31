@@ -91,7 +91,7 @@ service guarantees; the threat notes are what it deliberately does **not**.
 - At most **25 active keys per (tenant, user)** bounds abuse; create/list/revoke/
   validate are audited (fingerprints only — never the secret or its hash).
 
-### Strict user identity (opt-in; 3.0.0 default with surviving opt-out)
+### Strict user identity (default since 3.0.0; pre-3.0 tenants grandfathered)
 
 - `PUT /api/settings {"strict_users": true}` (audited) makes authorization
   decisions answer negatively for subjects holding no live API key — revocation
@@ -103,7 +103,11 @@ service guarantees; the threat notes are what it deliberately does **not**.
   issuance, and every delete/revoke path are never gated. Tenants that perform
   their own end-user authentication (machine/synthetic subjects) legitimately
   hold `strict_users: false` — the per-tenant opt-out survives the 3.0.0
-  default flip. See docs/DEPRECATIONS.md.
+  default flip. Flip mechanics: no-row tenants follow
+  `AUTH_STRICT_USERS_DEFAULT` (true since 3.0.0), and a one-shot grandfathering
+  pass (migration + marker-guarded `create_tables` pass for embedded
+  databases) wrote explicit false rows for every pre-3.0 creator, so the flip
+  reaches only tenants created after it. See docs/DEPRECATIONS.md.
 
 ### Transport security (embedded mode)
 
