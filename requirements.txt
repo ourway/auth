@@ -74,7 +74,7 @@ PyJWT==2.10.1
 pymongo==4.15.3
 pyparsing==3.2.5
 pyproject_hooks==1.2.0
-pytest==8.4.2
+pytest==9.0.3
 pytest-cov==7.0.0
 python-dotenv==1.2.1
 python-json-logger==4.0.0
