@@ -5,7 +5,7 @@ alembic==1.18.5
 annotated-types==0.7.0
 APScheduler==3.11.1
 backports.tarfile==1.2.0
-black==25.9.0
+black==26.3.1
 bleach==6.3.0
 blinker==1.9.0
 boolean.py==5.0
