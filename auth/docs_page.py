@@ -285,6 +285,18 @@ before 3.0.0 makes it the default.
 | GET | `/api/settings` | wrapped, `data` = `{{"strict_users": false}}` (defaults when never set) |
 | PUT | `/api/settings` | body `{{"strict_users": true}}` → wrapped, `data` = `{{"strict_users": true}}` (idempotent, audited) |
 
+### Audit (self-service diagnosis)
+
+Read-only access to YOUR namespace's own audit trail — who granted/revoked what,
+when, and whether it took effect. Strictly scoped to the calling namespace's
+fingerprint: it can never read another tenant's entries, and it never returns a
+raw key or user (client/user fields are non-reversible fingerprints). Use it to
+answer "why did my permission change / why was this denied?" without a human.
+
+| Method | Path | Returns |
+|---|---|---|
+| GET | `/api/audit` | query `?limit=50&offset=0&action=ADD_PERMISSION` → wrapped, `data` = `{{"total": N, "limit": 50, "offset": 0, "entries": [{{"id", "timestamp", "action", "resource", "details", "success", "user", "ip_address", "user_agent"}}]}}` (newest first; `limit` ≤ 500; `action` filters by action name) |
+
 ### Service
 
 | Method | Path | Auth | Returns |

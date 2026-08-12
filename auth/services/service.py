@@ -2,6 +2,7 @@
 SQLAlchemy-based authorization service
 """
 
+import json
 import logging
 import uuid
 from datetime import datetime, timezone
@@ -11,7 +12,7 @@ from sqlalchemy import Table, func, select, text, update
 from sqlalchemy.orm import Session
 
 from auth.api_keys import generate_api_key, hash_api_key
-from auth.audit import client_fingerprint
+from auth.audit import AuditLog, client_fingerprint
 from auth.encryption import encrypt_sensitive_data
 from auth.models.sql import (
     AuthApiKey,
@@ -648,6 +649,40 @@ class AuthorizationService:
         self._strict_cache = enabled
         self._commit()
         return {"strict_users": enabled}
+
+    def get_audit(
+        self, limit: int = 50, offset: int = 0, action: Optional[str] = None
+    ) -> Tuple[List[Dict[str, Any]], int]:
+        """Return THIS tenant's own audit trail, newest first.
+
+        Scoped by ``client_fingerprint(self.client)`` so a caller can never read
+        another namespace's entries. ``action`` is matched on the stored action
+        string (case-insensitive). ``details`` is decoded from its stored JSON.
+        Client and user fields are already non-reversible fingerprints — the
+        endpoint must never surface a raw key, user, or the audit pepper.
+        """
+        query = self.db.query(AuditLog).filter(
+            AuditLog.client_id == client_fingerprint(self.client)
+        )
+        if action:
+            query = query.filter(AuditLog.action == action.upper())
+        total = query.count()
+        rows = query.order_by(AuditLog.id.desc()).offset(offset).limit(limit).all()
+        entries = [
+            {
+                "id": row.id,
+                "timestamp": row.timestamp.isoformat() if row.timestamp else None,
+                "action": row.action,
+                "resource": row.resource,
+                "details": json.loads(cast(str, row.details)) if row.details else None,
+                "success": bool(row.success),
+                "user": row.user,
+                "ip_address": row.ip_address,
+                "user_agent": row.user_agent,
+            }
+            for row in rows
+        ]
+        return entries, total
 
     def user_is_key_backed(self, user: str) -> bool:
         """True when the user holds ≥1 active, unexpired API key here."""

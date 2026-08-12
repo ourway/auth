@@ -138,7 +138,12 @@ def test_strict_blocks_membership_add_but_never_removal(client):
     # was shown by two consumers to be silently written past).
     add = client.post("/api/membership/carol/engineers", headers=h)
     assert add.status_code == 409
-    assert add.get_json() == {"result": False, "reason": "user_not_key_backed"}
+    body = add.get_json()
+    assert body["result"] is False
+    assert body["reason"] == "user_not_key_backed"
+    # SPEC 0016: the refusal names the fix so a new integrator can self-serve.
+    assert "/api/apikeys/user/carol" in body["hint"]
+    assert "strict_users" in body["hint"]
     # The documented missing-role no-op keeps its 200-false shape even in
     # strict tenants — only the key-less refusal is a 409.
     ghost_role = client.post("/api/membership/carol/ghosts", headers=h)

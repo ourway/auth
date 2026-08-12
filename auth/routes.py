@@ -200,7 +200,22 @@ def register_routes(app):
                 # strict mode into silent dead-key provisioning. Strict mode is
                 # opt-in, so the shape may differ there; the documented
                 # missing-role 200-false below is untouched.
-                return jsonify({"result": False, "reason": reason}), 409
+                return (
+                    jsonify(
+                        {
+                            "result": False,
+                            "reason": reason,
+                            "hint": (
+                                f"strict_users is enabled and user '{user}' has no "
+                                "API key. Either create one with "
+                                f"POST /api/apikeys/user/{user}, or opt this "
+                                'namespace out with PUT /api/settings '
+                                '{"strict_users": false}.'
+                            ),
+                        }
+                    ),
+                    409,
+                )
 
         return jsonify({"result": result})
 
@@ -752,3 +767,40 @@ def register_routes(app):
         auth_service = _get_auth_service(db)
         result = auth_service.set_strict_users(body["strict_users"])
         return APIResponse.success(data=result, message="Tenant settings updated")
+
+    @app.route("/api/audit", methods=["GET"])
+    @with_db_session
+    @audit_log(AuditAction.GET_AUDIT, resource_extractor=lambda kwargs: "all")
+    def get_audit(db):
+        """Return THIS namespace's own audit trail, newest first.
+
+        Read-only, self-service diagnosis: who granted/revoked what, when, and
+        whether it took effect. Strictly scoped to the calling namespace's
+        fingerprint — never another tenant's entries, and never a raw key or
+        user (client/user fields are already non-reversible fingerprints).
+        """
+        try:
+            limit = int(request.args.get("limit", 50))
+            offset = int(request.args.get("offset", 0))
+        except ValueError:
+            return APIResponse.bad_request("limit and offset must be integers")
+        if limit < 1 or limit > 500:
+            return APIResponse.bad_request("limit must be between 1 and 500")
+        if offset < 0:
+            return APIResponse.bad_request("offset must be >= 0")
+
+        auth_service = _get_auth_service(db)
+        entries, total = auth_service.get_audit(
+            limit=limit,
+            offset=offset,
+            action=request.args.get("action"),
+        )
+        return APIResponse.success(
+            data={
+                "total": total,
+                "limit": limit,
+                "offset": offset,
+                "entries": entries,
+            },
+            message="Audit trail retrieved",
+        )

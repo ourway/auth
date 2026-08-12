@@ -2,6 +2,31 @@
 Changelog
 =========
 
+Version 3.1.0 (2026-08-12)
+==========================
+
+Self-service diagnosis and a discoverable strict_users opt-out — the two gaps
+that turned the 2026-08-12 registry and runflow incidents into escalations
+(issuedb #2, SPEC 0016). Backward compatible; no existing response shape was
+changed (the new ``hint`` field is additive).
+
+Added
+-----
+
+- **``GET /api/audit`` — read-only, namespace-scoped self-service audit trail.**
+  Answers "who granted/revoked what, when, and whether it took effect" for the
+  caller's own namespace, newest first, paginated (``limit`` ≤ 500, ``offset``),
+  filterable by ``action``. Never another tenant's rows; client and user fields
+  remain non-reversible fingerprints. Previously the audit trail was
+  database-only, so an unexpected denial forced an escalation.
+
+- **Actionable ``409 user_not_key_backed``.** A strict-mode membership grant
+  refused because the user has no API key now carries a ``hint`` naming the two
+  ways forward: create a key (``POST /api/apikeys/user/<user>``) or opt the
+  namespace out of strict user identity
+  (``PUT /api/settings {"strict_users": false}``). The ``reason`` discriminator
+  is unchanged.
+
 Version 3.0.1 (2026-07-31)
 ==========================
 
