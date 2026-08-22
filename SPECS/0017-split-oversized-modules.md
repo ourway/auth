@@ -1,7 +1,7 @@
 # SPEC 0017 — Split four oversized modules below the 500-line cap
 
 - **Ticket:** issuedb #3
-- **Status:** in-progress
+- **Status:** closed — merged as bb4e29b and deployed to vm2 on 2026-08-22
 - **Tags:** refactor
 
 ## Context
