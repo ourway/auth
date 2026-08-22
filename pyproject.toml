@@ -85,6 +85,10 @@ include = ["auth*"]
 
 [tool.setuptools.package-data]
 "*" = ["*.rst"]
+# The documentation blobs served at /, /docs, /llms.txt and /claude are data
+# files, not source (issuedb #3). They must ship in the wheel or the landing
+# page raises FileNotFoundError on an installed copy.
+"auth.static_docs" = ["*.md", "*.html"]
 
 [tool.ruff]
 line-length = 88

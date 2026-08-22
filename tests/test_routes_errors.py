@@ -109,7 +109,9 @@ def test_health_reports_unhealthy_when_db_unreachable(client, monkeypatch):
         def connect(self):
             raise RuntimeError("db down")
 
-    monkeypatch.setattr("auth.routes.engine", _BoomEngine())
+    # /health lives in auth.routes.public since the routes package was split
+    # (issuedb #3); patch the engine where that handler resolves it.
+    monkeypatch.setattr("auth.routes.public.engine", _BoomEngine())
     resp = client.get("/health")
     assert resp.status_code == 503
     assert resp.get_json() == {"status": "unhealthy"}
