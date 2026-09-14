@@ -2,6 +2,34 @@
 Changelog
 =========
 
+Version 3.1.1 (2026-09-14)
+==========================
+
+Packaging only — no code, API or behaviour change. The published dependency
+metadata was selecting a version of ``cryptography`` affected by
+CVE-2026-69247 for every clean install.
+
+Fixed
+-----
+
+- **The ``cryptography<48`` upper bound is removed.** CVE-2026-69247 (CVSS 8.2,
+  Bleichenbacher oracle in ``pkcs7_decrypt_*``) affects
+  ``44.0.0 <= cryptography < 50.0.0``, and the cap meant a clean resolve of any
+  auth consumer selected 47.0.0 — inside that window — with no way to take the
+  50.0.1 patch. The constraint is now ``cryptography>=3.0.0``, which is what
+  this file's own dependency comment and the commit that introduced the cap
+  (9e9230d, "cryptography kept open for security updates") both already
+  specified. Exact deploy pins continue to live in ``requirements.txt``.
+
+- **The generated lockfile pinned a vulnerable version.** ``requirements.txt``
+  moves from ``cryptography==46.0.3`` to ``50.0.1``.
+
+auth itself never reaches the vulnerable code path: ``auth.encryption`` uses
+AES-CTR, SHA256, PBKDF2HMAC and HKDFExpand only, and ``pkcs7`` is not imported
+on any runtime path — verified with a positive control that flips, so the
+negative result is a real absence. The full suite passes against 50.0.1
+(220 passed, 5 skipped).
+
 Version 3.1.0 (2026-08-12)
 ==========================
 

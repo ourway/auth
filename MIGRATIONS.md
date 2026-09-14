@@ -72,6 +72,27 @@ no-ops. (If a restart accidentally runs first, `IF NOT EXISTS` makes the later
 - Partial-failure repair: `mg fix <id> --applied` / `mg fix <id> --remove`
   after fixing by hand; `mg verify` checks applied checksums against disk.
 
+## Amending a migration that is already applied
+
+`mg apply` does **not** verify checksums — only `mg verify` does. So correcting
+the SQL of an already-applied migration is safe for a deployed host: `mg apply`
+reports `No pending migrations`, exits 0, and touches no schema. `mg verify`,
+however, will report `Checksum mismatch` and exit 1 from then on, because the
+file on disk no longer hashes to what was recorded when it ran.
+
+After deploying such a correction, re-baseline the recorded checksum on each
+host that had already applied it:
+
+```bash
+MG_DATABASE_URL="${AUTH_DATABASE_URL/+psycopg/}" .venv/bin/mg fix <id> --applied --yes
+MG_DATABASE_URL="${AUTH_DATABASE_URL/+psycopg/}" .venv/bin/mg verify
+```
+
+`mg fix --applied` re-records the checksum from disk and changes no schema and
+no rows. Only do this when the correction is a no-op against the state that host
+is already in — if the amended SQL would have produced a *different* schema, it
+needs a new migration instead.
+
 ## CI
 
 - `make test-postgres` and the GitHub `postgres` job run `mg apply` against the
