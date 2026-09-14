@@ -195,16 +195,29 @@ $$;
 
 -- 6. indexes, recreated on the parent so every partition inherits them.
 --    ix_..._id mirrors the model's index=True on the primary key column.
-CREATE INDEX IF NOT EXISTS ix_auth_rbac_audit_log_id
-    ON auth_rbac.audit_log (id);
-CREATE INDEX IF NOT EXISTS ix_auth_rbac_audit_log_client_id
-    ON auth_rbac.audit_log (client_id);
-CREATE INDEX IF NOT EXISTS ix_auth_rbac_audit_log_user
-    ON auth_rbac.audit_log ("user");
--- new: retention and time-range queries scan by timestamp; the old table had no
--- index on it at all.
-CREATE INDEX IF NOT EXISTS ix_auth_rbac_audit_log_timestamp
-    ON auth_rbac.audit_log ("timestamp");
+--    IF NOT EXISTS guards the index NAME, not the table, so these must sit behind
+--    the same absent-table guard the conversion block uses: to_regclass returns
+--    NULL instead of raising. On a fresh database auth_rbac.audit_log has not
+--    been created yet (SQLAlchemy create_all does that at app boot), and an
+--    unguarded CREATE INDEX errors there rather than no-opping.
+DO $guard$
+BEGIN
+    IF to_regclass('auth_rbac.audit_log') IS NULL THEN
+        RAISE NOTICE 'auth_rbac.audit_log absent; skipping index creation';
+        RETURN;
+    END IF;
+    CREATE INDEX IF NOT EXISTS ix_auth_rbac_audit_log_id
+        ON auth_rbac.audit_log (id);
+    CREATE INDEX IF NOT EXISTS ix_auth_rbac_audit_log_client_id
+        ON auth_rbac.audit_log (client_id);
+    CREATE INDEX IF NOT EXISTS ix_auth_rbac_audit_log_user
+        ON auth_rbac.audit_log ("user");
+    -- new: retention and time-range queries scan by timestamp; the old table had
+    -- no index on it at all.
+    CREATE INDEX IF NOT EXISTS ix_auth_rbac_audit_log_timestamp
+        ON auth_rbac.audit_log ("timestamp");
+END;
+$guard$;
 
 -- migrate: down
 -- Collapse back to a single unpartitioned table, preserving rows and the sequence.
@@ -250,9 +263,17 @@ BEGIN
 END;
 $$;
 
-CREATE INDEX IF NOT EXISTS ix_auth_rbac_audit_log_id ON auth_rbac.audit_log (id);
-CREATE INDEX IF NOT EXISTS ix_auth_rbac_audit_log_client_id ON auth_rbac.audit_log (client_id);
-CREATE INDEX IF NOT EXISTS ix_auth_rbac_audit_log_user ON auth_rbac.audit_log ("user");
+DO $guard$
+BEGIN
+    IF to_regclass('auth_rbac.audit_log') IS NULL THEN
+        RAISE NOTICE 'auth_rbac.audit_log absent; skipping index creation';
+        RETURN;
+    END IF;
+    CREATE INDEX IF NOT EXISTS ix_auth_rbac_audit_log_id ON auth_rbac.audit_log (id);
+    CREATE INDEX IF NOT EXISTS ix_auth_rbac_audit_log_client_id ON auth_rbac.audit_log (client_id);
+    CREATE INDEX IF NOT EXISTS ix_auth_rbac_audit_log_user ON auth_rbac.audit_log ("user");
+END;
+$guard$;
 
 DROP FUNCTION IF EXISTS auth_rbac.drop_audit_log_partitions_before(date);
 DROP FUNCTION IF EXISTS auth_rbac.provision_audit_log_partition(date);
