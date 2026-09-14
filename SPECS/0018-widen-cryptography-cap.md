@@ -1,7 +1,7 @@
 # SPEC 0018 — Widen the cryptography cap so security updates are never blocked
 
 - **Ticket:** issuedb #4
-- **Status:** in-progress
+- **Status:** closed — published as 3.1.1 and deployed to vm-2 on 2026-09-14
 - **Tags:** security
 - **Origin:** infra ticket 18 (infra-manager-c13110), AgentBus thread 01M2F63Z89QG51XS4KG3ED6RBB
 

@@ -1,7 +1,7 @@
 # SPEC 0019 — partition_audit_log fails on a fresh database
 
 - **Ticket:** issuedb #5 (blocks #4)
-- **Status:** in-progress
+- **Status:** closed — merged as d326f2a (PR #28); master CI green 2026-09-14
 - **Tags:** bug
 - **Origin:** master CI red since 2026-08-09; surfaced while releasing 3.1.1 (SPEC 0018)
 
@@ -129,3 +129,9 @@ under "Amending a migration that is already applied".
 Note on measurement: the first two attempts at this check piped `mg` through
 `tail`, so `$?` reported `tail`'s status and printed `exit 0` over a real
 failure. The exit codes above are `mg`'s own, captured before any pipe.
+
+## Note on vm-2
+
+migretti is not installed on vm-2 (`mg` absent; `import migretti` fails), so the
+`mg fix --applied` re-baseline does not apply on that host. Migrations are run
+from elsewhere against the production DSN; the step is required wherever that is.
