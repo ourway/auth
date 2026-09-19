@@ -63,6 +63,30 @@ def main():
         f"HTTP {h.status_code} {h.get_json()}",
     )
 
+    body = r.get_json() or {}
+    p.check(
+        "/readyz reports pool depth (needs no round trip, so it survives a stall)",
+        isinstance(body.get("pool"), dict) and "checked_out" in body["pool"],
+        repr(body.get("pool")),
+    )
+
+    # Single-flight: while a commit probe is in flight, a second caller must get
+    # the last verdict rather than queueing another backend onto the fsync path
+    # it is trying to measure.
+    from auth.routes import public as _public
+
+    assert _public._COMMIT_PROBE_LOCK.acquire(blocking=False)
+    try:
+        r2 = client.get("/readyz")
+        b2 = r2.get_json() or {}
+        p.check(
+            "a second concurrent probe does not start another commit",
+            b2.get("reason") == "commit probe already in flight",
+            f"HTTP {r2.status_code} {b2}",
+        )
+    finally:
+        _public._COMMIT_PROBE_LOCK.release()
+
     # Known-negative: readiness must be able to report NOT ready.
     from auth import keycheck
 
