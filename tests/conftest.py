@@ -37,22 +37,63 @@ os.environ.setdefault("AUTH_STRICT_USERS_DEFAULT", "false")
 import pytest  # noqa: E402
 
 
+class TestDatabaseIsolationError(AssertionError):
+    """Raised when the suite is pointed at something that is not a test database."""
+
+
+# Databases a postgres test run may legitimately reach. Override for a
+# differently-named disposable instance; it is deliberately NOT open-ended.
+ALLOWED_TEST_DATABASES = set(
+    filter(None, os.environ.get("AUTH_TEST_DB_ALLOWLIST", "auth_test,postgres_test").split(","))
+)
+
+
+def assert_test_database(engine) -> str:
+    """Refuse to run against anything that is not a disposable test database.
+
+    Asks the SERVER which database it actually reached rather than comparing a
+    connection string against a value derived from the same input. The previous
+    version did the latter and could not fail: ``expected`` was built from
+    ``AUTH_SQLITE_PATH`` and ``actual`` was the engine built from that same
+    variable, so the two moved together for any value — pointing the suite at a
+    decoy path left the whole run green. The postgres branch only asserted the
+    URL scheme, which a production DSN satisfies just as well as a container's.
+
+    Returns a description of what was reached, so a caller can show its
+    evidence. Raises :class:`TestDatabaseIsolationError` otherwise.
+    """
+    url = engine.url
+    if url.get_backend_name() == "sqlite":
+        path = os.path.realpath(url.database or "")
+        root = os.path.realpath(_TEST_DB_DIR)
+        if not path.startswith(root + os.sep):
+            raise TestDatabaseIsolationError(
+                f"Test isolation broken: the SQLite database is {path!r}, which is "
+                f"not inside this run's temporary directory {root!r}. Tests must "
+                "never touch a database that outlives the run."
+            )
+        return f"sqlite at {path}"
+
+    with engine.connect() as conn:
+        row = conn.exec_driver_sql(
+            "SELECT current_database(), inet_server_addr()::text, current_user"
+        ).fetchone()
+    database, host, user = (row[0], row[1], row[2]) if row else (None, None, None)
+    if database not in ALLOWED_TEST_DATABASES:
+        raise TestDatabaseIsolationError(
+            f"Refusing to run the test suite against database {database!r} on "
+            f"host {host!r} as {user!r}. Allowed: {sorted(ALLOWED_TEST_DATABASES)}. "
+            "Set AUTH_TEST_DB_ALLOWLIST only for a genuinely disposable instance."
+        )
+    return f"postgresql database {database!r} on {host!r} as {user!r}"
+
+
 @pytest.fixture(scope="session", autouse=True)
 def _verify_test_db_isolation():
-    """Fail the whole run loudly if the engine ever points at a non-test DB."""
+    """Fail the whole run loudly if the engine points at a non-test database."""
     from auth.database import engine
 
-    url = str(engine.url)
-    if os.environ["AUTH_DATABASE_TYPE"] == "postgresql":
-        assert url.startswith("postgresql+psycopg://"), (
-            f"Postgres test run resolved an unexpected engine URL: {url!r}"
-        )
-    else:
-        expected = f"sqlite:///{os.environ['AUTH_SQLITE_PATH']}"
-        assert url == expected, (
-            f"Test isolation broken: engine URL is {url!r}, expected {expected!r}. "
-            "Check that no module imported `auth` before tests/conftest.py ran."
-        )
+    print(f"\ntest database isolation verified: {assert_test_database(engine)}")
     yield
 
 
