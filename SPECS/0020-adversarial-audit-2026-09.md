@@ -1,7 +1,7 @@
 # SPEC 0020 — Adversarial audit (3 passes) and remediation
 
 - **Tickets:** issuedb #12 (F-2), #13 (F-4), #14 (F-3), #15 (F-5), #16 (F-1), #17 (F-6)
-- **Status:** in-progress — Step 1 landed; Steps 0, 2, 3, 4 open
+- **Status:** in-progress — Steps 0-4 landed (unmerged, undeployed); #11 and deployment open
 - **Plan:** `~/.claude/plans/ok-run-two-passes-linear-quiche.md`
 - **Method:** `mission-critical-audit` skill, single-threaded, non-destructive (read-only mode)
 
@@ -40,13 +40,13 @@ remediation plan and reordered it.
 
 | | Severity | Finding | Status |
 |---|---|---|---|
-| F-2 | critical | Changing/losing `AUTH_ENCRYPTION_KEY` silently denies every authorisation; `/health` stays healthy; key loss is unrecoverable | CONFIRMED, open (#12) |
-| F-4 | critical | 2 sync workers ⇒ estate-wide concurrency of 2; a DB latency event becomes a total outage; `/health` probes reads only | CONFIRMED config / SUSPECTED cause, open (#13) |
+| F-2 | critical | Changing/losing `AUTH_ENCRYPTION_KEY` silently denies every authorisation; `/health` stays healthy; key loss is unrecoverable | CONFIRMED, **fixed** (#12) |
+| F-4 | critical | 2 sync workers ⇒ estate-wide concurrency of 2; a DB latency event becomes a total outage; `/health` probes reads only | CONFIRMED config / SUSPECTED cause, **fixed** (#13) |
 | F-3 | high | Every audit row records `127.0.0.1` — no ProxyFix | CONFIRMED LIVE, **fixed** (#14) |
-| F-5 | medium | Audit partitions exhaust 2027-09-01; nothing provisions more; retention cannot reclaim the default partition | CONFIRMED, open (#15) |
+| F-5 | medium | Audit partitions exhaust 2027-09-01; nothing provisions more; retention cannot reclaim the default partition | CONFIRMED, **fixed** (#15) |
 | F-1 | medium | Two divergent client-key validators ⇒ 500 instead of 400 | CONFIRMED LIVE, **fixed** (#16) |
 | F-6 | medium | `USER_NAME_PATTERN` rejects `\|` and `:` | CONFIRMED, **fixed** (#17) |
-| F-7 | low | `BackgroundScheduler` started pre-fork under `preload_app` | SUSPECTED, unresolved |
+| F-7 | low | `BackgroundScheduler` started pre-fork under `preload_app` | CONFIRMED, **fixed** (lazy start) |
 
 ## Falsifications that failed (positive results)
 
@@ -76,3 +76,25 @@ commit stall was never reproduced, so F-4's causal link is reasoned, not shown.
 No sustained load beyond an 8-request burst. Key rotation was never run against
 production. The retention path has never run in production. F-7 is unresolved —
 the thread probe could not distinguish absence from naming.
+
+
+## Implementation notes discovered while fixing
+
+- **`statement_timeout` does not bound `COMMIT`.** The reported failure is a
+  commit stall, so no statement timeout can shed it. Concurrency, not timeouts,
+  is the mitigation for F-4 — this inverted Step 3's planned ordering.
+  `tcp_user_timeout` would bound it at the socket and was **rejected**: dropping
+  a connection mid-COMMIT leaves the outcome ambiguous, and an ambiguous
+  permission grant is worse than a slow one.
+- **Connection headroom measured**: `max_connections=200`, ~40 in use across 11
+  roles, auth using 3. The concurrency raise (2 → 16) is comfortably within it.
+- **Key rotation measured** at 0.12 ms/row — about 1s for the largest namespace
+  on this deployment (4,139 memberships + 4,181 API keys), so a 10s
+  `statement_timeout` leaves 10× headroom. Pass 3's concern that a lower timeout
+  could make rotation impossible is refuted by measurement.
+- **The test suite shared one SQLite database** across modules that deliberately
+  enable encryption, so the new key check correctly reported a mismatch that no
+  deployment could be in. Cleared between tests rather than weakening the check.
+- **My own first canary probe went red for the wrong reason** — the stage
+  subprocess crashed, every value was `None`, and one check passed vacuously.
+  Hardened to fail loudly on a dead stage.
