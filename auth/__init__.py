@@ -4,6 +4,7 @@ from importlib.metadata import PackageNotFoundError, version
 from typing import Optional
 
 from auth.client import (  # Import the new client
+    AuthRefused,
     AuthTransportError,
     Client,
     EnhancedAuthClient,
@@ -140,6 +141,7 @@ class Authorization:
 # Export the new client for users who want enhanced features
 __all__ = [
     "Authorization",
+    "AuthRefused",
     "AuthTransportError",
     "Client",
     "EnhancedAuthClient",

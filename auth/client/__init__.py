@@ -13,6 +13,7 @@ their ``__module__``.
 from auth.circuit_breaker import circuit_breaker
 from auth.client._transport import (
     _RETRY_METHODS,
+    AuthRefused,
     AuthTransportError,
     RetryableHTTPAdapter,
     _build_retry,
@@ -44,6 +45,7 @@ class Client(EnhancedAuthClient):
 
 __all__ = [
     "ApiKeyMixin",
+    "AuthRefused",
     "AuthTransportError",
     "Client",
     "ClientBase",
