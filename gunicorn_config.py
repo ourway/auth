@@ -7,7 +7,15 @@ backlog = 2048
 
 # Worker processes
 workers = 2
-worker_class = "sync"
+# gthread, not sync. Sync workers serve exactly one request each, so two of them
+# cap the whole service at two concurrent requests: a database that is merely
+# SLOW (commit stalls of 20-27s have been observed on the DB host) takes auth
+# fully offline for every caller rather than making it slower. Threads let a
+# stalled request hold a thread instead of the entire worker.
+# 2 workers x 8 threads = 16 concurrent; the pool below is sized to match, and
+# pg max_connections=200 with ~40 in use leaves ample headroom.
+worker_class = "gthread"
+threads = 8
 worker_connections = 1000
 timeout = 30
 keepalive = 2

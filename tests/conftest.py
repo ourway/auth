@@ -54,3 +54,42 @@ def _verify_test_db_isolation():
             "Check that no module imported `auth` before tests/conftest.py ran."
         )
     yield
+
+
+@pytest.fixture(autouse=True)
+def _isolate_encrypted_rows():
+    """Keep the deployment-wide encryption-key verdict meaningful across tests.
+
+    The suite shares ONE SQLite database for the whole session, and several
+    modules deliberately enable field encryption and write ``v2:`` ciphertext
+    into it (test_api_keys_encryption, test_encryption_integration,
+    test_key_rotation...). Those rows outlive the test that wrote them, so the
+    next module's ``create_app()`` — running with encryption off, per the
+    defaults at the top of this file — correctly reports that the database is
+    encrypted with a key it does not have, and refuses /api.
+
+    That verdict is true, and it is about a database state no deployment would
+    ever be in. Rather than weaken the check, clear the ciphertext between
+    tests. Production behaviour is covered out of process by
+    ``audit/evaluations/probe_encryption_key_canary.py``, which asserts all
+    three states (ok / mismatch / fresh) against databases of its own.
+    """
+    from auth import keycheck
+
+    keycheck.reset_for_tests()
+    yield
+    keycheck.reset_for_tests()
+    try:
+        from sqlalchemy import text
+
+        from auth.database import SessionLocal
+
+        db = SessionLocal()
+        try:
+            for table in ("auth_api_key", "auth_membership"):
+                db.execute(text(f'DELETE FROM {table} WHERE "user" LIKE :p'), {"p": "v2:%"})
+            db.commit()
+        finally:
+            db.close()
+    except Exception:  # pragma: no cover - the table may not exist yet
+        pass

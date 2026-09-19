@@ -93,7 +93,10 @@ class DatabaseEngine(metaclass=SingletonMeta):
 
         if settings.database_type == DatabaseType.POSTGRESQL:
             # Conservative sizing for production with multiple workers
-            return (5, 5)  # 10 max connections per worker
+            # Must be >= gunicorn `threads` so a thread never waits on the
+            # pool while the database is healthy. 2 workers x (10 + 5) = 30
+            # connections at full stretch, against max_connections=200.
+            return (10, 5)
         else:
             # SQLite - smaller pool since it's file-based
             return (5, 10)
@@ -106,7 +109,17 @@ class DatabaseEngine(metaclass=SingletonMeta):
             "connect_timeout": 30,
             "application_name": "auth_server",
             # Set statement timeout to prevent long-running queries
-            "options": "-c statement_timeout=30000",  # 30 seconds
+            # 10s: the slowest legitimate operation is a key rotation, measured
+            # at ~0.12 ms/row (~1s for the largest namespace on this deployment),
+            # so this leaves 10x headroom.
+            #
+            # NOTE: statement_timeout does NOT bound COMMIT. A commit stall is
+            # therefore unaffected by this value, which is why worker
+            # concurrency -- not this timeout -- is the mitigation for a stalled
+            # database. tcp_user_timeout would bound it at the socket, but
+            # dropping a connection mid-COMMIT leaves the outcome ambiguous, and
+            # an ambiguous permission grant is a worse failure than a slow one.
+            "options": "-c statement_timeout=10000",  # 10 seconds
         }
 
         forced = _forced_sslmode(database_url)
@@ -119,7 +132,7 @@ class DatabaseEngine(metaclass=SingletonMeta):
             poolclass=pool.QueuePool,  # Explicitly use QueuePool
             pool_size=pool_size,
             max_overflow=max_overflow,
-            pool_timeout=30,  # Wait up to 30s for a connection
+            pool_timeout=10,  # Fail fast rather than queueing behind a stalled DB
             pool_recycle=3600,  # Recycle connections after 1 hour
             pool_pre_ping=True,  # Verify connections before using them
             # Performance settings

@@ -14,7 +14,9 @@ PY=${AUDIT_PYTHON:-"$DIR/../../.venv/bin/python"}
 
 SAFE="probe_client_key_validator_parity.py
 probe_audit_records_real_client_ip.py
-probe_user_name_charset.py"
+probe_user_name_charset.py
+probe_encryption_key_canary.py
+probe_readiness_and_concurrency.py"
 
 DESTRUCTIVE=""
 

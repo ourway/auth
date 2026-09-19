@@ -111,6 +111,15 @@ def create_app():
         setup_audit_tables()  # Set up audit tables
         initialize_workflow_checker()  # Initialize workflow permission checker
 
+        # Verify the configured encryption key against this deployment's own
+        # stored data. A changed key is otherwise invisible: every lookup misses
+        # and every authorization answer becomes a confident "denied" with a 200.
+        from auth.database import get_db
+        from auth.keycheck import verify_encryption_key
+
+        with get_db() as _db:
+            verify_encryption_key(_db)
+
     # Import and register routes
     from auth.docs_page import register_docs_routes
     from auth.routes import register_routes

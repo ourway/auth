@@ -5,6 +5,7 @@ import logging
 from flask import abort, g, jsonify, request
 from sqlalchemy import text
 
+from auth import keycheck
 from auth.database import engine
 from auth.validation import (
     validate_client_key,
@@ -29,6 +30,12 @@ def register(app):
             return None
         if not request.path.startswith("/api/"):
             return None
+
+        # Fail closed and LOUDLY when the encryption key cannot read our own
+        # data. Serving would answer every authorization question negatively
+        # with a 200, which a caller cannot distinguish from a real denial.
+        if keycheck.is_degraded():
+            abort(503, description=f"Service degraded: {keycheck.detail()}")
 
         auth_header = request.headers.get("Authorization")
         if not auth_header:
@@ -71,4 +78,33 @@ def register(app):
         except Exception:
             logger.exception("health check failed: database unreachable")
             return jsonify({"status": "unhealthy"}), 503
+        if keycheck.is_degraded():
+            return jsonify({"status": "unhealthy", "reason": keycheck.detail()}), 503
         return jsonify({"status": "healthy"})
+
+    @app.route("/readyz", methods=["GET"])
+    def readyz():
+        """Readiness: can this instance actually COMMIT?
+
+        ``/health`` round-trips a ``SELECT``, which a database keeps serving
+        happily while its commit path is stalled — the failure mode actually
+        observed on this deployment (20-27s COMMIT stalls). ``statement_timeout``
+        does not bound COMMIT either, so nothing else notices.
+
+        This assigns a real transaction id and commits it, so the WAL/fsync path
+        is exercised and a commit stall shows up here instead of being invisible.
+        Flask serves HEAD for a GET route, so probes that use HEAD get the same
+        status with an empty body.
+        """
+        if keycheck.is_degraded():
+            return jsonify({"status": "unready", "reason": keycheck.detail()}), 503
+        try:
+            with engine.begin() as conn:
+                if conn.dialect.name == "postgresql":
+                    conn.execute(text("SELECT txid_current()"))
+                else:
+                    conn.execute(text("SELECT 1"))
+        except Exception:
+            logger.exception("readiness check failed: commit path unavailable")
+            return jsonify({"status": "unready", "reason": "commit path"}), 503
+        return jsonify({"status": "ready"})
