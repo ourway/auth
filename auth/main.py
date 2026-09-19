@@ -6,6 +6,7 @@ import logging
 
 from flask import Flask
 from flask_cors import CORS
+from werkzeug.middleware.proxy_fix import ProxyFix
 
 from auth.audit import setup_audit_tables
 from auth.config import get_settings, verify_audit_pepper, warn_on_weak_secrets
@@ -71,6 +72,14 @@ def _init_rate_limiter(app, settings):
 def create_app():
     # Create Flask app
     app = Flask(__name__)
+
+    # Exactly ONE trusted proxy hop (nginx on the app host). nginx appends the
+    # real peer to X-Forwarded-For, so x_for=1 takes the rightmost entry and a
+    # client-supplied prefix cannot override it. Without this every audit row
+    # records the proxy (127.0.0.1) instead of the caller.
+    app.wsgi_app = ProxyFix(  # type: ignore[method-assign]
+        app.wsgi_app, x_for=1, x_proto=1, x_host=1
+    )
 
     settings = get_settings()
     # Fail closed before serving: a server that writes audit rows must not run
