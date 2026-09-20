@@ -136,7 +136,10 @@ def validate_user_role_combination(user: str, role: str) -> tuple[bool, str]:
     if not validate_user_name(user):
         return (
             False,
-            f"Invalid user name: {user}. User names must be 1-64 characters long and contain only alphanumeric, underscore, hyphen, or email characters (@ . +).",
+            f"Invalid user name: {user}. User names must be 1-64 characters "
+            "long and contain only alphanumeric characters, underscore, "
+            "hyphen, the email characters (@ . +), or the namespace "
+            "separators (| :).",
         )
 
     if not validate_role_name(role):
