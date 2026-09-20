@@ -15,7 +15,11 @@ import uuid
 from typing import Tuple
 
 API_KEY_PREFIX = "rak_"
+#: Recovery ("rotate") keys. A different prefix so a credential is never
+#: mistaken for the other kind, and so a leaked one is identifiable on sight.
+ROTATE_KEY_PREFIX = "rrk_"
 API_KEY_PATTERN = re.compile(r"^rak_[0-9A-Za-z]{43}$")
+ROTATE_KEY_PATTERN = re.compile(r"^rrk_[0-9A-Za-z]{43}$")
 
 # "rak_" + first 8 payload chars — safe to store and display in listings.
 KEY_PREFIX_LEN = 12
@@ -48,3 +52,21 @@ def generate_api_key() -> Tuple[str, str, str, str]:
 def hash_api_key(secret: str) -> str:
     """SHA-256 hex digest of the full secret string (equality-queryable)."""
     return hashlib.sha256(secret.encode()).hexdigest()
+
+
+def generate_rotate_key() -> Tuple[str, str]:
+    """Mint a recovery key: returns ``(secret, secret_hash)``.
+
+    Same construction and entropy as a user API key -- 256 bits from
+    ``secrets.token_bytes(32)`` -- because it guards more, not less: whoever
+    holds it can take over the namespace without the client key. Only the hash
+    is stored, and the secret is disclosed exactly once.
+    """
+    payload = _base62(secrets.token_bytes(32)).rjust(_PAYLOAD_LEN, _ALPHABET[0])
+    secret = ROTATE_KEY_PREFIX + payload
+    return secret, hash_api_key(secret)
+
+
+def validate_rotate_key_format(secret: str) -> bool:
+    """Shape check before any database work."""
+    return bool(ROTATE_KEY_PATTERN.match(secret))

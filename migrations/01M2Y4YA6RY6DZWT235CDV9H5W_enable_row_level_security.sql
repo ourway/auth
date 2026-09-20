@@ -37,6 +37,22 @@ BEGIN
         RETURN;
     END IF;
 
+--    USING admits auth.rotating_to_fp as well as the caller's own tenant, and
+--    that is NOT belt-and-braces -- it is required. On an UPDATE, PostgreSQL
+--    applies the USING clause to the row AFTER the update as well as before:
+--    a rotated row no longer satisfies `creator_fp = auth.tenant_fp`, so a
+--    USING clause naming only the caller rejects the rotation with "new row
+--    violates row-level security policy" even though WITH CHECK would have
+--    admitted it. Measured, not assumed: replacing USING with `true` made the
+--    same statement succeed.
+--
+--    WITH CHECK recomputes the fingerprint inline from `creator` rather than
+--    reading `creator_fp`, so it never depends on when a generated column is
+--    materialised relative to the policy check.
+--
+--    auth.rotating_to_fp is transaction-local and set only inside
+--    rotate_client_key, so outside a rotation both clauses reduce to the
+--    caller's own tenant.
     -- 1. The five tables that carry `creator` directly.
     --
     -- WITH CHECK admits auth.rotating_to_fp as well, because key rotation
@@ -54,9 +70,12 @@ BEGIN
         EXECUTE format($p$
             CREATE POLICY tenant_isolation ON auth_rbac.%I
             FOR ALL
-            USING (creator_fp = current_setting('auth.tenant_fp', true))
-            WITH CHECK (creator_fp = current_setting('auth.tenant_fp', true)
-                        OR creator_fp = current_setting('auth.rotating_to_fp', true))
+            USING (creator_fp = ANY (ARRAY[
+                       current_setting('auth.tenant_fp', true),
+                       current_setting('auth.rotating_to_fp', true)]))
+            WITH CHECK (encode(sha256(creator::bytea), 'hex') = ANY (ARRAY[
+                       current_setting('auth.tenant_fp', true),
+                       current_setting('auth.rotating_to_fp', true)]))
         $p$, t);
     END LOOP;
 
@@ -83,7 +102,9 @@ BEGIN
             FOR ALL
             USING (EXISTS (SELECT 1 FROM auth_rbac.auth_membership m
                            WHERE m.id = membership_id
-                             AND m.creator_fp = current_setting('auth.tenant_fp', true)))
+                             AND m.creator_fp = ANY (ARRAY[
+                                 current_setting('auth.tenant_fp', true),
+                                 current_setting('auth.rotating_to_fp', true)])))
             WITH CHECK (EXISTS (SELECT 1 FROM auth_rbac.auth_membership m
                                 WHERE m.id = membership_id
                                   AND m.creator_fp IN (
@@ -99,7 +120,9 @@ BEGIN
             FOR ALL
             USING (EXISTS (SELECT 1 FROM auth_rbac.auth_permission p
                            WHERE p.id = permission_id
-                             AND p.creator_fp = current_setting('auth.tenant_fp', true)))
+                             AND p.creator_fp = ANY (ARRAY[
+                                 current_setting('auth.tenant_fp', true),
+                                 current_setting('auth.rotating_to_fp', true)])))
             WITH CHECK (EXISTS (SELECT 1 FROM auth_rbac.auth_permission p
                                 WHERE p.id = permission_id
                                   AND p.creator_fp IN (

@@ -1,8 +1,10 @@
 """Tenant settings, strict user identity, and the tenant audit trail."""
 
 import json
+from datetime import datetime
 from typing import Any, Dict, List, Optional, Tuple, cast
 
+from auth.api_keys import generate_rotate_key
 from auth.audit import AuditLog, client_fingerprint
 from auth.models.sql import (
     AuthApiKey,
@@ -62,6 +64,36 @@ class TenantMixin(ServiceBase):
         self._strict_cache = enabled
         self._commit()
         return {"strict_users": enabled}
+
+    # --- Recovery credential (issuedb #19) ------------------------------
+
+    def issue_rotate_key(self) -> Optional[str]:
+        """Mint this tenant's recovery key, once and only once.
+
+        Returns the secret on first call and ``None`` on every call after it.
+        The secret is never stored, so there is nothing to re-disclose even to
+        an operator; ``rotate_key_issued_at`` is the latch, and it being NULL is
+        exactly why every tenant that predates this feature can still claim
+        theirs.
+        """
+        self._lock_tenant()
+        row = (
+            self.db.query(AuthTenantSettings)
+            .filter(AuthTenantSettings.creator == self.client)
+            .first()
+        )
+        if row is None:
+            row = AuthTenantSettings(creator=self.client, strict_users=False)
+            self.db.add(row)
+            self.db.flush()
+        if cast(Optional[datetime], row.rotate_key_issued_at) is not None:
+            return None
+
+        secret, secret_hash = generate_rotate_key()
+        row.rotate_key_hash = secret_hash  # type: ignore[assignment]
+        row.rotate_key_issued_at = _utcnow()  # type: ignore[assignment]
+        self._commit()
+        return secret
 
     def get_audit(
         self, limit: int = 50, offset: int = 0, action: Optional[str] = None

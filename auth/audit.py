@@ -46,6 +46,8 @@ class AuditAction(Enum):
     GET_SETTINGS = "GET_SETTINGS"
     UPDATE_SETTINGS = "UPDATE_SETTINGS"
     GET_AUDIT = "GET_AUDIT"
+    GET_ROTATE_KEY = "GET_ROTATE_KEY"
+    RECOVER_KEY = "RECOVER_KEY"
 
 
 class AuditLog(Base):

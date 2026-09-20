@@ -71,3 +71,5 @@ dependency-grap/
 
 # test-only env (never a real secret)
 test.env
+.agentbus/
+.claude/settings.local.json

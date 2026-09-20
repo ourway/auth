@@ -19,7 +19,9 @@ probe_encryption_key_canary.py
 probe_readiness_and_concurrency.py
 probe_audit_partition_runway.py
 probe_test_isolation_guard.py
-probe_client_distinguishes_refusal.py"
+probe_client_distinguishes_refusal.py
+probe_rotate_key_recovery.py
+probe_rls_cross_tenant_isolation.py"
 
 DESTRUCTIVE=""
 
