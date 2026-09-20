@@ -18,6 +18,7 @@ from auth.config import DatabaseType, get_settings, warn_on_weak_secrets
 from auth.schema_reconcile import (
     GRANDFATHER_MARKER,  # noqa: F401  - re-exported; tests and embedded callers import it from here
     _apply_tenant_rls,
+    _ensure_audit_partition_runway,
     _grandfather_strict_users,
     _reconcile_text_columns,
 )
@@ -350,6 +351,7 @@ def create_tables(raise_on_error: bool = False):
         # is how a fresh database came up with the junction tables unprotected
         # -- grandfathering raised, and the RLS step below it never ran.
         _apply_tenant_rls(engine)
+        _ensure_audit_partition_runway(engine)
         _reconcile_text_columns(engine)
         _grandfather_strict_users(engine)
         logger.info("Tables created successfully.")
