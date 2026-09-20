@@ -62,6 +62,79 @@ def _apply_tenant_rls(target_engine: Engine) -> None:
         )
 
 
+def _ensure_audit_partition_runway(target_engine: Engine, months: int = 6) -> None:
+    """Keep monthly audit_log partitions provisioned ahead of now.
+
+    Partitions are finite and nothing renewed them. When they run out, rows do
+    not fail -- they land in audit_log_default, which
+    drop_audit_log_partitions_before deliberately skips, so retention can never
+    reclaim them and the growth problem partitioning solved returns with no
+    visible symptom (issuedb #15; production runway ended 2027-08).
+
+    Called here rather than scheduled in-process: create_tables runs pre-fork
+    under preload_app, so this executes once per service start, not once per
+    worker, and holds no thread across fork. A cron on the database-adjacent
+    host is still the durable answer for a deployment that runs longer than its
+    runway without restarting; this removes the cliff for one that restarts.
+
+    Non-raising, like everything beside it. A deployment whose role cannot
+    create partitions still starts, and rows in the default partition are
+    reported loudly below rather than silently absorbed.
+    """
+    from sqlalchemy import text
+
+    settings = get_settings()
+    if settings.database_type != DatabaseType.POSTGRESQL:
+        return
+    schema = settings.database_schema or "public"
+    try:
+        with target_engine.begin() as conn:
+            if conn.execute(
+                text("SELECT to_regproc(:fn) IS NULL"),
+                {"fn": f"{schema}.provision_audit_log_partition"},
+            ).scalar():
+                logger.info(
+                    "audit partition runway: provisioner absent, skipping"
+                )
+                return
+            created = []
+            for ahead in range(months + 1):
+                result = conn.execute(
+                    text(
+                        f"SELECT {schema}.provision_audit_log_partition("  # noqa: S608
+                        "(date_trunc('month', now()) + make_interval(months => :n))::date)"
+                    ),
+                    {"n": ahead},
+                ).scalar_one()
+                if "created" in str(result):
+                    created.append(str(result))
+            stranded = conn.execute(
+                text(f"SELECT count(*) FROM {schema}.audit_log_default")  # noqa: S608
+            ).scalar_one()
+    except Exception as exc:
+        logger.warning(
+            "audit partition runway could not be ensured (%s); "
+            "if partitions run out, rows land in audit_log_default and "
+            "retention cannot reclaim them",
+            exc.__class__.__name__,
+        )
+        return
+
+    logger.info(
+        "audit partition runway: %d month(s) ahead, %d created this start",
+        months,
+        len(created),
+    )
+    if stranded:
+        logger.critical(
+            "AUDIT PARTITION RUNWAY WAS EXHAUSTED: %d row(s) are in "
+            "audit_log_default. Retention skips that partition, so they can "
+            "never be reclaimed. They must be moved into a real partition by "
+            "hand once one covers their timestamps.",
+            stranded,
+        )
+
+
 def _reconcile_text_columns(target_engine: Engine) -> None:
     """Widen live ``character varying`` columns to TEXT where the current models
     declare :class:`~sqlalchemy.Text` (issuedb #21).
