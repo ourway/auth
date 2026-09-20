@@ -115,9 +115,12 @@ def create_app():
         # stored data. A changed key is otherwise invisible: every lookup misses
         # and every authorization answer becomes a confident "denied" with a 200.
         from auth.database import get_db
-        from auth.keycheck import verify_encryption_key
+        from auth.keycheck import verify_encryption_key, verify_row_level_security
 
         with get_db() as _db:
+            # Order matters: RLS first, because the canary read below depends on
+            # it being configured the way this process expects.
+            verify_row_level_security(_db)
             verify_encryption_key(_db)
 
     # Import and register routes

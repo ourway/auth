@@ -19,8 +19,17 @@ probe_encryption_key_canary.py
 probe_readiness_and_concurrency.py
 probe_audit_partition_runway.py
 probe_test_isolation_guard.py
-probe_client_distinguishes_refusal.py"
+probe_client_distinguishes_refusal.py
+probe_rotate_key_recovery.py
+probe_rls_cross_tenant_isolation.py
+probe_rls_no_leak_across_pooled_connections.py
+probe_rls_covers_every_tenant_table.py
+probe_rls_forced_not_merely_enabled.py"
 
+# probe_rls_forced_not_merely_enabled gates its own destructive half: it only
+# takes FORCE off a table when AUDIT_ALLOW_DESTRUCTIVE=1 and a superuser URL
+# are both given, and says plainly when it did not, so it is safe in the list
+# above and there is nothing to run twice here.
 DESTRUCTIVE=""
 
 fails=0

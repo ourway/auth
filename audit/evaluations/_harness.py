@@ -47,6 +47,19 @@ def local_client(**overrides):
     return app.test_client(), str(uuid.uuid4())
 
 
+def raw_dsn(url):
+    """A SQLAlchemy URL as libpq wants it.
+
+    The probes take one variable for each role and hand it to whichever client
+    is convenient, so the driver suffix has to come off before psycopg sees it
+    -- it rejects `postgresql+psycopg://...` with "missing = after", which reads
+    like a malformed password rather than the wrong URL dialect.
+    """
+    if not url:
+        return url
+    return url.replace("postgresql+psycopg://", "postgresql://", 1)
+
+
 def remote_target():
     """(base_url, client_key) when the operator points at a deployment."""
     base = os.environ.get("AUTH_BASE_URL")

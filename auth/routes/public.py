@@ -53,6 +53,11 @@ def register(app):
             return None
         if not request.path.startswith("/api/"):
             return None
+        # Recovery authenticates with the rotate key, in the body. Demanding a
+        # client-key Bearer here would make the endpoint useless to the only
+        # caller it exists for: someone who has lost theirs.
+        if request.path == "/api/keys/recover":
+            return None
 
         # Fail closed and LOUDLY when the encryption key cannot read our own
         # data. Serving would answer every authorization question negatively

@@ -291,5 +291,13 @@ class AuthTenantSettings(Base):
     id = Column(Integer, primary_key=True, index=True)
     creator = Column(String(64), nullable=False)
     strict_users = Column(Boolean, nullable=False, default=False)
+    # Recovery credential. Only the SHA-256 of the secret is stored; the secret
+    # itself is returned once at issuance and never again, so a lost rotate key
+    # is as unrecoverable as a lost client key. ``rotate_key_issued_at`` is the
+    # once-only latch: NULL means never disclosed.
+    rotate_key_hash = Column(String(64), unique=True)
+    rotate_key_issued_at = Column(DateTime)
+    # Encryption canary, on the reserved-tenant row only (see auth.keycheck).
+    canary = Column(Text)
     date_created = Column(DateTime, default=func.now())
     modified = Column(DateTime, default=func.now(), onupdate=func.now())

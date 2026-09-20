@@ -121,6 +121,26 @@ unaffected and stays idempotent — bootstrapping the same roles on every start
 keeps their grants. The users and permissions themselves survive a role delete;
 only that role's links go, so a user who is also in another role keeps it.
 
+**If you lose your client key, the rotate key is the only way back.** A client
+key is self-chosen and nothing about it is stored in plaintext — the audit trail
+holds only a non-reversible fingerprint — so a lost key has always meant a lost
+namespace, with no reset path and no way for anyone to identify which namespace
+was yours. `POST /api/keys/get_rotate_key`, authenticated with your current key,
+issues a recovery credential **once**: only its hash is kept, so it cannot be
+shown again, to you or to anyone. Store it somewhere your client key is not. A
+second call answers `409 rotate_key_already_issued`.
+
+To use it, `POST /api/keys/recover` with `{{"rotate_key": "rrk_...",
+"new_client_key": "<uuid4>"}}` — `new_client_key` is optional and generated when
+absent. This endpoint takes **no** `Authorization` header, because the caller it
+exists for no longer has one. It moves the namespace exactly as a rotation does
+and returns a **new** rotate key; the one you presented dies with the rotation,
+so a recovery cannot be replayed with the credential that performed it. Treat
+the rotate key with the same care as the client key: alone, it is sufficient to
+take over the namespace, which is precisely what makes it a recovery path.
+Rotating normally with `POST /api/keys/rotate` leaves your rotate key untouched
+and still valid.
+
 **Rotating a key is an instant cutover.** `POST /api/keys/rotate`, authenticated
 with your *current* key, mints a fresh key, atomically moves your entire
 namespace onto it, and returns it as `data.new_key`. The moment it returns the
@@ -235,6 +255,8 @@ only copy — persist it. See section 3 for the full semantics and threat model.
 | Method | Path | Returns |
 |---|---|---|
 | POST | `/api/keys/rotate` | wrapped, `data` = `{{"new_key": "<uuid4>", "migrated": {{"roles": 1, "memberships": 1, "permissions": 1, "api_keys": 0, "settings": 0}}}}` |
+| POST | `/api/keys/get_rotate_key` | wrapped, `data` = `{{"rotate_key": "rrk_..."}}`; `409` with `reason: rotate_key_already_issued` if already issued |
+| POST | `/api/keys/recover` | **no Authorization header**; body `{{"rotate_key": "rrk_...", "new_client_key": "<uuid4>"}}`; wrapped, `data` = `{{"client_key": "<uuid4>", "rotate_key": "rrk_..."}}` |
 
 ### Per-user API keys
 

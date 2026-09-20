@@ -13,6 +13,7 @@ from auth.models.sql import (
     AuthPermission,
     AuthTenantSettings,
 )
+from auth.rls import ROTATING_TO_GUC, bind_session, tenant_fingerprint
 from auth.services.base import validate_client_key
 from auth.services.keys import ApiKeyMixin
 
@@ -77,6 +78,14 @@ class RotationMixin(ApiKeyMixin):
             raise ValueError("new_key must be a valid UUID4")
         if new_key == self.client:
             raise ValueError("new_key must differ from the current key")
+
+        # Rotation is the one operation that legitimately writes rows belonging
+        # to another tenant: every row's creator_fp changes to the target's. The
+        # RLS policy's USING clause matches the row as it is, but WITH CHECK
+        # sees it as it will be, so the target fingerprint has to be admitted
+        # for the duration of this transaction. Binding it here keeps rotation
+        # inside the policy instead of running it with elevated privilege.
+        bind_session(self.db, **{ROTATING_TO_GUC: tenant_fingerprint(new_key)})
 
         from auth.encryption import field_encryption
 
