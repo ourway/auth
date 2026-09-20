@@ -39,7 +39,7 @@ from sqlalchemy import text  # noqa: E402
 
 from auth import Authorization  # noqa: E402
 from auth.database import SessionLocal, create_tables, engine  # noqa: E402
-from auth.keycheck import _RLS_TABLES  # noqa: E402
+from auth.keycheck import _RLS_OPTIONAL_TABLES, _RLS_TABLES  # noqa: E402
 from auth.rls import bind_tenant  # noqa: E402
 
 SCHEMA = os.environ.get("AUTH_DATABASE_SCHEMA") or "public"
@@ -180,4 +180,90 @@ def test_an_unscoped_query_returns_only_the_bound_tenant(unprivileged_sessions):
     assert seen_none == set(), (
         "an unbound session read rows; with no tenant set the policy must match "
         "nothing"
+    )
+
+
+def _schema_tables(conn):
+    return conn.execute(
+        text(
+            "SELECT c.relname, c.relrowsecurity FROM pg_class c "
+            "JOIN pg_namespace n ON n.oid = c.relnamespace "
+            "WHERE n.nspname = :s AND c.relkind IN ('r', 'p')"
+        ),
+        {"s": SCHEMA},
+    ).fetchall()
+
+
+def _audit_partitions(conn):
+    return {
+        r[0]
+        for r in conn.execute(
+            text(
+                "SELECT c.relname FROM pg_class c "
+                "JOIN pg_inherits i ON i.inhrelid = c.oid "
+                "JOIN pg_class par ON par.oid = i.inhparent "
+                "JOIN pg_namespace n ON n.oid = par.relnamespace "
+                "WHERE n.nspname = :s AND par.relname = 'audit_log'"
+            ),
+            {"s": SCHEMA},
+        )
+    }
+
+
+def test_every_table_holding_tenant_data_is_named_in_the_protected_set():
+    """The list the other tests iterate cannot report a table it omits.
+
+    _RLS_TABLES is what both the boot check and the parametrised test above
+    read, so a table added later and never added to it is unprotected AND
+    invisible to everything that would say so. This asks the database which
+    tables carry a `creator` column instead of asking the list.
+    """
+    with engine.begin() as conn:
+        discovered = {
+            r[0]
+            for r in conn.execute(
+                text(
+                    "SELECT DISTINCT c.relname FROM pg_class c "
+                    "JOIN pg_namespace n ON n.oid = c.relnamespace "
+                    "JOIN pg_attribute a ON a.attrelid = c.oid "
+                    "WHERE n.nspname = :s AND c.relkind IN ('r', 'p') "
+                    "AND a.attname = 'creator' AND a.attnum > 0 "
+                    "AND NOT a.attisdropped"
+                ),
+                {"s": SCHEMA},
+            )
+        }
+    assert "auth_group" in discovered, (
+        "discovery found no known creator-bearing table, so it is not looking "
+        "where it thinks it is and would report every table as accounted for"
+    )
+    unnamed = discovered - set(_RLS_TABLES) - set(_RLS_OPTIONAL_TABLES)
+    assert not unnamed, (
+        f"{sorted(unnamed)} carry a creator column but are absent from "
+        "_RLS_TABLES, so neither the boot check nor the tests above look at "
+        "them. Add them to auth/keycheck.py and to apply_tenant_rls()."
+    )
+
+
+def test_no_table_in_the_schema_is_left_unaccounted_for():
+    """A table nobody mentions is the one nobody protects.
+
+    Every table in the schema must be one the protected set names, an audit
+    partition, or migretti's own bookkeeping. "Neither declared nor flagged" is
+    not the same as "agreed", and silence is what let a table holding two
+    tenants' rows sit here with no policy at all.
+    """
+    bookkeeping = {"_migrations", "_migrations_log"}
+    with engine.begin() as conn:
+        rows = _schema_tables(conn)
+        partitions = _audit_partitions(conn)
+
+    assert rows, f"no tables found in schema {SCHEMA}; discovery is broken"
+    accounted = set(_RLS_TABLES) | set(_RLS_OPTIONAL_TABLES) | partitions | bookkeeping
+    unaccounted = {name for name, _ in rows} - accounted
+    assert not unaccounted, (
+        f"{sorted(unaccounted)} exist in {SCHEMA} but are named nowhere: not in "
+        "_RLS_TABLES, not an audit partition, not migration bookkeeping. If "
+        "such a table holds tenant data it is unprotected; if it deliberately "
+        "holds none, say so by naming it here."
     )
