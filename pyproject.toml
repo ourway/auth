@@ -43,7 +43,7 @@ dependencies = [
     "waitress>=2.0.0,<4",
     "cryptography>=3.0.0",
     "APScheduler>=3.0.0,<4",
-    "psycopg[binary]>=3.0.0,<4",
+    "psycopg>=3.0.0,<4",
     "pydantic>=2.0.0,<3",
     "pydantic-settings>=2.0.0,<3",
     "requests>=2.25.0,<3",
@@ -52,6 +52,12 @@ dependencies = [
 ]
 
 [project.optional-dependencies]
+# Speed without a bundled libpq: psycopg[c] compiles against the SYSTEM libpq,
+# so certificate verification stays with the library the operator patches.
+# There is deliberately no `binary` extra -- psycopg[binary] ships its own
+# libpq inside the wheel, which would make a pip resolve able to change who
+# verifies TLS certificates, with no diff and no review.
+c = ["psycopg[c]>=3.0.0,<4"]
 # Application-layer rate limiting (AUTH_ENABLE_RATE_LIMIT). Optional so the
 # default install pulls no extra packages; the app degrades gracefully to
 # "no app-layer limiting" if it is absent.
