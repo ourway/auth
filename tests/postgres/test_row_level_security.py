@@ -50,21 +50,60 @@ def _bootstrap():
     create_tables(raise_on_error=True)
 
 
-def test_the_app_role_is_not_exempt_from_rls():
-    """Without this, every other test in this file passes for the wrong reason."""
-    with engine.begin() as conn:
-        exempt = conn.execute(
+def _is_exempt(conn):
+    return bool(
+        conn.execute(
             text(
                 "SELECT rolsuper OR rolbypassrls FROM pg_roles "
                 "WHERE rolname = current_user"
             )
         ).scalar()
-    assert exempt is False, (
-        "the suite is connected as a role that bypasses row level security, so "
-        "it cannot distinguish policies being enforced from policies being "
-        "absent. Run via 'make test-postgres', which creates a non-superuser "
-        "role that owns the tables, as production does."
     )
+
+
+@pytest.fixture(scope="module")
+def unprivileged_sessions():
+    """A session factory whose role row level security actually applies to.
+
+    `make test-postgres` connects as a non-superuser that owns the tables, so
+    the app's own sessions are already subject to policies and are used as-is.
+    CI's postgres job connects as the container superuser, which bypasses RLS
+    outright -- there, this creates a throwaway unprivileged role and hands back
+    sessions bound to that instead, so the behavioural check below verifies
+    policies rather than quietly verifying nothing.
+
+    Skipping in the privileged case was the other option and is the wrong one:
+    the environment that cannot check is exactly the environment where nobody
+    finds out.
+    """
+    from sqlalchemy import create_engine
+    from sqlalchemy.orm import sessionmaker
+
+    with engine.begin() as conn:
+        if not _is_exempt(conn):
+            yield SessionLocal
+            return
+
+    name = f"rls_probe_{uuid.uuid4().hex[:8]}"
+    with engine.begin() as conn:
+        conn.execute(text(f"CREATE ROLE {name} LOGIN PASSWORD '{name}' NOSUPERUSER NOBYPASSRLS"))
+        conn.execute(text(f'GRANT USAGE ON SCHEMA "{SCHEMA}" TO {name}'))
+        conn.execute(
+            text(f'GRANT SELECT ON ALL TABLES IN SCHEMA "{SCHEMA}" TO {name}')
+        )
+    probe_engine = create_engine(engine.url.set(username=name, password=name))
+    try:
+        with probe_engine.begin() as conn:
+            assert not _is_exempt(conn), f"{name} was created exempt from RLS"
+        yield sessionmaker(bind=probe_engine)
+    finally:
+        probe_engine.dispose()
+        with engine.begin() as conn:
+            conn.execute(
+                text(f'REVOKE ALL ON ALL TABLES IN SCHEMA "{SCHEMA}" FROM {name}')
+            )
+            conn.execute(text(f'REVOKE USAGE ON SCHEMA "{SCHEMA}" FROM {name}'))
+            conn.execute(text(f"DROP ROLE {name}"))
 
 
 @pytest.mark.parametrize("table", _RLS_TABLES)
@@ -90,7 +129,7 @@ def test_every_tenant_table_is_enabled_forced_and_policied(table):
     assert policies > 0, f"{table}: no policy, so the table is deny-all or open"
 
 
-def test_an_unscoped_query_returns_only_the_bound_tenant():
+def test_an_unscoped_query_returns_only_the_bound_tenant(unprivileged_sessions):
     """No WHERE clause, so any filtering here is the database's doing."""
     a, b = str(uuid.uuid4()), str(uuid.uuid4())
     role_a, role_b = f"rls_{a[:8]}", f"rls_{b[:8]}"
@@ -104,7 +143,7 @@ def test_an_unscoped_query_returns_only_the_bound_tenant():
     stmt = text(f'SELECT role FROM "{SCHEMA}".auth_group')  # noqa: S608
 
     def unscoped(key):
-        s = SessionLocal()
+        s = unprivileged_sessions()
         try:
             if key:
                 bind_tenant(s, key)
