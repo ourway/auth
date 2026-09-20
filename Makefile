@@ -59,8 +59,26 @@ test-postgres: ## Run PostgreSQL integration tests (Docker required)
 		[ $$i -eq 30 ] && { docker stop auth-test-pg >/dev/null; exit 1; }; \
 		sleep 1; \
 	done
+	@# The app must NOT run as the container superuser. POSTGRES_USER is created
+	@# with SUPERUSER and BYPASSRLS, so every row level security policy is
+	@# skipped for it -- these tests would pass identically with RLS removed
+	@# from the database entirely, which is the definition of a check that
+	@# cannot go red. Run as a role that owns the tables and is exempt from
+	@# nothing, which is also what production does.
+	@docker exec -e PGPASSWORD=auth_test auth-test-pg psql -U auth_test -d auth_test -v ON_ERROR_STOP=1 -q \
+		-c "CREATE ROLE auth_app LOGIN PASSWORD 'auth_app' NOSUPERUSER NOBYPASSRLS" \
+		-c "GRANT CREATE ON DATABASE auth_test TO auth_app" \
+		-c "ALTER SCHEMA auth_rbac OWNER TO auth_app" \
+		-c "GRANT USAGE, CREATE ON SCHEMA auth_rbac TO auth_app" \
+		-c "DO \$$\$$ DECLARE r record; BEGIN \
+			FOR r IN SELECT c.oid::regclass AS t FROM pg_class c JOIN pg_namespace n ON n.oid=c.relnamespace \
+			WHERE n.nspname='auth_rbac' AND c.relkind IN ('r','p') LOOP \
+				EXECUTE format('ALTER TABLE %s OWNER TO auth_app', r.t); END LOOP; END \$$\$$;"
+	@docker exec -e PGPASSWORD=auth_test auth-test-pg psql -U auth_test -d auth_test -tAc \
+		"SELECT rolsuper OR rolbypassrls FROM pg_roles WHERE rolname='auth_app'" \
+		| grep -qx "f" || { echo "FATAL: auth_app can bypass RLS; these tests would prove nothing"; docker stop auth-test-pg >/dev/null; exit 1; }
 	AUTH_DATABASE_TYPE=postgresql \
-	AUTH_DATABASE_URL="postgresql://auth_test:auth_test@127.0.0.1:55432/auth_test" \
+	AUTH_DATABASE_URL="postgresql://auth_app:auth_app@127.0.0.1:55432/auth_test" \
 	AUTH_POSTGRESQL_URL= AUTH_SQLITE_PATH= \
 	AUTH_DATABASE_SCHEMA=auth_rbac \
 	AUTH_STRICT_USERS_DEFAULT=false \

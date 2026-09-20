@@ -26,6 +26,7 @@ from sqlalchemy import text  # noqa: E402
 
 from auth import Authorization  # noqa: E402
 from auth.database import SessionLocal, create_tables, engine  # noqa: E402
+from auth.rls import tenant_fingerprint  # noqa: E402
 
 
 @pytest.fixture(scope="module", autouse=True)
@@ -108,12 +109,21 @@ def test_legacy_plaintext_description_stays_readable(auth_client):
     schema = os.environ["AUTH_DATABASE_SCHEMA"]
     with engine.begin() as conn:
         conn.execute(
+            text("SELECT set_config('auth.tenant_fp', :fp, true)"),
+            {"fp": tenant_fingerprint(auth_client.client)},
+        )
+        result = conn.execute(
             text(
                 f'UPDATE "{schema}".auth_group '  # noqa: S608
                 "SET description = 'plain old text!' "
                 "WHERE creator = :creator AND role = 'legacy'"
             ),
             {"creator": auth_client.client},
+        )
+        assert result.rowcount == 1, (
+            "the legacy row was not written, so this test would assert against "
+            "state it never created -- unbound, row level security filters the "
+            "UPDATE to zero rows and it still reports success"
         )
     roles = {r["role"]: r for r in auth_client.roles}
     assert roles["legacy"]["description"] == "plain old text!"
