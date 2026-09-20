@@ -98,11 +98,12 @@ class DatabaseEngine(metaclass=SingletonMeta):
         settings = get_settings()
 
         if settings.database_type == DatabaseType.POSTGRESQL:
-            # Conservative sizing for production with multiple workers
-            # Must be >= gunicorn `threads` so a thread never waits on the
-            # pool while the database is healthy. 2 workers x (10 + 5) = 30
-            # connections at full stretch, against max_connections=200.
-            return (10, 5)
+            # Sized for ONE request per worker, because the workers are sync.
+            # A request can hold two connections at once: its own session, and
+            # the separate committed session `audit.py` opens on the decorator's
+            # failure path. Two plus two spare, so 8 workers reach at most 32
+            # connections against max_connections=200.
+            return (2, 2)
         else:
             # SQLite - smaller pool since it's file-based
             return (5, 10)
