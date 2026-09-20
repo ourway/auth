@@ -27,15 +27,27 @@ configured PostgreSQL schema (`AUTH_DATABASE_SCHEMA`, e.g. `auth_rbac`).
 
 ## Provisioning / upgrading (operator, with a DDL-capable role)
 
-1. Back up the database (`pg_dump`).
-2. Apply pending migrations — build `MG_DATABASE_URL` from the deployment env,
-   never type credentials inline:
+**Run `mg` on vm-2, not from a workstation.** The database is
+`pg-nano-02.rodmena.co.uk` and the DSN authenticates with client certificates
+that exist only at `/opt/auth/etc/tls/` on the deploy host, so a laptop cannot
+reach it. `migretti` is installed in `/opt/auth/venv` for this. The env file is
+**not shell-sourceable** — a value contains `&` — so read the DSN with `grep`,
+never `. auth.env`.
+
+1. Back up the database (`pg_dump`). For a migration that drops anything, dump
+   the affected tables specifically and **verify the dump holds rows**, not just
+   that the file exists:
    ```bash
-   cd ~/develop/auth
-   set -a; . ./.env; set +a
-   # Prod defines AUTH_DATABASE_URL; strip any +psycopg driver suffix.
-   MG_DATABASE_URL="${AUTH_DATABASE_URL/+psycopg/}" .venv/bin/mg apply
-   MG_DATABASE_URL="${AUTH_DATABASE_URL/+psycopg/}" .venv/bin/mg status
+   pg_dump "$DSN" --schema=public -f /opt/auth/backups/public-$(date -u +%Y%m%dT%H%M%SZ).sql
+   ```
+2. Apply pending migrations:
+   ```bash
+   ssh vm2
+   cd /opt/auth/app
+   DSN=$(grep '^AUTH_DATABASE_URL=' /opt/auth/etc/auth.env | cut -d= -f2- | sed 's/+psycopg//')
+   MG_DATABASE_URL="$DSN" /opt/auth/venv/bin/mg status
+   MG_DATABASE_URL="$DSN" /opt/auth/venv/bin/mg apply
+   MG_DATABASE_URL="$DSN" /opt/auth/venv/bin/mg verify
    ```
 3. **Verify** the expected tables exist before serving:
    ```
@@ -57,6 +69,33 @@ Order matters: migrate **before** deploying code that needs the new schema. The
 running old code ignores new tables; the new code's boot `create_all` then
 no-ops. (If a restart accidentally runs first, `IF NOT EXISTS` makes the later
 `mg apply` converge and record the migration as applied.)
+
+**Exception — a migration that constrains what the running code may read.**
+Row Level Security is the example: the policies added by
+`enable_row_level_security` filter on a session variable that only the newer
+code sets. Migrate first, with the old code still serving, and every query
+returns zero rows — a total authorization outage, not a degraded one. For that
+class: **stop the service, deploy the code, migrate, start.** The 3.1.1 window
+cost 1m44s end to end.
+
+### Three things that will bite you, all learned the hard way
+
+- **`CREATE OR REPLACE FUNCTION` fails if an earlier migration ran as a
+  different role** — `ERROR: must be owner of function`. The app role owns the
+  *schema*, which is enough to DROP an object inside it, so use
+  `DROP FUNCTION IF EXISTS` + `CREATE FUNCTION`. Afterwards the function belongs
+  to the role that owns the tables, and the next person is not blocked.
+- **A migration that counts rows sees them through RLS.** The app role owns
+  these tables and FORCE applies to the owner, so an unbound `SELECT count(*)`
+  in a migration returns **0** — a guard built on that count silently decides
+  the table is empty. Run as a superuser the same migration behaves differently.
+  Lift FORCE for the duration of the count and restore it before committing (see
+  `drop_stale_public_tables`), or the result depends on who invokes it.
+- **Amending an applied migration leaves `mg verify` failing** until the
+  checksum is re-baselined with `mg fix <id> --applied`. Only do that once you
+  have confirmed the amendment produces the state the database is already in —
+  `partition_audit_log` qualified because its change only wrapped existing index
+  creation in an existence guard.
 
 ## Rollback
 
