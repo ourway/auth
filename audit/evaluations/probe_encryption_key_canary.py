@@ -11,7 +11,9 @@ them is the self-confirming check this harness exists to catch:
 
   correct key   -> serves normally, /health healthy
   changed key   -> /api refused 503, /health unhealthy
-  fresh deploy  -> starts normally (nothing encrypted yet to verify against)
+  fresh deploy  -> starts normally (no canary yet, so one is written under
+                   the reserved sentinel tenant and this key becomes the one
+                   this deployment is checked against from now on)
 """
 
 import json

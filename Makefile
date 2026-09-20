@@ -1,4 +1,4 @@
-.PHONY: help install format lint type-check test test-cov test-postgres version-check smoke build publish-test publish clean start-server list-keys start-remote start-remote-docker start-compose stop-compose start-compose-remote
+.PHONY: help install format lint type-check test test-cov test-postgres probe-postgres version-check smoke build publish-test publish clean start-server list-keys start-remote start-remote-docker start-compose stop-compose start-compose-remote
 
 # Pin dev tools to the project virtualenv so the make targets don't fall back
 # to a system python that lacks the deps. Override any of these if needed,
@@ -69,6 +69,49 @@ test-postgres: ## Run PostgreSQL integration tests (Docker required)
 	AUTH_JWT_SECRET_KEY=test-secret \
 	$(PYTEST) tests/postgres/ -m postgres; \
 	status=$$?; docker stop auth-test-pg >/dev/null; exit $$status
+
+# RLS probes against a disposable container.
+#
+# The app role must be a NON-superuser that OWNS the tables, because that is
+# what production does and because both halves matter: a superuser bypasses RLS
+# outright, and an owner bypasses it unless FORCE is set. Run as the container's
+# own superuser, every probe below would pass without RLS existing at all.
+#
+# Sequences are not reassigned: one owned by a table follows that table's owner,
+# and PostgreSQL refuses to separate them.
+#
+# AUDIT_DB_URL is deliberately NOT set: probe_audit_partition_runway asks
+# whether a LIVE database's monthly partition cron has kept ahead, which a
+# container built seconds ago cannot answer. It reports SKIPPED here, and
+# saying so is the point -- run it against the deployment.
+probe-postgres: ## Run the RLS probes against a disposable PostgreSQL (Docker required)
+	docker run -d --rm --name auth-probe-pg \
+		-e POSTGRES_USER=pgadmin -e POSTGRES_PASSWORD=pgadmin \
+		-e POSTGRES_DB=auth_probe -p 127.0.0.1:55433:5432 postgres:16-alpine
+	@until docker exec auth-probe-pg pg_isready -U pgadmin -q; do sleep 1; done
+	@for i in $$(seq 1 30); do \
+		MG_DATABASE_URL="postgresql://pgadmin:pgadmin@127.0.0.1:55433/auth_probe" \
+			$(VENV)/bin/mg apply && break; \
+		[ $$i -eq 30 ] && { docker stop auth-probe-pg >/dev/null; exit 1; }; \
+		sleep 1; \
+	done
+	@docker exec -e PGPASSWORD=pgadmin auth-probe-pg psql -U pgadmin -d auth_probe -v ON_ERROR_STOP=1 -q \
+		-c "CREATE ROLE auth_app LOGIN PASSWORD 'auth_app' NOSUPERUSER NOBYPASSRLS" \
+		-c "GRANT CREATE ON DATABASE auth_probe TO auth_app" \
+		-c "ALTER SCHEMA auth_rbac OWNER TO auth_app" \
+		-c "GRANT USAGE, CREATE ON SCHEMA auth_rbac TO auth_app" \
+		-c "DO \$$\$$ DECLARE r record; BEGIN \
+			FOR r IN SELECT c.oid::regclass AS t FROM pg_class c JOIN pg_namespace n ON n.oid=c.relnamespace \
+			WHERE n.nspname='auth_rbac' AND c.relkind IN ('r','p') LOOP \
+				EXECUTE format('ALTER TABLE %s OWNER TO auth_app', r.t); END LOOP; END \$$\$$;"
+	@docker exec -e PGPASSWORD=pgadmin auth-probe-pg psql -U pgadmin -d auth_probe -tAc \
+		"SELECT 'app role is superuser or bypasses rls: '||(rolsuper OR rolbypassrls) FROM pg_roles WHERE rolname='auth_app'" \
+		| grep -q 'false' || { echo "FATAL: auth_app can bypass RLS; probes would be vacuous"; docker stop auth-probe-pg >/dev/null; exit 1; }
+	AUTH_PG_URL="postgresql+psycopg://auth_app:auth_app@127.0.0.1:55433/auth_probe" \
+	AUTH_PG_SUPERUSER_URL="postgresql+psycopg://pgadmin:pgadmin@127.0.0.1:55433/auth_probe" \
+	AUTH_PG_SCHEMA=auth_rbac AUDIT_ALLOW_DESTRUCTIVE=1 \
+		sh audit/evaluations/run_all.sh; \
+	status=$$?; docker stop auth-probe-pg >/dev/null; exit $$status
 
 version-check: ## Assert pyproject, docs/conf.py and changelog agree on the version
 	@V=$$(grep -Po '(?<=^version = ")[^"]+' pyproject.toml); \

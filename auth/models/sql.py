@@ -297,5 +297,7 @@ class AuthTenantSettings(Base):
     # once-only latch: NULL means never disclosed.
     rotate_key_hash = Column(String(64), unique=True)
     rotate_key_issued_at = Column(DateTime)
+    # Encryption canary, on the reserved-tenant row only (see auth.keycheck).
+    canary = Column(Text)
     date_created = Column(DateTime, default=func.now())
     modified = Column(DateTime, default=func.now(), onupdate=func.now())

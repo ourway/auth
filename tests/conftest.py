@@ -129,6 +129,12 @@ def _isolate_encrypted_rows():
         try:
             for table in ("auth_api_key", "auth_membership"):
                 db.execute(text(f'DELETE FROM {table} WHERE "user" LIKE :p'), {"p": "v2:%"})
+            # Same reason, for the encryption canary: a module that enables
+            # encryption writes one under the reserved tenant, and every later
+            # create_app() then correctly reports that the deployment is
+            # encrypted with a key it does not have.
+            db.execute(text("DELETE FROM auth_tenant_settings WHERE creator = :c"),
+                       {"c": "00000000-0000-0000-0000-000000000000"})
             db.commit()
         finally:
             db.close()

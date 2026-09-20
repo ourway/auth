@@ -20,7 +20,7 @@ import sys
 import uuid
 
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
-from _harness import Probe  # noqa: E402
+from _harness import Probe, raw_dsn  # noqa: E402
 
 UNSCOPED = "SELECT role FROM {schema}.auth_group ORDER BY role"
 
@@ -80,7 +80,7 @@ def main():
     p.check("with NO tenant bound the query returns nothing (fail-closed)",
             seen_none == [], repr(seen_none))
 
-    su = os.environ.get("AUTH_PG_SUPERUSER_URL")
+    su = raw_dsn(os.environ.get("AUTH_PG_SUPERUSER_URL"))
     if su:
         import psycopg
 
