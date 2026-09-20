@@ -6,16 +6,27 @@ bind = "127.0.0.1:4000"
 backlog = 2048
 
 # Worker processes
-workers = 2
-# gthread, not sync. Sync workers serve exactly one request each, so two of them
-# cap the whole service at two concurrent requests: a database that is merely
-# SLOW (commit stalls of 20-27s have been observed on the DB host) takes auth
-# fully offline for every caller rather than making it slower. Threads let a
-# stalled request hold a thread instead of the entire worker.
-# 2 workers x 8 threads = 16 concurrent; the pool below is sized to match, and
-# pg max_connections=200 with ~40 in use leaves ample headroom.
-worker_class = "gthread"
-threads = 8
+#
+# Eight sync workers, not two threaded ones. The problem #13 identified was the
+# CONCURRENCY LIMIT -- two workers cap the service at two in-flight requests, so
+# a merely slow database (commit stalls of 20-27s have been observed on the DB
+# host) takes auth fully offline rather than making it slower. gthread fixed
+# that and introduced a connection-level fault: from its first run, nginx logged
+# "upstream prematurely closed connection" at roughly 0.28% of requests, with
+# rt=0.000, against 1,766,168 requests and zero occurrences under sync. Adding
+# processes raises the same limit without that behaviour.
+#
+# threads MUST stay 1. gunicorn's Config.worker_class resolves `sync` to
+# gthread whenever threads > 1, silently, so leaving it at 8 would keep the
+# thread pool while this file appeared to say otherwise. `Using worker: sync`
+# in the startup log is the check.
+#
+# Cost: 8 processes at ~91 MB RSS (less in practice; preload_app shares pages
+# copy-on-write) on an 8 GB host, and at most 32 database connections against
+# max_connections=200.
+workers = 8
+worker_class = "sync"
+threads = 1
 worker_connections = 1000
 timeout = 30
 keepalive = 2
