@@ -15,6 +15,13 @@
 -- changes, which is the sync-bug class this design avoids elsewhere.
 --
 -- Also backfills any partition that already slipped through.
+--
+-- DROP then CREATE, not CREATE OR REPLACE: partition_audit_log was applied by a
+-- different role, so the function is owned by that role and CREATE OR REPLACE
+-- fails with "must be owner of function". The application role owns the SCHEMA,
+-- which is enough to drop an object inside it, so this works whoever applied the
+-- earlier migration -- and afterwards the function belongs to the same role as
+-- the tables it secures.
 
 -- migrate: up
 
@@ -40,7 +47,9 @@ BEGIN
 END;
 $c$;
 
-CREATE OR REPLACE FUNCTION auth_rbac.provision_audit_log_partition(p_month date)
+DROP FUNCTION IF EXISTS auth_rbac.provision_audit_log_partition(date);
+
+CREATE FUNCTION auth_rbac.provision_audit_log_partition(p_month date)
 RETURNS text
 LANGUAGE plpgsql
 AS $f$
@@ -72,7 +81,9 @@ COMMENT ON FUNCTION auth_rbac.provision_audit_log_partition(date) IS
 
 -- migrate: down
 
-CREATE OR REPLACE FUNCTION auth_rbac.provision_audit_log_partition(p_month date)
+DROP FUNCTION IF EXISTS auth_rbac.provision_audit_log_partition(date);
+
+CREATE FUNCTION auth_rbac.provision_audit_log_partition(p_month date)
 RETURNS text
 LANGUAGE plpgsql
 AS $f$
