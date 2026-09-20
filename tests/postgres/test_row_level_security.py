@@ -51,14 +51,32 @@ def _bootstrap():
 
 
 def _is_exempt(conn):
-    return bool(
-        conn.execute(
-            text(
-                "SELECT rolsuper OR rolbypassrls FROM pg_roles "
-                "WHERE rolname = current_user"
-            )
-        ).scalar()
+    """Whether row level security is skipped outright for the current role.
+
+    The two columns are read separately and each is required to be a real
+    boolean. `rolsuper OR rolbypassrls` collapses to NULL if either is NULL and
+    to no row at all if current_user is absent from pg_roles, and bool(None) is
+    False -- so the unhardened version answers "not exempt" to every question it
+    cannot actually answer, which is the direction that lets an exempt
+    connection through as if it were safe.
+    """
+    row = conn.execute(
+        text(
+            "SELECT rolsuper, rolbypassrls FROM pg_roles "
+            "WHERE rolname = current_user"
+        )
+    ).first()
+    assert row is not None, (
+        "current_user has no pg_roles row, so exemption from row level security "
+        "cannot be determined; refusing to assume it is absent"
     )
+    superuser, bypassrls = row
+    assert isinstance(superuser, bool) and isinstance(bypassrls, bool), (
+        f"pg_roles returned non-boolean privilege flags "
+        f"(rolsuper={superuser!r}, rolbypassrls={bypassrls!r}); refusing to "
+        "treat an unreadable answer as 'not exempt'"
+    )
+    return superuser or bypassrls
 
 
 @pytest.fixture(scope="module")
