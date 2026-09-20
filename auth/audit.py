@@ -176,6 +176,23 @@ def _emit_structured_log(
     audit_logger.info(json.dumps(log_msg))
 
 
+def _bind_audit(session, client_id: str) -> None:
+    """Bind the audit tenant so RLS admits the row (no-op off PostgreSQL).
+
+    audit_log's policy compares ``client_id`` against a session variable, and
+    the value is bound VERBATIM: every caller already passes a fingerprint (see
+    ``client_ref`` in auth/decorators.py), and ``_build_audit_entry`` stores it
+    unchanged. Fingerprinting it again here would bind a fingerprint OF a
+    fingerprint, which matches no row and rejects every audit write.
+    """
+    try:
+        from auth.rls import AUDIT_GUC, bind_session
+
+        bind_session(session, **{AUDIT_GUC: client_id})
+    except Exception:  # pragma: no cover - binding must never break an audit write
+        pass
+
+
 def record_audit(
     session,
     *,
@@ -196,6 +213,7 @@ def record_audit(
     surrounding request (fail-closed), never leave a committed mutation
     unaudited.
     """
+    _bind_audit(session, client_id)
     session.add(
         _build_audit_entry(
             client_id, user, action, resource, details, ip_address, user_agent, success
@@ -224,6 +242,7 @@ def log_audit_event(
     """
     session = SessionLocal()
     try:
+        _bind_audit(session, client_id)
         session.add(
             _build_audit_entry(
                 client_id, user, action, resource, details, ip_address, user_agent, success
