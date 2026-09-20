@@ -22,6 +22,11 @@ from auth.config import DatabaseType, get_settings
 
 logger = logging.getLogger(__name__)
 
+#: What the last audit-partition runway check saw, so /readyz can report it.
+#: Logging is not a channel on every deployment -- vm-2 captures no application
+#: log line at all, which makes a CRITICAL there unreachable by anyone.
+audit_partition_state: dict = {"checked": False, "stranded": None, "newest": None}
+
 def _apply_tenant_rls(target_engine: Engine) -> None:
     """Secure any tenant-scoped table that ``create_all`` has just created.
 
@@ -111,6 +116,16 @@ def _ensure_audit_partition_runway(target_engine: Engine, months: int = 6) -> No
             stranded = conn.execute(
                 text(f"SELECT count(*) FROM {schema}.audit_log_default")  # noqa: S608
             ).scalar_one()
+            newest = conn.execute(
+                text(
+                    "SELECT c.relname FROM pg_class c "
+                    "JOIN pg_inherits i ON i.inhrelid = c.oid "
+                    "WHERE i.inhparent = to_regclass(:p) "
+                    "AND c.relname <> 'audit_log_default' "
+                    "ORDER BY c.relname DESC LIMIT 1"
+                ),
+                {"p": f"{schema}.audit_log"},
+            ).scalar()
     except Exception as exc:
         logger.warning(
             "audit partition runway could not be ensured (%s); "
@@ -120,6 +135,9 @@ def _ensure_audit_partition_runway(target_engine: Engine, months: int = 6) -> No
         )
         return
 
+    audit_partition_state.update(
+        {"checked": True, "stranded": int(stranded), "newest": newest}
+    )
     logger.info(
         "audit partition runway: %d month(s) ahead, %d created this start",
         months,

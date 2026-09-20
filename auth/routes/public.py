@@ -19,6 +19,26 @@ _COMMIT_PROBE_LOCK = threading.Lock()
 _last_commit_verdict = ["ready"]
 
 
+
+def _audit_partitions():
+    """What the boot-time runway check saw, for /readyz.
+
+    Reported as a FIELD, never as the verdict: rows stranded in the default
+    partition are a retention problem, and pulling a healthy node out of the
+    load balancer over one would turn a slow leak into an outage.
+
+    It exists at all because logging is not a channel everywhere -- vm-2
+    captures no application log line, so the CRITICAL this condition also emits
+    is unreachable there.
+    """
+    try:
+        from auth.schema_reconcile import audit_partition_state
+
+        return dict(audit_partition_state)
+    except Exception:
+        return {"checked": False, "stranded": None, "newest": None}
+
+
 def _pool_depth():
     """Connection-pool saturation. Needs no database round trip.
 
@@ -146,6 +166,7 @@ def register(app):
                 "status": _last_commit_verdict[0],
                 "reason": "commit probe already in flight",
                 "pool": pool_depth,
+                "audit_partitions": _audit_partitions(),
             }
             return jsonify(body), (200 if _last_commit_verdict[0] == "ready" else 503)
         try:
@@ -160,7 +181,16 @@ def register(app):
         except Exception:
             logger.exception("readiness check failed: commit path unavailable")
             _last_commit_verdict[0] = "unready"
-            return jsonify({"status": "unready", "reason": "commit path", "pool": pool_depth}), 503
+            return jsonify({
+                "status": "unready",
+                "reason": "commit path",
+                "pool": pool_depth,
+                "audit_partitions": _audit_partitions(),
+            }), 503
         finally:
             _COMMIT_PROBE_LOCK.release()
-        return jsonify({"status": "ready", "pool": pool_depth})
+        return jsonify({
+            "status": "ready",
+            "pool": pool_depth,
+            "audit_partitions": _audit_partitions(),
+        })
