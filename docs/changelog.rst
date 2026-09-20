@@ -2,6 +2,61 @@
 Changelog
 =========
 
+Version 3.2.0 (2026-09-20)
+==========================
+
+Tenant isolation is now enforced by PostgreSQL rather than by query convention,
+a lost client key is recoverable, and the package no longer ships a bundled
+libpq.
+
+**Action required for some installs.** ``psycopg[binary]`` is no longer a
+dependency. Plain ``psycopg`` loads the system ``libpq`` at run time, so an
+environment without one -- a slim container, for instance -- must install it,
+or install ``auth[c]``. Every host that already talks to PostgreSQL has it.
+
+Added
+-----
+
+- Row Level Security on every tenant-scoped table, ``ENABLE`` **and**
+  ``FORCE``, with policies keyed on a generated ``creator_fp`` column. The
+  application role owns these tables and PostgreSQL exempts a table's owner
+  without ``FORCE``, so a query that forgets its ``creator`` filter now returns
+  the caller's rows or none, rather than everything.
+- ``POST /api/keys/get_rotate_key`` issues a recovery credential exactly once
+  per namespace; a second request is refused with 409 and it is never
+  re-disclosed.
+- ``POST /api/keys/recover`` moves a namespace onto a fresh client key when the
+  original is lost, authenticating with the rotate key alone. Rotation
+  previously authenticated with the key it replaced, so it could not help
+  anyone who had lost it.
+- Boot verification that RLS is in force; if it is not, ``/api`` is refused
+  with 503 and ``/health`` reports unhealthy rather than serving unprotected.
+- ``auth[c]`` extra: the compiled psycopg driver linked against the system
+  libpq, for speed without a bundled library.
+
+Changed
+-------
+
+- **Dependency**: ``psycopg[binary]`` replaced by plain ``psycopg``. The binary
+  wheel bundles its own libpq, which performed certificate verification for any
+  consumer using ``sslmode=verify-full`` -- outside the operator's control and
+  beyond the reach of a security update. Consumers could not opt out, because
+  psycopg prefers ``psycopg-binary`` whenever it is installed. Reported by the
+  RunFlow team with measurements.
+- Gunicorn runs eight sync workers rather than two threaded ones. The threaded
+  worker raised the concurrency limit and introduced connection-level faults at
+  0.28% of requests; processes raise the same limit without them.
+
+Fixed
+-----
+
+- The client raised ``AuthTransportError`` for a 4xx refusal, conflating "the
+  service said no" with "the service is unreachable".
+- ``/api/user_roles/<subject>`` rejected subjects containing ``|`` or ``:``,
+  including percent-encoded, which made OIDC-style identities unusable.
+- ``/readyz`` performs a single-flight commit probe and reports pool depth as a
+  field rather than a verdict.
+
 Version 3.1.1 (2026-09-14)
 ==========================
 
