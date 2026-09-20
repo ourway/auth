@@ -3,6 +3,7 @@ Input validation and sanitization utilities for the authorization system
 """
 
 import re
+import uuid
 from typing import Optional
 
 # Define validation patterns
@@ -12,7 +13,13 @@ CLIENT_KEY_PATTERN = re.compile(
 USER_ROLE_NAME_PATTERN = re.compile(r"^[a-zA-Z0-9_-]{1,64}$")
 # User names additionally allow email addresses (the documented usage and
 # what the Python API accepts): @ . +
-USER_NAME_PATTERN = re.compile(r"^[a-zA-Z0-9_.@+-]{1,64}$")
+# ``|`` and ``:`` are admitted because callers namespace their subjects with
+# them; both are safe here — they are legal in a URL path segment, queries are
+# parameterised, and the audit log is JSON so neither can break a field
+# boundary. ``%`` stays out: the path is percent-decoded before validation, so
+# an encoded ``|`` already arrives as ``|`` and a literal ``%`` would only
+# invite double-decoding confusion.
+USER_NAME_PATTERN = re.compile(r"^[a-zA-Z0-9_.@+|:-]{1,64}$")
 # API-key labels are display text chosen by the end user; spaces allowed,
 # nothing that could carry markup or path meaning.
 API_KEY_LABEL_PATTERN = re.compile(r"^[a-zA-Z0-9 _.-]{1,64}$")
@@ -21,9 +28,19 @@ API_KEY_LABEL_PATTERN = re.compile(r"^[a-zA-Z0-9 _.-]{1,64}$")
 def validate_client_key(client_key: str) -> bool:
     """
     Validate that the client key is a valid UUID4
+
+    Single definition for the whole service: the request gate and the service
+    layer both call this, so a key can never pass authentication and then be
+    rejected downstream as a 500. The shape check rejects alternative UUID
+    spellings (urn:, braces, unhyphenated); the parse rejects any string whose
+    version or variant bits are not a real v4.
     """
-    match_result = CLIENT_KEY_PATTERN.match(client_key)
-    return bool(match_result)
+    if not CLIENT_KEY_PATTERN.match(client_key):
+        return False
+    try:
+        return str(uuid.UUID(client_key, version=4)) == client_key.lower()
+    except ValueError:
+        return False
 
 
 def validate_user_name(user_name: str) -> bool:
@@ -119,7 +136,10 @@ def validate_user_role_combination(user: str, role: str) -> tuple[bool, str]:
     if not validate_user_name(user):
         return (
             False,
-            f"Invalid user name: {user}. User names must be 1-64 characters long and contain only alphanumeric, underscore, hyphen, or email characters (@ . +).",
+            f"Invalid user name: {user}. User names must be 1-64 characters "
+            "long and contain only alphanumeric characters, underscore, "
+            "hyphen, the email characters (@ . +), or the namespace "
+            "separators (| :).",
         )
 
     if not validate_role_name(role):

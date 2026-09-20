@@ -25,8 +25,12 @@ class WorkflowPermissionChecker:
         # that get_db() has already closed.
         self.auth_service = auth_service
         self.client = auth_service.client if auth_service is not None else client
+        # NOT started here. create_app() runs in the gunicorn master under
+        # preload_app=True, and threads do not survive fork(): a scheduler
+        # started at construction leaves every worker holding an object whose
+        # thread does not exist, so any job added later would never run. Started
+        # lazily by _ensure_scheduler() in the process that actually adds a job.
         self.scheduler = BackgroundScheduler()
-        self.scheduler.start()
 
         # Shut down the scheduler when exiting the app
         # Suppress any logging errors during shutdown
@@ -39,6 +43,11 @@ class WorkflowPermissionChecker:
             except Exception:
                 pass  # Ignore errors during shutdown (e.g., closed logging)
         atexit.register(safe_shutdown)
+
+    def _ensure_scheduler(self) -> None:
+        """Start the scheduler in this process, on first job registration."""
+        if not self.scheduler.running:
+            self.scheduler.start()
 
     @contextmanager
     def _service(self):
@@ -90,6 +99,7 @@ class WorkflowPermissionChecker:
             users = self.get_users_with_workflow_permission(workflow_name)
             callback_func(users)
 
+        self._ensure_scheduler()
         self.scheduler.add_job(
             func=job,
             trigger=CronTrigger.from_crontab(cron_expression),
@@ -112,6 +122,7 @@ class WorkflowPermissionChecker:
             except Exception as e:
                 print(f"Error in workflow permission check job: {e}")
 
+        self._ensure_scheduler()
         self.scheduler.add_job(
             func=job,
             trigger="interval",

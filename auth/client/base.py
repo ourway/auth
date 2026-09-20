@@ -11,6 +11,7 @@ from requests.exceptions import ConnectionError
 
 from auth.circuit_breaker import circuit_breaker
 from auth.client._transport import (
+    AuthRefused,
     AuthTransportError,
     RetryableHTTPAdapter,
     _build_retry,
@@ -168,6 +169,20 @@ class ClientBase:
                     return text_response
 
             except requests.exceptions.RequestException as e:
+                # A 4xx means the service ANSWERED and refused. Collapsing that
+                # into a transport failure sends the reader to the health
+                # endpoint and the network when the cause is the request itself.
+                resp = getattr(e, "response", None)
+                if resp is not None and 400 <= resp.status_code < 500:
+                    try:
+                        payload = resp.json()
+                    except Exception:
+                        payload = None
+                    raise AuthRefused(
+                        f"auth refused the request: HTTP {resp.status_code}",
+                        resp.status_code,
+                        payload,
+                    ) from e
                 # Convert to our expected exception type
                 raise ConnectionError(f"Request failed: {str(e)}") from e
 
@@ -176,6 +191,8 @@ class ClientBase:
             try:
                 cb_result: Dict[str, Any] = circuit_breaker("api_call")(request_func)()
                 return cb_result
+            except AuthRefused:
+                raise  # a refusal is an answer; it is not a breaker event
             except Exception as e:
                 raise ConnectionError(
                     f"Circuit breaker prevented request: {str(e)}"
@@ -195,6 +212,8 @@ class ClientBase:
         compatibility and intentionally unused: inputs like key material must
         never ride on an exception.
         """
+        if isinstance(exc, AuthRefused):
+            raise exc
         raise AuthTransportError(str(exc)) from exc
 
     def ping(self) -> Dict[str, Any]:
