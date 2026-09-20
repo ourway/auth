@@ -78,6 +78,40 @@ returns zero rows — a total authorization outage, not a degraded one. For that
 class: **stop the service, deploy the code, migrate, start.** The 3.1.1 window
 cost 1m44s end to end.
 
+### Export this before touching the database by hand
+
+```bash
+export PGOPTIONS="-c default_transaction_read_only=on"
+```
+
+The server then refuses every write for the whole session, DDL included. libpq
+passes it through, so it binds `psql`, `psycopg`, and anything else reading the
+environment -- there is no safe statement shape to remember, because no unsafe
+one is reachable.
+
+Unset it deliberately for the one command that needs to write, rather than
+working unprotected and being careful. Being careful is the thing that fails at
+05:00; `mg apply` needs its own shell without it.
+
+Verified against pg-nano-02 (`SHOW default_transaction_read_only` goes `off` ->
+`on`, reads unaffected) and both directions on a throwaway container:
+
+```
+SELECT                   1
+CREATE TABLE             ERROR: cannot execute CREATE TABLE in a read-only transaction
+INSERT                   ERROR: cannot execute INSERT in a read-only transaction
+ALTER .. NO FORCE RLS    ERROR: cannot execute ALTER TABLE in a read-only transaction
+DROP TABLE               ERROR: cannot execute DROP TABLE in a read-only transaction
+
+same ALTER without it    ALTER TABLE, and relforcerowsecurity became false
+```
+
+That last line is the control: the statement genuinely works when unguarded, so
+the refusals above are the guard and not an unrelated failure. It is also the
+exact statement that removed FORCE from a live table on a sibling platform
+tonight -- an ad-hoc script inside a `psycopg` `conn.transaction()` block, which
+commits on success, leaving one table readable across every tenant for an hour.
+
 ### Three things that will bite you, all learned the hard way
 
 - **`CREATE OR REPLACE FUNCTION` fails if an earlier migration ran as a
