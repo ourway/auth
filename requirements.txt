@@ -76,7 +76,7 @@ pyparsing==3.2.5
 pyproject_hooks==1.2.0
 pytest==8.4.2
 pytest-cov==7.0.0
-python-dotenv==1.2.1
+python-dotenv==1.2.2
 python-json-logger==4.0.0
 pytokens==0.2.0
 PyYAML==6.0.3
