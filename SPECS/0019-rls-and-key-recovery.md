@@ -121,3 +121,50 @@ as a non-superuser role that owns the tables (`make probe-postgres`):
 `audit_log` is never partitioned on a database built from migrations alone
 (issuedb #20) — the same ORM-after-migrations ordering, but a retention problem
 rather than an isolation one. An existing deployment is unaffected.
+
+## Deployed 2026-09-20
+
+Live on vm-2 at 02:49:59Z. Downtime 1m44s (02:48:15Z–02:49:59Z), 93 requests
+served 502 inside that window and no 5xx since.
+
+Production shape, which is what makes FORCE meaningful: the app connects as
+`auth`, which is **not** superuser, does **not** have BYPASSRLS, and **owns**
+every table. State after the deploy: 8 tables and 15 `audit_log` partitions all
+enabled + forced + policied, `creator_fp` on all five tenant tables, rotate-key
+and canary columns present, all 11 migrations applied and `mg verify` clean.
+
+Verified in production through the API, not the database:
+
+- Full round trip — role, permission, key-backed membership — then
+  `has_permission` **true** for the granted permission and **false** for an
+  ungranted one. The true answer is the known-positive that makes the false one
+  meaningful.
+- Cross-tenant: a second tenant saw `roles []` against the first tenant's
+  `[deployer]`, and `user_roles []` against `[{deployer, alice}]`.
+- `GET /api/audit`: tenant A 15 entries, tenant B 5, no overlap.
+- Rotate key: issued once (200), refused on the second request (409).
+- Recovery with **no** Authorization header: namespace moved, old key left with
+  `[]`, new key answering `has_permission` true, replay of the used key 401.
+- The encryption canary exists and is ciphertext (`v2:` prefix), so the boot
+  check's OK verdict is a real positive rather than a vacuous one.
+- Existing consumers unaffected: `apikeys/validate`, `runflow_template_read` and
+  `/api/settings` all back at 200 within seconds of restart; 346 requests in the
+  following two minutes, all 200.
+
+Two defects found *by* the deployment, each fixed and re-verified:
+
+- `CREATE OR REPLACE FUNCTION` aborted migration 4 — `partition_audit_log` had
+  been applied by another role, so the function was owned by it. Three
+  migrations had committed and this one rolled back cleanly, leaving RLS in
+  force; service was restored rather than held down, and the remaining three
+  applied after the fix (PR #32).
+- `drop_stale_public_tables` counted live rows through its own policy and would
+  have kept every stale table while reporting success. Caught pre-flight,
+  because it had only ever been exercised as a superuser (PR #31).
+
+## Still not done
+
+- Idempotent 409 for provenance — deliberately not folded into a release that
+  was already changing the isolation model under every query.
+- issuedb #20, `audit_log` unpartitioned on a database built from migrations
+  alone. Existing deployments unaffected.
