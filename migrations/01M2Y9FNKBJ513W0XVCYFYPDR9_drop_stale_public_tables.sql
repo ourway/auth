@@ -21,6 +21,15 @@
 --
 -- Failing any guard skips that table with a NOTICE rather than failing the
 -- migration, except guard 3, which aborts: it means the premise is false.
+--
+-- The auth_rbac count is taken with FORCE lifted for the duration of the
+-- count, because by the time this runs enable_row_level_security has already
+-- applied policies and the application role OWNS these tables. Counted under
+-- force, every guard here reads zero live rows, concludes auth_rbac is the
+-- empty side, and keeps every stale table -- a no-op that looks exactly like a
+-- successful drop. Run as a superuser the same migration would drop them, so
+-- without this the outcome depends on who runs it. The toggle is inside the
+-- migration's own transaction and re-forced before it commits.
 
 -- migrate: up
 
@@ -29,6 +38,7 @@ DECLARE
     t             text;
     v_public_rows bigint;
     v_live_rows   bigint;
+    v_forced      boolean;
     v_dropped     int := 0;
 BEGIN
     IF to_regnamespace('auth_rbac') IS NULL THEN
@@ -49,7 +59,18 @@ BEGIN
         END IF;
 
         EXECUTE format('SELECT count(*) FROM public.%I', t) INTO v_public_rows;
+
+        SELECT c.relforcerowsecurity INTO v_forced
+        FROM pg_class c JOIN pg_namespace n ON n.oid = c.relnamespace
+        WHERE n.nspname = 'auth_rbac' AND c.relname = t;
+
+        IF v_forced THEN
+            EXECUTE format('ALTER TABLE auth_rbac.%I NO FORCE ROW LEVEL SECURITY', t);
+        END IF;
         EXECUTE format('SELECT count(*) FROM auth_rbac.%I', t) INTO v_live_rows;
+        IF v_forced THEN
+            EXECUTE format('ALTER TABLE auth_rbac.%I FORCE ROW LEVEL SECURITY', t);
+        END IF;
 
         IF v_live_rows = 0 AND v_public_rows > 0 THEN
             RAISE NOTICE 'public.% kept: auth_rbac.% is empty while public holds % row(s)',
