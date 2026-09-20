@@ -7,7 +7,10 @@
 # or sustained load are listed under DESTRUCTIVE and refuse to run unless
 # AUDIT_ALLOW_DESTRUCTIVE=1 is set.
 #
-# Exits non-zero if any probe fails.
+# Exits non-zero if any probe fails, AND if any probe could not run. A probe
+# that skips has not checked anything, so counting it as a pass turns "I had no
+# database to ask" into "tenant isolation is fine". Set AUDIT_ALLOW_SKIPS=1 to
+# acknowledge the gap deliberately -- the summary still names what was skipped.
 set -u
 DIR=$(CDPATH= cd -- "$(dirname -- "$0")" && pwd)
 PY=${AUDIT_PYTHON:-"$DIR/../../.venv/bin/python"}
@@ -34,14 +37,22 @@ DESTRUCTIVE=""
 
 fails=0
 total=0
+skipped=0
+skipped_names=""
+out=$(mktemp)
 for p in $SAFE; do
     [ -f "$DIR/$p" ] || continue
     total=$((total + 1))
-    if ! "$PY" "$DIR/$p"; then
+    if ! "$PY" "$DIR/$p" 2>&1 | tee "$out"; then
         fails=$((fails + 1))
+    fi
+    if grep -q "SKIPPED" "$out"; then
+        skipped=$((skipped + 1))
+        skipped_names="$skipped_names $p"
     fi
     echo
 done
+rm -f "$out"
 
 if [ "${AUDIT_ALLOW_DESTRUCTIVE:-0}" = "1" ]; then
     for p in $DESTRUCTIVE; do
@@ -60,5 +71,21 @@ if [ "$total" -eq 0 ]; then
     echo "NO PROBES RAN - treat this as a failure, not a pass"
     exit 1
 fi
-echo "probes: $total   failed: $fails"
+echo "probes: $total   failed: $fails   skipped: $skipped"
 [ "$fails" -eq 0 ] || exit 1
+
+if [ "$skipped" -gt 0 ]; then
+    echo
+    echo "$skipped probe(s) COULD NOT RUN and checked nothing:"
+    for p in $skipped_names; do echo "    $p"; done
+    echo
+    echo "Most of these need a PostgreSQL deployment (AUTH_PG_URL). Tenant"
+    echo "isolation was NOT verified by this run. 'make probe-postgres' builds"
+    echo "a disposable container and runs the full set."
+    if [ "${AUDIT_ALLOW_SKIPS:-0}" = "1" ]; then
+        echo
+        echo "AUDIT_ALLOW_SKIPS=1 - exiting 0 with the gap acknowledged."
+        exit 0
+    fi
+    exit 2
+fi

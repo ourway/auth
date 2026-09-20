@@ -84,6 +84,11 @@ test-postgres: ## Run PostgreSQL integration tests (Docker required)
 # whether a LIVE database's monthly partition cron has kept ahead, which a
 # container built seconds ago cannot answer. It reports SKIPPED here, and
 # saying so is the point -- run it against the deployment.
+#
+# AUDIT_ALLOW_SKIPS=1 acknowledges exactly that one gap. The runner otherwise
+# exits non-zero on any skip, because a probe that could not run has checked
+# nothing and must not be read as a pass. Everything else in the set DOES run
+# here, which is what makes the acknowledgement narrow rather than a blanket.
 probe-postgres: ## Run the RLS probes against a disposable PostgreSQL (Docker required)
 	docker run -d --rm --name auth-probe-pg \
 		-e POSTGRES_USER=pgadmin -e POSTGRES_PASSWORD=pgadmin \
@@ -109,7 +114,7 @@ probe-postgres: ## Run the RLS probes against a disposable PostgreSQL (Docker re
 		| grep -q 'false' || { echo "FATAL: auth_app can bypass RLS; probes would be vacuous"; docker stop auth-probe-pg >/dev/null; exit 1; }
 	AUTH_PG_URL="postgresql+psycopg://auth_app:auth_app@127.0.0.1:55433/auth_probe" \
 	AUTH_PG_SUPERUSER_URL="postgresql+psycopg://pgadmin:pgadmin@127.0.0.1:55433/auth_probe" \
-	AUTH_PG_SCHEMA=auth_rbac AUDIT_ALLOW_DESTRUCTIVE=1 \
+	AUTH_PG_SCHEMA=auth_rbac AUDIT_ALLOW_DESTRUCTIVE=1 AUDIT_ALLOW_SKIPS=1 \
 		sh audit/evaluations/run_all.sh; \
 	status=$$?; docker stop auth-probe-pg >/dev/null; exit $$status
 
