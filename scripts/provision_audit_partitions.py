@@ -16,10 +16,17 @@ would multiply by worker count and hold threads that do not survive ``fork()``.
 Idempotent: ``provision_audit_log_partition`` returns "already exists" for a
 month it has already created.
 
+The DSN never reaches stdout or stderr, not even inside an exception. A psycopg
+error raised while PARSING a conninfo string quotes that string back in full,
+password included; one raised while CONNECTING names only the endpoint. Both
+arrive here as the same exception class from the same call, so the type is
+reported and the body is dropped -- which is the only rule that holds without
+knowing which of the two you have.
+
 Exit codes
     0  the requested runway exists and the default partition is empty
     1  rows are sitting in the default partition, or provisioning failed
-    2  misconfigured (no DSN)
+    2  misconfigured (no DSN, or a DSN that cannot be parsed or reached)
 """
 
 import argparse
@@ -65,7 +72,17 @@ def main():
     import psycopg
 
     print(f"provisioning {args.months} month(s) of audit_log runway (DSN from {var})")
-    with psycopg.connect(dsn, autocommit=True) as conn:
+    try:
+        conn = psycopg.connect(dsn, autocommit=True)
+    except psycopg.Error as exc:
+        print(
+            f"ERROR: could not open a connection from {var}: "
+            f"{type(exc).__name__} (body withheld: it may quote the DSN)",
+            file=sys.stderr,
+        )
+        return 2
+
+    with conn:
         for month in _months_ahead(args.months):
             if args.dry_run:
                 print(f"  would provision {month}")
