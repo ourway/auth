@@ -42,6 +42,16 @@ def main():
     client, client_key = local_client()
     auth_header = {"Authorization": f"Bearer {client_key}"}
 
+    # Registered BEFORE the first request: Flask refuses new routes afterwards.
+    # The global @app.errorhandler(Exception) was asserted safe by READING it --
+    # it returns a fixed string. Reading is not calling, so an unhandled
+    # exception carrying the sentinel is raised through it further down.
+    from auth.main import app as flask_app
+
+    @flask_app.route("/__probe_unhandled__", methods=["GET"])
+    def _probe_unhandled():
+        raise RuntimeError(f"internal failure carrying {SENTINEL}")
+
     # Known-positive first: a role name is a submitted value the API is MEANT to
     # return, so finding it proves the detector can see an echoed string. An
     # earlier version of this probe used the /api/audit filter and appeared to
@@ -113,6 +123,14 @@ def main():
         "malformed JSON does not return a traceback or exception text",
         not leaked,
         f"status={resp.status_code} body={body[:120]!r}",
+    )
+
+    resp = client.get("/__probe_unhandled__", headers=auth_header)
+    body = _body(resp)
+    probe.check(
+        "an UNHANDLED exception does not render its message to the caller",
+        SENTINEL not in body and "RuntimeError" not in body,
+        f"status={resp.status_code} echoed={SENTINEL in body} body={body[:80]!r}",
     )
 
     return probe.done()
