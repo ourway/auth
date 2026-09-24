@@ -35,7 +35,6 @@ import json
 import os
 import subprocess
 import sys
-import sysconfig
 from pathlib import Path
 
 CRITICAL = ("flask", "sqlalchemy", "psycopg", "pydantic", "cryptography", "werkzeug")
@@ -45,7 +44,7 @@ _PROJECT = Path(os.environ.get("AUDIT_PROJECT") or Path(__file__).resolve().pare
 
 def _declared():
     try:
-        import tomllib
+        import tomllib  # type: ignore[import-not-found,unused-ignore]
     except ModuleNotFoundError:
         return {}
     data = tomllib.loads((_PROJECT / "pyproject.toml").read_text())
