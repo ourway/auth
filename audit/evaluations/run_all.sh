@@ -16,6 +16,7 @@ DIR=$(CDPATH= cd -- "$(dirname -- "$0")" && pwd)
 PY=${AUDIT_PYTHON:-"$DIR/../../.venv/bin/python"}
 
 SAFE="probe_dependency_provenance.py
+probe_errors_do_not_echo_credentials.py
 probe_client_key_validator_parity.py
 probe_audit_records_real_client_ip.py
 probe_user_name_charset.py
