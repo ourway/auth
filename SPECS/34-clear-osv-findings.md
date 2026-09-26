@@ -8,7 +8,7 @@ EARS SPEC:
 - The auth repository shall pin no version carrying an OSV advisory in requirements.txt or uv.lock (0 findings over 100% of pins, per resolution fork), except where no fixed release exists for a supported Python, in which case the residual shall be listed with its reason in SPECS.
 - If a lockfile pins a version with a known OSV advisory, then audit/evaluations/probe_osv_lockfiles.py shall exit 1 and name the package, version and advisory ids.
 - The auth lockfiles shall not pin packages absent from pyproject's dependency closure (alembic, PyJWT removed).
-- When auth 3.2.1 is released, the served /health version on auth.rodmena.app and auth.rodmena.co.uk shall equal 3.2.1 and the PyPI release shall be 3.2.1.
+- When auth is released, the version served on /docs and /llms.txt of auth.rodmena.app and auth.rodmena.co.uk shall equal the released version (3.3.0; /health carries no version) and PyPI shall serve that release.
 - Where a pinned upgrade crosses a major version, the full unit and postgres test suites shall pass unchanged (0 failures).
 
 TECHNICAL PROBLEMS:
