@@ -4,6 +4,8 @@ import json
 from datetime import datetime
 from typing import Any, Dict, List, Optional, Tuple, cast
 
+from sqlalchemy import desc, or_
+
 from auth.api_keys import generate_rotate_key
 from auth.audit import AuditLog, client_fingerprint
 from auth.models.sql import (
@@ -11,6 +13,8 @@ from auth.models.sql import (
     AuthTenantSettings,
 )
 from auth.services.base import ServiceBase, _utcnow
+
+_api_key_table = AuthApiKey.__table__
 
 
 class TenantMixin(ServiceBase):
@@ -112,7 +116,7 @@ class TenantMixin(ServiceBase):
         if action:
             query = query.filter(AuditLog.action == action.upper())
         total = query.count()
-        rows = query.order_by(AuditLog.id.desc()).offset(offset).limit(limit).all()
+        rows: List[Any] = query.order_by(desc(AuditLog.id)).offset(offset).limit(limit).all()
         entries = [
             {
                 "id": row.id,
@@ -131,15 +135,23 @@ class TenantMixin(ServiceBase):
 
     def user_is_key_backed(self, user: str) -> bool:
         """True when the user holds ≥1 active, unexpired API key here."""
-        row = (
+        row: Any = (
             self.db.query(AuthApiKey.id)
             .filter(
                 AuthApiKey.creator == self.client,
                 AuthApiKey._user == self._get_encrypted_user(user),
-                AuthApiKey.is_active,
+                # Core column rather than the mapped attribute. SQLAlchemy 2.1's
+                # stubs resolve a legacy `x = Column(...)` attribute to Never, so
+                # the bare `AuthApiKey.is_active` poisons the whole chain and every
+                # statement after it reads as unreachable. __table__.c types as a
+                # KeyedColumnElement and emits byte-identical SQL, verified.
+                _api_key_table.c.is_active.is_(True),
             )
             .filter(
-                (AuthApiKey.expires_at.is_(None)) | (AuthApiKey.expires_at > _utcnow())
+                or_(
+                    _api_key_table.c.expires_at.is_(None),
+                    _api_key_table.c.expires_at > _utcnow(),
+                )
             )
             .first()
         )
