@@ -2,7 +2,7 @@
 Installation
 ============
 
-Auth can be installed via pip or from source. It supports Python 3.9 and newer.
+Auth can be installed via pip or from source. It supports Python 3.10 and newer.
 
 Requirements
 ============
@@ -10,7 +10,7 @@ Requirements
 System Requirements
 -------------------
 
-- Python 3.9 or higher
+- Python 3.10 or higher
 - PostgreSQL 12+ (for production) or SQLite 3 (for development)
 - 512MB RAM minimum (1GB+ recommended for production)
 

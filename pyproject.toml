@@ -4,10 +4,10 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "auth"
-version = "3.2.0"
+version = "3.3.0"
 description = "Authorization for humans"
 readme = "README.md"
-requires-python = ">=3.9"
+requires-python = ">=3.10"
 license = "MIT"
 authors = [
     {name = "Farshid Ashouri", email = "farsheed.ashouri@gmail.com"}
@@ -25,7 +25,6 @@ classifiers = [
     "Programming Language :: Python",
     "Programming Language :: Python :: Implementation :: CPython",
     "Programming Language :: Python :: 3",
-    "Programming Language :: Python :: 3.9",
     "Programming Language :: Python :: 3.10",
     "Programming Language :: Python :: 3.11",
     "Programming Language :: Python :: 3.12",
@@ -185,7 +184,7 @@ line_length = 88
 
 [tool.mypy]
 # Lowest version current mypy can target; the service deploys on 3.11 and CI
-# also runs 3.12. (Package metadata still advertises >=3.9 for older installs.)
+# also runs 3.12. (Package metadata advertises >=3.10.)
 python_version = "3.10"
 # `python -m build` leaves a copy of the package under build/lib/, which mypy
 # would otherwise report as a duplicate module — so `make build` broke the next
