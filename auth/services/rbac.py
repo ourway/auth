@@ -1,7 +1,7 @@
 """Roles, memberships and permissions — the mutating RBAC core."""
 
 import logging
-from typing import Optional
+from typing import Any, Optional
 
 from sqlalchemy import func, select
 
@@ -139,7 +139,7 @@ class RbacMixin(QueryMixin):
                 set_={"is_active": True, "modified": func.now()},
             )
             self.db.execute(stmt)
-            membership_id = self.db.execute(
+            membership_id: Any = self.db.execute(
                 select(m_table.c.id).where(
                     m_table.c.creator == self.client,
                     m_table.c.user == encrypted_user,
@@ -258,7 +258,7 @@ class RbacMixin(QueryMixin):
                 )
             )
             self.db.execute(stmt)
-            perm_id = self.db.execute(
+            perm_id: Any = self.db.execute(
                 select(p_table.c.id).where(
                     p_table.c.creator == self.client,
                     p_table.c.name == encrypted_name,

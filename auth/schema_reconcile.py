@@ -15,6 +15,7 @@ junction tables holding every tenant's authorization edges under no policy.
 """
 
 import logging
+from typing import Any
 
 from sqlalchemy.engine import Engine
 
@@ -55,7 +56,7 @@ def _apply_tenant_rls(target_engine: Engine) -> None:
     schema = settings.database_schema or "public"
     try:
         with target_engine.begin() as conn:
-            result = conn.execute(
+            result: Any = conn.execute(
                 text(f'SELECT {schema}.apply_tenant_rls()')  # noqa: S608
             ).scalar_one()
         logger.info("apply_tenant_rls: %s", result)
@@ -104,7 +105,7 @@ def _ensure_audit_partition_runway(target_engine: Engine, months: int = 6) -> No
                 return
             created = []
             for ahead in range(months + 1):
-                result = conn.execute(
+                result: Any = conn.execute(
                     text(
                         f"SELECT {schema}.provision_audit_log_partition("  # noqa: S608
                         "(date_trunc('month', now()) + make_interval(months => :n))::date)"
@@ -113,7 +114,7 @@ def _ensure_audit_partition_runway(target_engine: Engine, months: int = 6) -> No
                 ).scalar_one()
                 if "created" in str(result):
                     created.append(str(result))
-            stranded = conn.execute(
+            stranded: int = conn.execute(
                 text(f"SELECT count(*) FROM {schema}.audit_log_default")  # noqa: S608
             ).scalar_one()
             newest = conn.execute(
