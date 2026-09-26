@@ -2,6 +2,46 @@
 Changelog
 =========
 
+Version 3.3.0 (2026-09-27)
+==========================
+
+Every OSV advisory against auth's lockfiles and its deployed interpreter is
+cleared, at every severity.
+
+**Action required for some installs.** Python 3.9 is no longer supported;
+``requires-python`` is now ``>=3.10``. Python 3.9 reached end of life in
+October 2025, CI never exercised it, and none of the fixed releases below
+(click, urllib3, requests, cryptography 48+, sqlparse 0.6) exists for it, so
+the 3.9 resolution could not be made clean. pip on 3.9 keeps resolving 3.2.0.
+
+Security
+--------
+
+- ``requirements.txt`` pinned 16 versions with published advisories (Flask
+  3.1.2, Werkzeug 3.1.3, requests 2.32.5, urllib3 2.5.0, bleach 6.3.0,
+  pydantic-settings 2.12.0, click 8.3.0, idna 3.11, PyJWT 2.10.1 and others),
+  and the ``Dockerfile`` installs from it. It is regenerated from a fresh
+  resolve of auth's own closure and pins none. It also no longer pins
+  ``psycopg-binary``, ``psycopg2-binary``, ``alembic``, ``PyJWT``,
+  ``mongoengine`` or ``pymongo``, none of which auth depends on: the previous
+  file was a freeze of a working venv.
+- ``uv.lock`` pinned 9 versions with advisories, including
+  ``cryptography==47.0.0``. Regenerated; it pins none and no longer contains
+  ``psycopg-binary``.
+- The deployed service now resolves ``click`` 8.3.3 or later from its own venv
+  instead of the host's ``py312-click`` 8.3.1 (PYSEC-2026-2132), installed by
+  ``scripts/deploy.sh``. ``click`` is deliberately not declared in
+  ``pyproject.toml``: auth does not import it, and a floor there would narrow
+  every consumer's resolver.
+
+Added
+-----
+
+- ``audit/evaluations/probe_osv_lockfiles.py`` asks OSV about every pin in
+  ``requirements.txt`` and ``uv.lock``, and exits 1 on any advisory. It carries
+  a known-vulnerable control and refuses to report a clean result when a
+  lockfile parses to nothing.
+
 Version 3.2.0 (2026-09-20)
 ==========================
 

@@ -6,7 +6,7 @@ Welcome to the official documentation for **Auth**, an enterprise-grade authoriz
 .. image:: https://img.shields.io/badge/tests-152%20passing-brightgreen
    :alt: Tests
 
-.. image:: https://img.shields.io/badge/python-3.9%2B-blue
+.. image:: https://img.shields.io/badge/python-3.10%2B-blue
    :alt: Python Version
 
 .. image:: https://img.shields.io/badge/license-MIT-blue
