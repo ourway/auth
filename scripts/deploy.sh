@@ -95,10 +95,17 @@ echo "   commit $EXPECTED   installed metadata $INSTALLED   pyproject $SOURCE"
 CLICK=$("$VENV/bin/python" -c 'import importlib.metadata as m; print(m.version("click"))')
 CLICK_PATH=$("$VENV/bin/python" -c 'import click, os; print(os.path.dirname(click.__file__))')
 echo "   click $CLICK from $CLICK_PATH"
+# Both halves, because either alone passes while the finding stands: the venv can
+# own a copy that is still vulnerable, and a fixed version can be the host's.
 case "$CLICK_PATH" in
     "$VENV"/*) ;;
     *) fail "click resolves from $CLICK_PATH, outside the venv -- the install did not shadow the host copy" ;;
 esac
+"$VENV/bin/python" - "$CLICK" "$CLICK_FLOOR" <<'PY' || fail "click $CLICK is below the required floor $CLICK_FLOOR (PYSEC-2026-2132)"
+import sys
+from packaging.version import Version
+sys.exit(0 if Version(sys.argv[1]) >= Version(sys.argv[2]) else 1)
+PY
 
 for H in $HOSTS; do
     for EP in health readyz; do
