@@ -5,6 +5,7 @@ Centralized configuration management for the authorization system
 import os
 from enum import Enum
 from functools import lru_cache
+from typing import Optional
 
 from pydantic import Field, model_validator
 from pydantic_settings import BaseSettings, SettingsConfigDict
@@ -88,6 +89,19 @@ class Settings(BaseSettings):
 
     # Schema settings (for PostgreSQL multi-tenancy)
     database_schema: str = ""  # Optional schema name (e.g., "auth_rbac" for Highway)
+
+    database_pool_size: Optional[int] = Field(default=None, ge=1)
+    database_max_overflow: Optional[int] = Field(default=None, ge=0)
+    database_pool_timeout: Optional[float] = Field(default=None, gt=0)
+    database_pool_recycle: Optional[int] = Field(default=None, ge=-1)
+
+    @model_validator(mode="after")
+    def _reject_zero_pool_recycle(self):
+        if self.database_pool_recycle == 0:
+            raise ValueError(
+                "database_pool_recycle must be -1 (never recycle) or >= 1 second"
+            )
+        return self
 
     @model_validator(mode="after")
     def assemble_db_connection(self) -> "Settings":

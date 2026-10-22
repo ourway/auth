@@ -7,14 +7,14 @@ import os
 import sqlite3
 import threading
 from contextlib import contextmanager
-from typing import Generator, Optional
+from typing import Generator, NamedTuple, Optional
 
 from sqlalchemy import create_engine, event, pool
 from sqlalchemy.engine import Engine, make_url
 from sqlalchemy.orm import Session, sessionmaker
 from sqlalchemy.pool import Pool
 
-from auth.config import DatabaseType, get_settings, warn_on_weak_secrets
+from auth.config import DatabaseType, Settings, get_settings, warn_on_weak_secrets
 from auth.schema_reconcile import (
     GRANDFATHER_MARKER,  # noqa: F401  - re-exported; tests and embedded callers import it from here
     _apply_tenant_rls,
@@ -45,6 +45,47 @@ def _forced_sslmode(database_url: str) -> Optional[str]:
 
 
 logger = logging.getLogger(__name__)
+
+
+class PoolSettings(NamedTuple):
+    pool_size: int
+    max_overflow: int
+    pool_timeout: float
+    pool_recycle: int
+
+
+_POSTGRESQL_POOL_DEFAULTS = PoolSettings(2, 2, 10.0, 3600)
+_SQLITE_POOL_DEFAULTS = PoolSettings(5, 10, 30.0, 300)
+
+
+def resolve_pool_settings(settings: Settings) -> PoolSettings:
+    defaults = (
+        _POSTGRESQL_POOL_DEFAULTS
+        if settings.database_type == DatabaseType.POSTGRESQL
+        else _SQLITE_POOL_DEFAULTS
+    )
+    return PoolSettings(
+        pool_size=(
+            defaults.pool_size
+            if settings.database_pool_size is None
+            else settings.database_pool_size
+        ),
+        max_overflow=(
+            defaults.max_overflow
+            if settings.database_max_overflow is None
+            else settings.database_max_overflow
+        ),
+        pool_timeout=(
+            defaults.pool_timeout
+            if settings.database_pool_timeout is None
+            else settings.database_pool_timeout
+        ),
+        pool_recycle=(
+            defaults.pool_recycle
+            if settings.database_pool_recycle is None
+            else settings.database_pool_recycle
+        ),
+    )
 
 
 class SingletonMeta(type):
@@ -83,35 +124,16 @@ class DatabaseEngine(metaclass=SingletonMeta):
         self._initialize_engine()
         self._setup_pool_monitoring()
 
+    def _pool_settings(self) -> PoolSettings:
+        return resolve_pool_settings(get_settings())
+
     def _calculate_pool_size(self) -> tuple[int, int]:
-        """
-        Calculate optimal pool size for Gunicorn workers
-
-        For 8 workers with PostgreSQL:
-        - pool_size=5 per worker = 40 base connections
-        - max_overflow=5 per worker = 80 total max connections
-        - Leaves headroom for PostgreSQL default max_connections (100)
-        - Also accounts for other services using the database
-
-        Returns:
-            tuple: (pool_size, max_overflow)
-        """
-        settings = get_settings()
-
-        if settings.database_type == DatabaseType.POSTGRESQL:
-            # Sized for ONE request per worker, because the workers are sync.
-            # A request can hold two connections at once: its own session, and
-            # the separate committed session `audit.py` opens on the decorator's
-            # failure path. Two plus two spare, so 8 workers reach at most 32
-            # connections against max_connections=200.
-            return (2, 2)
-        else:
-            # SQLite - smaller pool since it's file-based
-            return (5, 10)
+        pool_settings = self._pool_settings()
+        return (pool_settings.pool_size, pool_settings.max_overflow)
 
     def _create_postgresql_engine(self, database_url: str) -> Engine:
         """Create optimized PostgreSQL engine with enterprise pooling"""
-        pool_size, max_overflow = self._calculate_pool_size()
+        pool_settings = self._pool_settings()
 
         connect_args = {
             "connect_timeout": 30,
@@ -138,10 +160,10 @@ class DatabaseEngine(metaclass=SingletonMeta):
             database_url,
             # Connection pool settings
             poolclass=pool.QueuePool,  # Explicitly use QueuePool
-            pool_size=pool_size,
-            max_overflow=max_overflow,
-            pool_timeout=10,  # Fail fast rather than queueing behind a stalled DB
-            pool_recycle=3600,  # Recycle connections after 1 hour
+            pool_size=pool_settings.pool_size,
+            max_overflow=pool_settings.max_overflow,
+            pool_timeout=pool_settings.pool_timeout,
+            pool_recycle=pool_settings.pool_recycle,
             pool_pre_ping=True,  # Verify connections before using them
             # Performance settings
             echo=False,  # Disable SQL logging in production
@@ -161,16 +183,16 @@ class DatabaseEngine(metaclass=SingletonMeta):
                 connect_args={"check_same_thread": False},
             )
 
-        pool_size, max_overflow = self._calculate_pool_size()
+        pool_settings = self._pool_settings()
 
         return create_engine(
             database_url,
             poolclass=pool.QueuePool,
-            pool_size=pool_size,
-            max_overflow=max_overflow,
+            pool_size=pool_settings.pool_size,
+            max_overflow=pool_settings.max_overflow,
             pool_pre_ping=True,
-            pool_recycle=300,  # 5 minutes for SQLite
-            pool_timeout=30,
+            pool_recycle=pool_settings.pool_recycle,
+            pool_timeout=pool_settings.pool_timeout,
             connect_args={
                 "check_same_thread": False,
                 "timeout": 60,
@@ -200,10 +222,13 @@ class DatabaseEngine(metaclass=SingletonMeta):
             expire_on_commit=False,  # Prevent unnecessary queries
         )
 
-        pool_size, max_overflow = self._calculate_pool_size()
+        pool_settings = self._pool_settings()
         logger.info(
-            f"Database engine initialized: pool_size={pool_size}, "
-            f"max_overflow={max_overflow}, max_connections={pool_size + max_overflow}"
+            f"Database engine initialized: pool_size={pool_settings.pool_size}, "
+            f"max_overflow={pool_settings.max_overflow}, "
+            f"max_connections={pool_settings.pool_size + pool_settings.max_overflow}, "
+            f"pool_timeout={pool_settings.pool_timeout}, "
+            f"pool_recycle={pool_settings.pool_recycle}"
         )
 
     def _setup_pool_monitoring(self):
