@@ -70,6 +70,11 @@ flowchart TB
   encryption and audit modules are cross-cutting.
 - **PostgreSQL** holds the RBAC tables and the audit log in the configured schema
   (`AUTH_DATABASE_SCHEMA`, e.g. `auth_rbac`). SQLite is supported for local/tests.
+- **Connection pool**: one SQLAlchemy `QueuePool` per process, sized by
+  `AUTH_DATABASE_POOL_SIZE`, `AUTH_DATABASE_MAX_OVERFLOW`,
+  `AUTH_DATABASE_POOL_TIMEOUT` and `AUTH_DATABASE_POOL_RECYCLE` (defaults
+  PostgreSQL 2 / 2 / 10 s / 3600 s). A process opens at most
+  `pool_size + max_overflow` connections.
 
 ## Request lifecycle
 

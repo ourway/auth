@@ -2,6 +2,41 @@
 Changelog
 =========
 
+Version 3.4.0 (2026-10-22)
+==========================
+
+The database connection pool can now be sized through the environment, so an
+embedder with a per-role connection budget can bound what auth opens.
+
+Added
+-----
+
+- ``AUTH_DATABASE_POOL_SIZE``, ``AUTH_DATABASE_MAX_OVERFLOW``,
+  ``AUTH_DATABASE_POOL_TIMEOUT`` (seconds) and ``AUTH_DATABASE_POOL_RECYCLE``
+  (seconds, ``-1`` for never). Unset keeps the 3.3.0 values: PostgreSQL
+  2 / 2 / 10 / 3600, file SQLite 5 / 10 / 30 / 300. Each process opens at most
+  ``pool_size + max_overflow`` connections; a checkout beyond that waits
+  ``pool_timeout`` and then raises ``sqlalchemy.exc.TimeoutError``.
+- Invalid values (size below 1, negative overflow, timeout not above 0,
+  recycle of 0 or below -1, non-numeric) raise ``ValidationError`` when
+  settings are built, so ``import auth.database`` fails before any connection
+  is opened. The error names the field and does not include the database URL.
+- The engine logs the effective ``pool_timeout`` and ``pool_recycle`` along
+  with the size and overflow it already logged.
+- ``Authorization.close()``, and ``with Authorization(key) as a:``. A read
+  through an ``Authorization`` leaves its session's transaction open, so the
+  instance holds one pooled connection until the session commits, rolls back
+  or closes; writes commit and release it. With a pool of 1, a second live
+  instance that has read waits ``pool_timeout`` and fails. ``close()`` releases
+  the connection. It closes only a session the instance opened itself: a
+  ``db_session`` passed in by the caller is left for the caller to close.
+- ``audit/evaluations/probe_tls_dsn_params_reach_libpq.py`` starts a
+  disposable PostgreSQL that accepts only TLS with client certificates and
+  checks that ``sslmode=verify-full``, ``sslrootcert``, ``sslcert`` and
+  ``sslkey`` in ``AUTH_DATABASE_URL`` reach libpq through auth's engine
+  factory: the right CA and certificate connect, a foreign CA, a host-name
+  mismatch and a missing client certificate are each refused.
+
 Version 3.3.0 (2026-09-27)
 ==========================
 

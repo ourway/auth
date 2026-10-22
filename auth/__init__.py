@@ -56,6 +56,7 @@ class Authorization:
 
         self.client = client
         # Use provided session or create a new one
+        self._owns_session = not db_session
         self.db = db_session if db_session else SessionLocal()
         # Use legacy mode (no client validation) for backward compatibility.
         # strict_users: None reads the tenant's stored setting (identical
@@ -63,6 +64,16 @@ class Authorization:
         self.service = AuthorizationService(
             self.db, client, validate_client=False, strict_users=strict_users
         )
+
+    def close(self) -> None:
+        if self._owns_session:
+            self.db.close()
+
+    def __enter__(self) -> "Authorization":
+        return self
+
+    def __exit__(self, exc_type, exc, tb) -> None:
+        self.close()
 
     @property
     def roles(self):
