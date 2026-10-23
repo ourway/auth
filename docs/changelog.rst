@@ -2,6 +2,50 @@
 Changelog
 =========
 
+Version 3.5.0 (2026-10-23)
+==========================
+
+An embedder whose tables are older than the installed models now gets an
+error at startup that names the missing columns. Before this release the first
+permission check failed with ``ProgrammingError``.
+
+**Action required when upgrading an embedded database from 3.1.x or earlier
+to 3.2.0 or later.** 3.2.0 added three columns to ``auth_tenant_settings``.
+``create_tables`` creates missing tables but never adds a column to a table
+that already exists, so run this first (``auth_rbac`` is the schema set in
+``AUTH_DATABASE_SCHEMA``)::
+
+    ALTER TABLE auth_rbac.auth_tenant_settings
+        ADD COLUMN IF NOT EXISTS rotate_key_hash varchar(64),
+        ADD COLUMN IF NOT EXISTS rotate_key_issued_at timestamp without time zone,
+        ADD COLUMN IF NOT EXISTS canary text;
+    CREATE UNIQUE INDEX IF NOT EXISTS uq_auth_tenant_settings_rotate_key_hash
+        ON auth_rbac.auth_tenant_settings (rotate_key_hash)
+        WHERE rotate_key_hash IS NOT NULL;
+
+These are the statements in our migretti migrations
+``01M2Y4SMRCS9PW29AA0TFCVXKR_add_creator_fp_and_rotate_key`` and
+``01M2Y8WEM8SYB1SG8QD35S3T6M_add_encryption_canary``. The first also adds a
+generated ``creator_fp`` column to five tables for the hosted service's Row
+Level Security policies. The library never reads it, and an embedder does not
+need it.
+
+Added
+-----
+
+- ``auth.check_schema(bind=None)`` compares every column the installed models
+  declare against the live tables, using the default engine unless an
+  ``Engine`` or ``Connection`` is passed. It raises
+  ``auth.SchemaMismatchError`` listing every missing ``table`` and
+  ``table.column``, which are also on the exception as ``missing_tables`` and
+  ``missing_columns``. Extra live columns are allowed. It runs catalog reads
+  only and issues no DDL, and the message carries no host, database name or
+  credentials.
+- ``create_tables`` runs the same check after creating tables. With
+  ``raise_on_error=True`` it raises ``SchemaMismatchError``. By default it logs
+  ``create_tables failed`` with the missing names at ERROR and returns, as it
+  already did for other failures.
+
 Version 3.4.0 (2026-10-22)
 ==========================
 
