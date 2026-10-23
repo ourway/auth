@@ -2,6 +2,16 @@
 Changelog
 =========
 
+Version 3.5.1 (2026-10-23)
+==========================
+
+Fixed
+-----
+
+- ``check_schema`` and ``find_schema_drift`` raise ``SchemaMismatchError``
+  when the installed models register no tables. In 3.5.0 an empty model set
+  compared nothing and passed. Reported by Highway.
+
 Version 3.5.0 (2026-10-23)
 ==========================
 

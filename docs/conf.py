@@ -17,7 +17,7 @@ author = "Farshid Ashouri"
 
 # The full version, including alpha/beta/rc tags
 # Keep in sync with pyproject.toml (checked by `make version-check`)
-release = "3.5.0"
+release = "3.5.1"
 version = "3.5"
 
 # -- General configuration ---------------------------------------------------
