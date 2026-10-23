@@ -15,6 +15,7 @@ from sqlalchemy.orm import Session, sessionmaker
 from sqlalchemy.pool import Pool
 
 from auth.config import DatabaseType, Settings, get_settings, warn_on_weak_secrets
+from auth.schema_check import check_schema
 from auth.schema_reconcile import (
     GRANDFATHER_MARKER,  # noqa: F401  - re-exported; tests and embedded callers import it from here
     _apply_tenant_rls,
@@ -379,6 +380,7 @@ def create_tables(raise_on_error: bool = False):
         _ensure_audit_partition_runway(engine)
         _reconcile_text_columns(engine)
         _grandfather_strict_users(engine)
+        check_schema(engine)
         logger.info("Tables created successfully.")
     except Exception:
         logger.exception("create_tables failed")

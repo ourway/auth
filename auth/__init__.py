@@ -10,6 +10,7 @@ from auth.client import (  # Import the new client
     EnhancedAuthClient,
 )
 from auth.database import SessionLocal
+from auth.schema_check import SchemaMismatchError, check_schema
 from auth.services.service import AuthorizationService
 
 try:
@@ -157,5 +158,7 @@ __all__ = [
     "Client",
     "EnhancedAuthClient",
     "SessionLocal",
+    "SchemaMismatchError",
+    "check_schema",
     "__version__",
 ]
