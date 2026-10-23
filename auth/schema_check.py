@@ -8,10 +8,16 @@ Bind = Union[Engine, Connection]
 
 class SchemaMismatchError(RuntimeError):
     def __init__(
-        self, missing_tables: Sequence[str], missing_columns: Sequence[str]
+        self,
+        missing_tables: Sequence[str],
+        missing_columns: Sequence[str],
+        message: Optional[str] = None,
     ) -> None:
         self.missing_tables = list(missing_tables)
         self.missing_columns = list(missing_columns)
+        if message is not None:
+            super().__init__(message)
+            return
         parts = []
         if self.missing_tables:
             parts.append("missing tables: " + ", ".join(self.missing_tables))
@@ -32,10 +38,18 @@ def find_schema_drift(bind: Bind) -> Tuple[List[str], List[str]]:
     import auth.audit  # noqa: F401
     from auth.models.sql import Base
 
+    tables = sorted(Base.metadata.tables.values(), key=_qualified)
+    if not tables:
+        raise SchemaMismatchError(
+            [],
+            [],
+            "the installed auth models register no tables, so there is nothing"
+            " to compare the live database against.",
+        )
     inspector = inspect(bind)
     missing_tables: List[str] = []
     missing_columns: List[str] = []
-    for table in sorted(Base.metadata.tables.values(), key=_qualified):
+    for table in tables:
         if not inspector.has_table(table.name, schema=table.schema):
             missing_tables.append(_qualified(table))
             continue

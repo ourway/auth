@@ -1,7 +1,7 @@
 import logging
 
 import pytest
-from sqlalchemy import create_engine, event, text
+from sqlalchemy import MetaData, create_engine, event, text
 
 import auth
 import auth.audit  # noqa: F401
@@ -126,6 +126,19 @@ def test_create_tables_on_current_schema_reports_success(current_engine, monkeyp
     with caplog.at_level(logging.INFO, logger=auth.database.logger.name):
         auth.database.create_tables(raise_on_error=True)
     assert "Tables created successfully." in caplog.text
+
+
+def test_empty_model_metadata_refuses_instead_of_passing(current_engine, monkeypatch):
+    seen = _statements(current_engine)
+    monkeypatch.setattr(Base, "metadata", MetaData())
+    with pytest.raises(SchemaMismatchError) as caught:
+        check_schema(current_engine)
+    assert "register no tables" in str(caught.value)
+    assert caught.value.missing_tables == []
+    assert caught.value.missing_columns == []
+    with pytest.raises(SchemaMismatchError):
+        find_schema_drift(current_engine)
+    assert seen == []
 
 
 def test_public_exports():
