@@ -1,22 +1,38 @@
 __author__ = "Farshid Ashouri"
 
 from importlib.metadata import PackageNotFoundError, version
-from typing import Optional
+from typing import TYPE_CHECKING, Optional
 
-from auth.client import (  # Import the new client
-    AuthRefused,
-    AuthTransportError,
-    Client,
-    EnhancedAuthClient,
-)
 from auth.database import SessionLocal
 from auth.schema_check import SchemaMismatchError, check_schema
 from auth.services.service import AuthorizationService
+
+if TYPE_CHECKING:
+    from auth.client import (
+        AuthRefused,
+        AuthTransportError,
+        Client,
+        EnhancedAuthClient,
+    )
 
 try:
     __version__ = version("auth")
 except PackageNotFoundError:  # running from a source checkout without install
     __version__ = "0.0.0.dev0"
+
+_CLIENT_EXPORTS = frozenset(
+    {"AuthRefused", "AuthTransportError", "Client", "EnhancedAuthClient"}
+)
+
+
+def __getattr__(name: str):
+    if name in _CLIENT_EXPORTS:
+        import auth.client
+
+        value = getattr(auth.client, name)
+        globals()[name] = value
+        return value
+    raise AttributeError(f"module 'auth' has no attribute {name!r}")
 
 
 # Lazy import for Flask app to avoid immediate initialization
