@@ -45,3 +45,6 @@ Related: #23 (isolation), #39 (probe), infra thread 01M5R230A5WJFK8EEGD41D3V51 (
 - If an ignored *.egg-info is in the app directory after the editable install, then --build shall remove it, and shall fail if such a directory is tracked by git.
 - check_venv shall run its content check with the working directory at the app directory, the directory gunicorn serves from.
 - --swap shall choose only timestamped build directories. The previous glob sorted legacy-system-site-* after every build, so the second swap would have picked the legacy directory and failed for a missing VERIFIED file.
+- After the swap on 2026-10-27, `deploy.sh --verify-only` failed with ModuleNotFoundError for `packaging`, which the old venv had taken from the host. The service itself was healthy. The floor check shall compare plain release versions without third-party modules, and shall fail on a version it cannot parse.
+- The verify and rollback checks shall include auth.rodmena.com, the canonical name since 2026-10-27.
+- The live venv maps one file from /usr/local/lib/python3.12/site-packages: `_sqlite3.cpython-312.so`, the interpreter's own sqlite3 module, installed by `py312-sqlite3` and linked from lib-dynload. It is part of the interpreter, not a third-party package. Removing `py312-sqlite3` would break `import sqlite3`.
