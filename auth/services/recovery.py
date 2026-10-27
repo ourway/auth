@@ -114,7 +114,9 @@ def recover_namespace(db, secret: str, new_client_key: str) -> Dict[str, Any]:
     )
     new_secret, new_hash = generate_rotate_key()
     if row is None:
-        row = AuthTenantSettings(creator=new_client_key, strict_users=False)
+        row = AuthTenantSettings(
+            creator=new_client_key, strict_users=service.default_strict_users()
+        )
         db.add(row)
     row.rotate_key_hash = new_hash
     row.rotate_key_issued_at = _utcnow()

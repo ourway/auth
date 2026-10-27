@@ -43,10 +43,14 @@ class TenantMixin(ServiceBase):
                 # 3.0.0: tenants with no stored setting follow the server
                 # default (strict). Pre-3.0 tenants never reach this branch —
                 # grandfathering wrote them explicit false rows.
-                from auth.config import get_settings
-
-                self._strict_cache = bool(get_settings().strict_users_default)
+                self._strict_cache = self.default_strict_users()
         return self._strict_cache
+
+    @staticmethod
+    def default_strict_users() -> bool:
+        from auth.config import get_settings
+
+        return bool(get_settings().strict_users_default)
 
     def get_settings(self) -> Dict[str, Any]:
         """This tenant's settings (defaults when no row exists)."""
@@ -86,10 +90,17 @@ class TenantMixin(ServiceBase):
             .filter(AuthTenantSettings.creator == self.client)
             .first()
         )
+        created = row is None
         if row is None:
-            row = AuthTenantSettings(creator=self.client, strict_users=False)
+            row = AuthTenantSettings(
+                creator=self.client, strict_users=self.default_strict_users()
+            )
             self.db.add(row)
             self.db.flush()
+        self.rotate_key_settings = {
+            "strict_users": bool(row.strict_users),
+            "settings_row_created": created,
+        }
         if cast(Optional[datetime], row.rotate_key_issued_at) is not None:
             return None
 
