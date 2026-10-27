@@ -11,6 +11,12 @@ from auth.audit import (
 )
 from auth.config import get_settings
 
+AUDIT_OUTCOME = "audit_outcome"
+
+
+def record_outcome(**facts: Any) -> None:
+    setattr(g, AUDIT_OUTCOME, facts)
+
 
 def _status_code(response) -> int:
     """Best-effort HTTP status of a Flask view return value."""
@@ -101,6 +107,13 @@ def audit_log(action: AuditAction, resource_extractor=None):
 
             status_code = _status_code(response)
             success = _derive_success(response)
+            details: dict = {"status_code": status_code}
+            outcome = g.pop(AUDIT_OUTCOME, None)
+            if isinstance(outcome, dict):
+                resource = outcome.pop("resource", resource)
+                refused = outcome.pop("refused", False)
+                success = success and not refused
+                details.update(outcome)
             # Stage the audit row on the SAME session as the mutation; the
             # ``with_db_session`` wrapper commits both together. If this raises,
             # the whole request fails closed rather than committing an unaudited
@@ -111,7 +124,7 @@ def audit_log(action: AuditAction, resource_extractor=None):
                 user=user,
                 action=action,
                 resource=resource,
-                details={"status_code": status_code},
+                details=details,
                 ip_address=request.remote_addr,
                 user_agent=request.headers.get("User-Agent", ""),
                 success=success,
