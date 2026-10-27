@@ -20,7 +20,7 @@ before you add members or permissions to it.
 
 ```bash
 KEY=$(python3 -c "import uuid; print(uuid.uuid4())")
-BASE=https://auth.rodmena.app
+BASE=https://auth.rodmena.com
 
 curl -X POST -H "Authorization: Bearer $KEY" $BASE/api/role/engineers
 curl -X POST -H "Authorization: Bearer $KEY" $BASE/api/permission/engineers/deploy
@@ -55,7 +55,7 @@ With the Python client (`pip install auth`):
 ```python
 from auth import Client
 
-with Client(api_key=KEY, service_url="https://auth.rodmena.app") as c:
+with Client(api_key=KEY, service_url="https://auth.rodmena.com") as c:
     c.create_role("engineers")
     c.add_permission("engineers", "deploy")
     c.create_api_key("alice")                  # strict default since 3.0.0
@@ -101,7 +101,7 @@ with Client(api_key=KEY, service_url="https://auth.rodmena.app") as c:
 
 | Doc | What's in it |
 |---|---|
-| **Live API reference** — [`/docs`](https://auth.rodmena.app/docs) · [`/llms.txt`](https://auth.rodmena.app/llms.txt) | Every endpoint and exact response shape, served by the app (agent-friendly). |
+| **Live API reference** — [`/docs`](https://auth.rodmena.com/docs) · [`/llms.txt`](https://auth.rodmena.com/llms.txt) | Every endpoint and exact response shape, served by the app (agent-friendly). |
 | [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md) | Design, components, request lifecycle, data model, permission-check and key-rotation flows, diagrams. |
 | [SECURITY.md](SECURITY.md) | Security model (tenant isolation, encryption, audit, rotation), threat notes, reporting. |
 | [MIGRATIONS.md](MIGRATIONS.md) | Schema creation vs migrations, upgrade/rollback runbook. |

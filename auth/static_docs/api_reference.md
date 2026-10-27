@@ -1,7 +1,7 @@
 # auth — RBAC authorization service
 
 Role-based access control over HTTP. Version {version}.
-Base URL: `https://auth.rodmena.app`
+Base URL: `https://auth.rodmena.com`
 
 You are probably an agent reading this to call the API. Everything you need is
 below; the response shapes are exact.
@@ -40,7 +40,7 @@ A role must exist **before** you can add members or permissions to it. Run this
 sequence top to bottom:
 
     KEY=$(python3 -c "import uuid; print(uuid.uuid4())")
-    BASE=https://auth.rodmena.app
+    BASE=https://auth.rodmena.com
 
     # 1. create the role first
     curl -X POST  -H "Authorization: Bearer $KEY" $BASE/api/role/engineers
@@ -101,9 +101,11 @@ wrapper. There is no way to guess which — use the table in section 4.
     wrapped   {{"success": true, "code": 200, "message": "...",
                "data": ..., "timestamp": "2026-07-20T03:11:34.288114"}}
 
-**Errors are HTML, not JSON.** 400/401/404 responses are Flask's default error
-pages with `Content-Type: text/html`. Parsing them as JSON will throw, so branch
-on the status code first and only decode a body on 2xx.
+**Most errors are HTML, not JSON.** A bad header (401), a key that is not a
+UUID4 (400), an invalid name (400) and an unknown route (404) answer with Flask's
+error pages, `Content-Type: text/html`. Parsing them as JSON will throw, so
+branch on the status code first. The strict-mode 409 and the per-user API-key
+errors (the 400 at the 25-key limit, the 404 for an unknown key) are JSON.
 
 **`has_permission` is also the membership answer.** The membership check reuses
 the permission payload, so `GET /api/membership/<user>/<role>` replies with
@@ -277,9 +279,9 @@ active keys per user — revoke to free a slot.
 
 ### Tenant settings
 
-Per-tenant switches. Today there is one: `strict_users` (see the deprecation
-note in section 3). Enabling it is how you opt in to strict user identity
-before 3.0.0 makes it the default.
+Per-tenant switches. Today there is one: `strict_users` (see section 3). It
+has been on by default for every namespace created since 3.0.0, and turning it
+off is the audited opt-out for platforms that authenticate their own users.
 
 | Method | Path | Returns |
 |---|---|---|
@@ -337,7 +339,7 @@ containing `/` changes which route matches and yields 404.
     from auth import Client
 
     with Client(api_key="3f6b1c9e-6f1a-4a5e-9c2e-2b7a5d0e1f34",
-                service_url="https://auth.rodmena.app") as c:
+                service_url="https://auth.rodmena.com") as c:
         c.create_role("engineers")
         c.add_permission("engineers", "deploy")
         c.create_api_key("alice")          # strict default since 3.0.0
@@ -397,7 +399,28 @@ It is the wrong tool for:
   them.
 - **Fine-grained / attribute-based rules** — "owner of *this* record",
   time-of-day, row-level tenancy. auth is coarse RBAC by name; you can encode
-  resource scope in the permission name (e.g. `doc:123:edit`) while that stays
+  resource scope in the permission name (e.g. `doc-123-edit`; `:` is rejected) while that stays
   manageable, otherwise reach for an ABAC/policy engine.
 - **Air-gapped or hot inner loops** where a network hop per check is too costly
   — cache decisions, or use the in-process mode from section 6.
+
+## 9. Running your own instance (CI jobs, local tests)
+
+Test against a real auth rather than a mock of it. Since 3.6.0 the package
+carries its PostgreSQL migrations and a command to apply them:
+
+    pip install "auth[c,migrations]==<the version production runs>" gunicorn
+    MG_DATABASE_URL=postgresql://auth:...@127.0.0.1:5432/auth_ci auth-migrate apply --yes
+    AUTH_DATABASE_URL=postgresql://auth:...@127.0.0.1:5432/auth_ci \
+    AUTH_DATABASE_SCHEMA=auth_rbac \
+    AUTH_JWT_SECRET_KEY=<random> AUTH_AUDIT_PEPPER=<random, 16+ characters> \
+    gunicorn --bind 127.0.0.1:4000 --workers 1 auth.main:app
+
+`auth-migrate` also takes `status`, `verify`, `head` and `list`, and reads the
+database from `MG_DATABASE_URL`, `AUTH_DATABASE_URL` or `AUTH_POSTGRESQL_URL`,
+in that order. Connect as a role that owns the database and is **not** a
+superuser: auth forces row level security on its tables, and superusers bypass
+it. Wait for `GET /readyz` to answer 200. If it answers 503 naming
+`AUTH_DATABASE_SCHEMA`, set it to `auth_rbac`; if it names tables without row
+level security, the migrations were not applied. One worker uses about
+120–150 MB.

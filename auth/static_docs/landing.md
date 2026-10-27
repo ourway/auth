@@ -1,7 +1,7 @@
 # auth — RBAC authorization service
 
 Authorization (not authentication) over HTTP. Version __VERSION__.
-Base URL: `https://auth.rodmena.app`
+Base URL: `https://auth.rodmena.com`
 
 auth answers one question — *may user X do Y* — so services don't reinvent roles
 and permissions. It does **not** log anyone in; it trusts you already know who
@@ -15,7 +15,7 @@ created implicitly, but a role must exist before you add members or permissions
 to it.
 
     KEY=$(python3 -c "import uuid; print(uuid.uuid4())")
-    BASE=https://auth.rodmena.app
+    BASE=https://auth.rodmena.com
     curl -X POST -H "Authorization: Bearer $KEY" $BASE/api/role/engineers
     curl -X POST -H "Authorization: Bearer $KEY" $BASE/api/permission/engineers/deploy
     curl -X POST -H "Authorization: Bearer $KEY" $BASE/api/apikeys/user/alice
