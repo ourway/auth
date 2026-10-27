@@ -14,9 +14,12 @@ configured PostgreSQL schema (`AUTH_DATABASE_SCHEMA`, e.g. `auth_rbac`).
   already-provisioned schema. It logs at **ERROR** if DDL fails — treat that log
   line as a provisioning failure.
 - **Changes** are authored with **migretti** (`mg`, SQL-first — the house
-  standard). Migration files live in `migrations/` with `-- migrate: up` /
-  `-- migrate: down` sections; config is `mg.yaml` (no credentials — targets are
-  selected via `MG_DATABASE_URL`). Every migration must mirror what the
+  standard). Migration files live in `auth/migrations/`, which ships in the
+  wheel; the root `migrations` is a symlink to it so `mg` run from the repo root
+  still finds them. Each file has `-- migrate: up` / `-- migrate: down`
+  sections; config is `mg.yaml` (no credentials — targets are selected via
+  `MG_DATABASE_URL`). From an installed package, `auth-migrate apply` runs the
+  same files without a checkout (3.6.0, issuedb #41). Every migration must mirror what the
   SQLAlchemy models would emit and use `IF NOT EXISTS`, so the boot-time
   `create_all(checkfirst=True)` and `mg apply` converge in either order.
 - **Alembic is fully purged** (2.4.1): no tree, no config, no dependency. Its

@@ -2,6 +2,34 @@
 Changelog
 =========
 
+Version 3.6.0 (2026-10-27)
+==========================
+
+Added
+-----
+
+- The wheel carries auth's PostgreSQL migrations (``auth/migrations``), and the
+  new ``auth-migrate`` command applies them from an installed package:
+  ``auth-migrate apply``, ``status``, ``verify``, ``head`` or ``list``. It reads
+  the database from ``MG_DATABASE_URL``, ``AUTH_DATABASE_URL`` or
+  ``AUTH_POSTGRESQL_URL`` and needs the ``migrations`` extra. A consumer that
+  runs auth in a test job no longer copies the SQL from the git repository.
+- The served reference has a section on running your own instance.
+
+Changed
+-------
+
+- When row level security cannot be confirmed at boot and
+  ``AUTH_DATABASE_SCHEMA`` is not ``auth_rbac``, the 503 and the log line name
+  the setting.
+- The served docs, the README and the examples use https://auth.rodmena.com,
+  the canonical name since 2026-10-27. auth.rodmena.app and auth.rodmena.co.uk
+  keep working.
+- The docs no longer suggest ``doc:123:edit`` as a permission name, which the
+  API rejects with 400. They show ``doc-123-edit``. They also say which errors
+  are HTML and which are JSON, and that ``strict_users`` has been the default
+  since 3.0.0.
+
 Version 3.5.2 (2026-10-25)
 ==========================
 
