@@ -24,7 +24,7 @@ check_venv() {
     grep -qx 'include-system-site-packages = false' "$V/pyvenv.cfg" \
         || fail "$V/pyvenv.cfg does not say include-system-site-packages = false"
     "$V/bin/python" -m pip check || fail "pip check failed in $V"
-    "$V/bin/python" - "$V" "$EXCLUDED" <<'PY' || fail "venv content check failed for $V"
+    (cd "$APP" && "$V/bin/python" - "$V" "$EXCLUDED") <<'PY' || fail "venv content check failed for $V"
 import importlib.metadata as m
 import os
 import sys
@@ -134,6 +134,12 @@ case "${1:-}" in
         "$PYTHON" -m venv "$NEW"
         "$NEW/bin/python" -m pip install -q --require-hashes --no-deps -r "$LOCK"
         "$NEW/bin/python" -m pip install -q --no-deps --no-build-isolation -e "$APP"
+        for STALE in "$APP"/*.egg-info; do
+            [ -e "$STALE" ] || continue
+            git -C "$APP" check-ignore -q "$STALE" || fail "$STALE is not an ignored build artifact"
+            echo "   removing stale build metadata $STALE ($(grep -m1 '^Version' "$STALE/PKG-INFO" 2>/dev/null))"
+            rm -rf "$STALE"
+        done
         check_venv "$NEW"
         trial_serve "$NEW"
         "$NEW/bin/python" -m pip freeze --all > "$NEW/FREEZE.txt"
@@ -141,7 +147,7 @@ case "${1:-}" in
         echo "BUILT AND VERIFIED: $NEW"
         ;;
     --swap)
-        NEW=$(ls -1d "$VENVS"/*/ 2>/dev/null | sed 's:/$::' | sort | tail -1)
+        NEW=$(ls -1d "$VENVS"/[0-9]*/ 2>/dev/null | sed 's:/$::' | sort | tail -1)
         [ -n "$NEW" ] && [ -f "$NEW/VERIFIED" ] || fail "no verified build in $VENVS; run --build first"
         [ "$(cat "$NEW/VERIFIED")" = "$(git -C "$APP" rev-parse HEAD)" ] || fail "$NEW was verified at another commit"
         if [ -L "$LINK" ]; then

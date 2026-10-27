@@ -38,3 +38,10 @@ Related: #23 (isolation), #39 (probe), infra thread 01M5R230A5WJFK8EEGD41D3V51 (
 
 - vm-2 trial build of deploy/requirements-vm2.txt into /tmp, 2026-10-25: pip --require-hashes exit 0 in 2 min 46 s; pip check clean; psycopg 3.3.6 impl c, libpq 180006; distributions outside the venv: none; cryptography 50.0.1 and pydantic-core 2.46.5 compiled with rustc 1.99.1.
 - Mutants caught: eager client import (footprint test), pillow added to lock, werkzeug 3.1.8, certifi without hashes (lock tests).
+
+## Production build, 2026-10-27
+
+- The first --build on vm-2 stopped at check_venv: `auth 3.5.1 at /opt/auth/app`, outside the venv. The source was /opt/auth/app/auth.egg-info, a gitignored artifact left by the 3.5.1 editable install on 2026-10-23. With the working directory at /opt/auth/app, importlib.metadata reads it before the venv's own dist-info, so the served app would report 3.5.1 while running 3.5.2. Both venvs keep auth's metadata in their own site-packages.
+- If an ignored *.egg-info is in the app directory after the editable install, then --build shall remove it, and shall fail if such a directory is tracked by git.
+- check_venv shall run its content check with the working directory at the app directory, the directory gunicorn serves from.
+- --swap shall choose only timestamped build directories. The previous glob sorted legacy-system-site-* after every build, so the second swap would have picked the legacy directory and failed for a missing VERIFIED file.
