@@ -8,7 +8,7 @@ chain of mixins rooted here; see :mod:`auth.services.service`.
 
 import logging
 from datetime import datetime, timezone
-from typing import Any, Optional
+from typing import Any, Dict, Optional
 
 from sqlalchemy import text
 from sqlalchemy.orm import Session
@@ -53,6 +53,7 @@ class ServiceBase:
         # an explicit bool overrides it for in-process/library callers.
         self._strict_override = strict_users
         self._strict_cache: Optional[bool] = None
+        self.rotate_key_settings: Dict[str, Any] = {}
         # Bind this tenant to the session so Row Level Security can see it. Done
         # here rather than in the HTTP layer so library callers are covered too,
         # and via an after_begin listener so it survives the per-method commits

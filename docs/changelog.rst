@@ -2,6 +2,23 @@
 Changelog
 =========
 
+Version 3.7.1 (2026-10-27)
+==========================
+
+Security
+--------
+
+- ``POST /api/keys/get_rotate_key`` and ``POST /api/keys/recover`` no longer
+  turn strict user identity off. Since 3.2.0 (2026-09-20), fetching a recovery
+  key for a namespace with no stored settings created the settings row with
+  ``strict_users`` false. A namespace that was strict by default became
+  non-strict, and the only audit entry was GET_ROTATE_KEY. The row now takes
+  the server default, recovery does the same, and the GET_ROTATE_KEY audit
+  entry records ``strict_users`` and whether the row was created. A namespace
+  affected before this release keeps its stored value: read
+  ``GET /api/settings`` and set it back with ``PUT /api/settings`` if strict
+  was intended. (issuedb #46)
+
 Version 3.7.0 (2026-10-27)
 ==========================
 

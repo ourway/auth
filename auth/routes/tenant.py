@@ -12,7 +12,7 @@ from auth.audit import (
     record_audit,
 )
 from auth.config import get_settings
-from auth.decorators import audit_log
+from auth.decorators import audit_log, record_outcome
 from auth.response_format import (
     APIResponse,
 )
@@ -143,6 +143,7 @@ def register(app):
         """
         auth_service = _get_auth_service(db)
         secret = auth_service.issue_rotate_key()
+        record_outcome(**auth_service.rotate_key_settings)
         if secret is None:
             return (
                 jsonify(
