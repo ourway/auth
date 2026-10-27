@@ -1,10 +1,12 @@
 """Per-user API keys (SPEC 0004): minting, listing, revocation, validation."""
 
-from typing import Any, Dict, List, Optional, cast
+from datetime import datetime
+from typing import Any, Dict, List, Optional, Tuple, cast
 
 from sqlalchemy import func
 
 from auth.api_keys import generate_api_key, hash_api_key
+from auth.key_expiry import KeyExpiryError, check_expiry
 from auth.models.sql import (
     AuthApiKey,
 )
@@ -31,16 +33,21 @@ class ApiKeyMixin(RbacMixin):
         construction (this very key just validated), so strict mode never
         blocks the second half.
         """
-        validated = self.validate_api_key(api_key)
+        return self.resolve_api_key_permission(api_key, permission)[0]
+
+    def resolve_api_key_permission(
+        self, api_key: str, permission: str
+    ) -> Tuple[Dict[str, Any], Optional[str]]:
+        validated, key_id = self.resolve_api_key(api_key)
         if not validated["valid"]:
-            return validated
+            return validated, key_id
         user = cast(str, validated["user"])
         return {
             "valid": True,
             "user": user,
             "key_id": validated["key_id"],
             "has_permission": self.user_has_permission(user, permission),
-        }
+        }, key_id
 
     # --- Per-user API keys (SPEC 0004) -----------------------------------
 
@@ -63,7 +70,10 @@ class ApiKeyMixin(RbacMixin):
         }
 
     def create_api_key(
-        self, user: str, label: Optional[str] = None
+        self,
+        user: str,
+        label: Optional[str] = None,
+        expires_at: Optional[datetime] = None,
     ) -> Optional[Dict[str, Any]]:
         """Mint and store an API key for ``user`` in this tenant's namespace.
 
@@ -72,6 +82,8 @@ class ApiKeyMixin(RbacMixin):
         serializes against key rotation so the new row cannot strand under a
         creator that is being moved.
         """
+        if expires_at is not None:
+            check_expiry(expires_at, _utcnow())
         self._lock_tenant()
         active = (
             self.db.query(func.count(AuthApiKey.id))
@@ -97,6 +109,8 @@ class ApiKeyMixin(RbacMixin):
         row.user = user
         if label:
             row.label = label
+        if expires_at is not None:
+            row.expires_at = expires_at  # type: ignore[assignment]
         self.db.add(row)
         self.db.flush()
         self._commit()
@@ -107,7 +121,7 @@ class ApiKeyMixin(RbacMixin):
             "label": label,
             "key_prefix": key_prefix,
             "created": row.date_created.isoformat() if row.date_created else None,
-            "expires_at": None,
+            "expires_at": expires_at.isoformat() if expires_at else None,
         }
 
     def list_api_keys(self, user: str) -> List[Dict[str, Any]]:
@@ -149,6 +163,29 @@ class ApiKeyMixin(RbacMixin):
         self._commit()
         return "revoked"
 
+    def set_api_key_expiry(
+        self, user: str, key_id: str, expires_at: datetime
+    ) -> Optional[Dict[str, Any]]:
+        self._lock_tenant()
+        row = (
+            self.db.query(AuthApiKey)
+            .filter(
+                AuthApiKey.creator == self.client,
+                AuthApiKey.key_id == key_id.lower(),
+                AuthApiKey._user == self._get_encrypted_user(user),
+            )
+            .first()
+        )
+        if row is None:
+            return None
+        if not row.is_active:
+            raise KeyExpiryError("the key is revoked")
+        current = cast(Optional[datetime], row.expires_at)
+        check_expiry(expires_at, _utcnow(), current)
+        row.expires_at = expires_at  # type: ignore[assignment]
+        self._commit()
+        return self._api_key_meta(row)
+
     def validate_api_key(self, api_key: str) -> Dict[str, Any]:
         """Resolve a presented secret within THIS tenant's namespace.
 
@@ -157,18 +194,22 @@ class ApiKeyMixin(RbacMixin):
         foreign tenant cannot probe key existence. Touches ``last_used_at``
         at most once per throttle window.
         """
+        return self.resolve_api_key(api_key)[0]
+
+    def resolve_api_key(self, api_key: str) -> Tuple[Dict[str, Any], Optional[str]]:
         row = (
             self.db.query(AuthApiKey)
             .filter(AuthApiKey.key_hash == hash_api_key(api_key))
             .first()
         )
         if row is None or row.creator != self.client:
-            return {"valid": False, "reason": "unknown_key"}
+            return {"valid": False, "reason": "unknown_key"}, None
+        key_id = cast(str, row.key_id)
         if not row.is_active:
-            return {"valid": False, "reason": "revoked"}
+            return {"valid": False, "reason": "revoked"}, key_id
         now = _utcnow()
         if row.expires_at is not None and row.expires_at <= now:
-            return {"valid": False, "reason": "expired"}
+            return {"valid": False, "reason": "expired"}, key_id
         if (
             row.last_used_at is None
             or (now - row.last_used_at).total_seconds() >= _LAST_USED_THROTTLE_SECONDS
@@ -181,4 +222,4 @@ class ApiKeyMixin(RbacMixin):
             "key_id": row.key_id,
             "label": row.label,
             "expires_at": row.expires_at.isoformat() if row.expires_at else None,
-        }
+        }, key_id

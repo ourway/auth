@@ -2,6 +2,35 @@
 Changelog
 =========
 
+Version 3.7.0 (2026-10-27)
+==========================
+
+Added
+-----
+
+- Per-user API keys can expire. ``POST /api/apikeys/user/<user>`` accepts an
+  optional ``expires_at`` (ISO-8601, read as UTC when it has no offset), which
+  must be in the future and at most 365 days ahead. ``PATCH
+  /api/apikeys/user/<user>/<key_id>`` with ``{"expires_at": ...}`` can only
+  move a key's expiry earlier, or give a key without one an expiry within 365
+  days. From that moment validate and check_permission answer
+  ``{"valid": false, "reason": "expired"}``. The client gains
+  ``create_api_key(..., expires_at=...)`` and ``set_api_key_expiry``.
+  (issuedb #43)
+- The audit trail records the ``key_id`` on CREATE, UPDATE, VALIDATE and
+  CHECK_API_KEY_PERMISSION entries when the key belongs to the caller's
+  namespace. VALIDATE and CHECK entries record the outcome: ``valid``,
+  ``reason`` and, for checks, ``permission`` and ``has_permission``. A refused
+  key is now recorded with ``success: false``. Neither the secret nor its hash
+  is recorded. (issuedb #44)
+
+Changed
+-------
+
+- The create body for a per-user API key accepts only ``label`` and
+  ``expires_at``. Any other field is a 400. Up to 3.6.0 unknown fields were
+  silently ignored, an ``expires_at`` among them.
+
 Version 3.6.0 (2026-10-27)
 ==========================
 

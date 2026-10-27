@@ -1,8 +1,17 @@
 """Client key rotation, per-user API keys, and tenant settings."""
 
-from typing import Any, Dict, Optional
+from datetime import datetime, timezone
+from typing import Any, Dict, Optional, Union
 
 from auth.client.rbac import RbacMixin
+
+
+def _iso(value: Union[str, datetime]) -> str:
+    if isinstance(value, datetime):
+        if value.tzinfo is not None:
+            value = value.astimezone(timezone.utc).replace(tzinfo=None)
+        return value.isoformat()
+    return value
 
 
 class ApiKeyMixin(RbacMixin):
@@ -34,7 +43,12 @@ class ApiKeyMixin(RbacMixin):
         return response
 
     # Per-user API keys (SPEC 0004)
-    def create_api_key(self, user: str, label: Optional[str] = None) -> Dict[str, Any]:
+    def create_api_key(
+        self,
+        user: str,
+        label: Optional[str] = None,
+        expires_at: Optional[Union[str, datetime]] = None,
+    ) -> Dict[str, Any]:
         """Mint an API key for a user; ``data.api_key`` is shown only once.
 
         Sent WITHOUT automatic retries: create is not idempotent, and a blind
@@ -45,11 +59,28 @@ class ApiKeyMixin(RbacMixin):
         your unavailable/503 path, never to a denial.
         """
         endpoint = self.endpoints["apikeys_user"].format(user=user)
-        payload = {"label": label} if label is not None else None
+        body: Dict[str, Any] = {}
+        if label is not None:
+            body["label"] = label
+        if expires_at is not None:
+            body["expires_at"] = _iso(expires_at)
         try:
-            return self._make_request("POST", endpoint, retry=False, json=payload)
+            return self._make_request(
+                "POST", endpoint, retry=False, json=body or None
+            )
         except Exception as e:
             return self._transport_failure(e, data={"user": user, "label": label})
+
+    def set_api_key_expiry(
+        self, user: str, key_id: str, expires_at: Union[str, datetime]
+    ) -> Dict[str, Any]:
+        endpoint = self.endpoints["apikey_revoke"].format(user=user, key_id=key_id)
+        try:
+            return self._make_request(
+                "PATCH", endpoint, json={"expires_at": _iso(expires_at)}
+            )
+        except Exception as e:
+            return self._transport_failure(e, data={"user": user, "key_id": key_id})
 
     def list_api_keys(self, user: str) -> Dict[str, Any]:
         """List a user's API keys (metadata only; never the secrets).

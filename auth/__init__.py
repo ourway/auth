@@ -4,6 +4,7 @@ from importlib.metadata import PackageNotFoundError, version
 from typing import TYPE_CHECKING, Optional
 
 from auth.database import SessionLocal
+from auth.key_expiry import parse_expiry
 from auth.schema_check import SchemaMismatchError, check_schema
 from auth.services.service import AuthorizationService
 
@@ -150,8 +151,14 @@ class Authorization:
         return self.service.set_strict_users(enabled)
 
     # Per-user API keys (SPEC 0004)
-    def create_api_key(self, user: str, label: Optional[str] = None):
-        return self.service.create_api_key(user, label)
+    def create_api_key(
+        self, user: str, label: Optional[str] = None, expires_at: Optional[str] = None
+    ):
+        expiry = parse_expiry(expires_at) if expires_at is not None else None
+        return self.service.create_api_key(user, label, expiry)
+
+    def set_api_key_expiry(self, user: str, key_id: str, expires_at: str):
+        return self.service.set_api_key_expiry(user, key_id, parse_expiry(expires_at))
 
     def list_api_keys(self, user: str):
         return self.service.list_api_keys(user)

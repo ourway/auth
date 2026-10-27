@@ -267,11 +267,15 @@ only in the creating response (auth stores its SHA-256, nothing recoverable).
 Listing shows revoked keys too (`is_active: false`) so a UI can render
 history. Validate answers `valid: false` with a `reason` rather than erroring;
 a key from another tenant is indistinguishable from an unknown one. At most 25
-active keys per user — revoke to free a slot.
+active keys per user — revoke to free a slot. `expires_at` is UTC; a value with
+an offset is converted and one without is read as UTC. From the moment it
+passes, validate and check_permission answer `{{"valid": false, "reason":
+"expired"}}`.
 
 | Method | Path | Returns |
 |---|---|---|
-| POST | `/api/apikeys/user/<user>` | optional body `{{"label": "laptop"}}` → wrapped, `data` = `{{"api_key": "rak_<43 chars, shown ONCE>", "key_id": "<uuid4>", "user": "alice", "label": "laptop", "key_prefix": "rak_ab12cd34", "created": "<iso>", "expires_at": null}}` (400 once 25 active keys exist) |
+| POST | `/api/apikeys/user/<user>` | optional body `{{"label": "laptop", "expires_at": "2027-01-01T00:00:00Z"}}` (both optional; any other field is a 400) → wrapped, `data` = `{{"api_key": "rak_<43 chars, shown ONCE>", "key_id": "<uuid4>", "user": "alice", "label": "laptop", "key_prefix": "rak_ab12cd34", "created": "<iso>", "expires_at": "<iso or null>"}}` (400 once 25 active keys exist, or when expires_at is in the past or more than 365 days ahead) |
+| PATCH | `/api/apikeys/user/<user>/<key_id>` | body `{{"expires_at": "<ISO-8601>"}}` → wrapped, `data` = the key's listing entry. Shorten-only: the new time must be in the future, earlier than the current expiry, and at most 365 days ahead; 400 otherwise, also for a revoked key; 404 JSON if no such key |
 | GET | `/api/apikeys/user/<user>` | wrapped, `data` = `{{"count": 1, "keys": [{{"key_id": "<uuid4>", "key_prefix": "rak_ab12cd34", "label": "laptop", "is_active": true, "created": "<iso>", "revoked_at": null, "expires_at": null, "last_used_at": "<iso>"}}]}}` |
 | DELETE | `/api/apikeys/user/<user>/<key_id>` | wrapped, `data` = `{{"revoked": true, "already_revoked": false}}` (repeat calls idempotent; 404 JSON if no such key for that user in your namespace) |
 | POST | `/api/apikeys/validate` | body `{{"api_key": "rak_..."}}` → wrapped, `data` = `{{"valid": true, "user": "alice", "key_id": "<uuid4>", "label": "laptop", "expires_at": null}}` or `{{"valid": false, "reason": "revoked" | "expired" | "unknown_key"}}` |
@@ -295,6 +299,11 @@ when, and whether it took effect. Strictly scoped to the calling namespace's
 fingerprint: it can never read another tenant's entries, and it never returns a
 raw key or user (client/user fields are non-reversible fingerprints). Use it to
 answer "why did my permission change / why was this denied?" without a human.
+API-key entries carry the `key_id` in `details` when the key belongs to your
+namespace (CREATE, UPDATE, REVOKE, VALIDATE, CHECK_API_KEY_PERMISSION), and
+VALIDATE/CHECK entries record the outcome: `valid`, `reason`, and for checks
+`permission` and `has_permission`. A refused key is recorded with `success:
+false`. Neither the secret nor its hash is ever recorded.
 
 | Method | Path | Returns |
 |---|---|---|
@@ -361,8 +370,9 @@ Methods mirror the endpoints: `create_role`, `delete_role`, `list_roles`,
 `get_user_permissions`, `get_role_permissions`, `get_user_roles`,
 `get_role_members`, `which_roles_can`, `which_users_can`,
 `get_users_for_workflow`, `rotate_key`, `ping`, the per-user key lifecycle
-`create_api_key`, `list_api_keys`, `revoke_api_key`, `validate_api_key`,
-`check_api_key_permission`, and tenant settings `get_settings` /
+`create_api_key` (optional `expires_at`), `set_api_key_expiry`, `list_api_keys`,
+`revoke_api_key`, `validate_api_key`, `check_api_key_permission`, and tenant
+settings `get_settings` /
 `set_strict_users`.
 Each returns the parsed JSON body, so the shapes in section 4 still apply.
 `rotate_key()` also switches the live client (and its session header) to the new
