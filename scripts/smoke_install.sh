@@ -30,9 +30,33 @@ if [ -n "$BAD_FILES" ]; then
     exit 1
 fi
 
+echo "==> Checking the wheel ships every migration"
+EXPECTED_SQL="$(ls "$REPO_DIR"/auth/migrations/*.sql | wc -l)"
+WHEEL_SQL="$("$PYTHON" - "$WHEEL" <<'EOF'
+import sys, zipfile
+names = zipfile.ZipFile(sys.argv[1]).namelist()
+print(sum(1 for n in names if n.startswith("auth/migrations/") and n.endswith(".sql")))
+EOF
+)"
+echo "    repo $EXPECTED_SQL, wheel $WHEEL_SQL"
+if [ "$EXPECTED_SQL" -lt 12 ] || [ "$WHEEL_SQL" != "$EXPECTED_SQL" ]; then
+    echo "ERROR: the wheel must carry all $EXPECTED_SQL migrations" >&2
+    exit 1
+fi
+
 echo "==> Installing into a fresh venv"
 "$PYTHON" -m venv "$WORK_DIR/venv"
 "$WORK_DIR/venv/bin/pip" install --quiet "$WHEEL"
+
+echo "==> auth-migrate is installed and refuses to run without a database URL"
+set +e
+MIGRATE_OUT="$(cd "$WORK_DIR" && env -i PATH="$PATH" "$WORK_DIR/venv/bin/auth-migrate" 2>&1)"
+MIGRATE_RC=$?
+set -e
+if [ "$MIGRATE_RC" != "2" ] || ! printf '%s' "$MIGRATE_OUT" | grep -q "usage: auth-migrate"; then
+    echo "ERROR: auth-migrate rc=$MIGRATE_RC: $MIGRATE_OUT" >&2
+    exit 1
+fi
 
 echo "==> Import + README quick-start on SQLite"
 # Run from the temp dir AND pin every AUTH_ var: pydantic-settings reads a

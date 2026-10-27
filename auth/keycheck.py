@@ -164,6 +164,18 @@ def verify_encryption_key(db) -> str:
     return _set(OK, "encryption key verified against the deployment canary")
 
 
+RLS_SCHEMA = "auth_rbac"
+
+
+def _schema_hint(schema: str) -> str:
+    if schema == RLS_SCHEMA:
+        return ""
+    return (
+        f" (AUTH_DATABASE_SCHEMA is {schema!r}; auth's migrations and row level"
+        f" security are defined in schema {RLS_SCHEMA!r})"
+    )
+
+
 def verify_row_level_security(db) -> str:
     """Confirm RLS is actually in force, not merely enabled.
 
@@ -198,7 +210,10 @@ def verify_row_level_security(db) -> str:
         return _set(UNVERIFIED, f"could not read RLS state: {exc.__class__.__name__}")
 
     if not rows:
-        return _set(UNVERIFIED, "no tenant tables found to check RLS on")
+        return _set(
+            UNVERIFIED,
+            "no tenant tables found to check RLS on" + _schema_hint(schema),
+        )
 
     # A table that is absent is not a table that is safe. The junction tables
     # are created by the ORM rather than by a migration, so on a fresh database
@@ -210,7 +225,8 @@ def verify_row_level_security(db) -> str:
         return _set(
             MISMATCH,
             "expected tenant tables are absent, so nothing protects them: "
-            + ", ".join(missing),
+            + ", ".join(missing)
+            + _schema_hint(schema),
         )
 
     unprotected = [
@@ -221,7 +237,8 @@ def verify_row_level_security(db) -> str:
             MISMATCH,
             "row level security is not in force on: "
             + ", ".join(sorted(unprotected))
-            + " - tenant isolation would rest on query convention alone",
+            + " - tenant isolation would rest on query convention alone"
+            + _schema_hint(schema),
         )
     return _set(OK, f"row level security forced on {len(rows)} tables")
 

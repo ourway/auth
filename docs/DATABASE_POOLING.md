@@ -43,7 +43,7 @@ max_overflow = 5       # Additional connections when needed
 #### Health Endpoint
 
 ```bash
-curl https://auth.rodmena.app/health
+curl https://auth.rodmena.com/health
 ```
 
 Returns:
@@ -126,7 +126,7 @@ logging.getLogger('auth.database').setLevel(logging.DEBUG)
 
 **Check**:
 ```bash
-curl https://auth.rodmena.app/health
+curl https://auth.rodmena.com/health
 ```
 
 If `checked_out` consistently equals `pool_size + overflow`, you're hitting limits.
@@ -249,10 +249,10 @@ Test connection pooling with:
 ```bash
 # Run 100 concurrent requests
 ab -n 1000 -c 100 -H "Authorization: Bearer $(uuidgen)" \
-   https://auth.rodmena.app/api/roles
+   https://auth.rodmena.com/api/roles
 
 # Monitor during test
-watch -n 1 'curl -s https://auth.rodmena.app/health | jq .'
+watch -n 1 'curl -s https://auth.rodmena.com/health | jq .'
 ```
 
 Expected behavior:

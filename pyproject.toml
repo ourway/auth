@@ -4,7 +4,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "auth"
-version = "3.5.2"
+version = "3.6.0"
 description = "Authorization for humans"
 readme = "README.md"
 requires-python = ">=3.10"
@@ -89,6 +89,7 @@ dev = [
 
 [project.scripts]
 auth-server = "auth.server:main"
+auth-migrate = "auth.migrate:main"
 
 [tool.uv]
 constraint-dependencies = [
@@ -108,6 +109,7 @@ include = ["auth*"]
 # files, not source (issuedb #3). They must ship in the wheel or the landing
 # page raises FileNotFoundError on an installed copy.
 "auth.static_docs" = ["*.md", "*.html"]
+"auth.migrations" = ["*.sql"]
 
 [tool.ruff]
 line-length = 88

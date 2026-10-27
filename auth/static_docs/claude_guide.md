@@ -17,7 +17,7 @@ here and at `/docs`.
     from auth import Client  # alias of EnhancedAuthClient: pooling, retries, circuit breaker
 
     KEY = "3f6b1c9e-6f1a-4a5e-9c2e-2b7a5d0e1f34"  # your app's secret UUID4, from config/secrets
-    with Client(api_key=KEY, service_url="https://auth.rodmena.app") as auth:
+    with Client(api_key=KEY, service_url="https://auth.rodmena.com") as auth:
         auth.create_role("engineers")
         auth.add_permission("engineers", "deploy")
         auth.create_api_key("alice")                  # strict default since 3.0.0
@@ -69,8 +69,9 @@ your unavailable/503 path, never to a permission denial.
    `200 {"result": false}`. Check the field, not just the status.
 2. **Two response shapes** — bare `{"result": ...}` vs wrapped
    `{"success", "data", ...}`. `/docs` says which per endpoint.
-3. **Errors are HTML, not JSON** — 400/401/404 are Flask error pages; branch on
-   the status code first, decode a body only on 2xx.
+3. **Most errors are HTML, not JSON** — a bad header, key or name (400/401)
+   and an unknown route (404) are Flask error pages; branch on the status code
+   first. The strict 409 and the API-key endpoints' errors are JSON.
 4. **`has_permission` doubles as the membership answer** —
    `GET /api/membership/<user>/<role>` replies `{"has_permission": true}`
    meaning *is a member*.
@@ -80,7 +81,7 @@ your unavailable/503 path, never to a permission denial.
 - **Authentication** — login, passwords, sessions, OAuth, JWT issuance. Different
   concern; auth trusts you already know who the user is.
 - **Fine-grained / attribute rules** — "owner of *this* record", time-of-day,
-  row-level tenancy. Encode scope in the permission name (`doc:123:edit`) while
+  row-level tenancy. Encode scope in the permission name (`doc-123-edit`) while
   that stays manageable, otherwise use an ABAC/policy engine.
 - **Air-gapped or hot inner loops** — a network hop per check is too costly;
   cache decisions or embed a library.
