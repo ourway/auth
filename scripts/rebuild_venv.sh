@@ -178,7 +178,7 @@ case "${1:-}" in
         echo "== $LINK -> $PREV (rolled back from $CUR)"
         service "$SERVICE" restart
         sleep 5
-        for H in ${AUTH_VERIFY_HOSTS:-"auth.rodmena.app auth.rodmena.co.uk"}; do
+        for H in ${AUTH_VERIFY_HOSTS:-"auth.rodmena.com auth.rodmena.app auth.rodmena.co.uk"}; do
             curl -fsS -o /dev/null -m 10 "https://$H/readyz" || fail "https://$H/readyz not 200 after rollback"
         done
         echo "ROLLBACK OK"

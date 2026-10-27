@@ -25,7 +25,7 @@ set -eu
 APP=${AUTH_APP_DIR:-/opt/auth/app}
 VENV=${AUTH_VENV:-/opt/auth/venv}
 SERVICE=${AUTH_SERVICE:-authsvc}
-HOSTS=${AUTH_VERIFY_HOSTS:-"auth.rodmena.app auth.rodmena.co.uk"}
+HOSTS=${AUTH_VERIFY_HOSTS:-"auth.rodmena.com auth.rodmena.app auth.rodmena.co.uk"}
 
 # Packages the venv must OWN rather than inherit from the host's py312-* set,
 # with the floor each must meet. Space separated, "name>=version".
@@ -80,9 +80,16 @@ verify() {
             *) fail "$NAME resolves from $WHERE, outside the venv -- it is inheriting the host copy" ;;
         esac
         "$VENV/bin/python" - "$GOT" "$FLOOR" <<'PY' || fail "$NAME $GOT is below the required floor $FLOOR"
+import re
 import sys
-from packaging.version import Version
-sys.exit(0 if Version(sys.argv[1]) >= Version(sys.argv[2]) else 1)
+
+def release(text):
+    if not re.fullmatch(r"\d+(\.\d+)*", text):
+        sys.exit(f"cannot compare version {text!r}")
+    parts = [int(p) for p in text.split(".")]
+    return parts + [0] * (6 - len(parts))
+
+sys.exit(0 if release(sys.argv[1]) >= release(sys.argv[2]) else 1)
 PY
     done
 
