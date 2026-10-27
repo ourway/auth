@@ -39,7 +39,7 @@ HOSTS=${AUTH_VERIFY_HOSTS:-"auth.rodmena.app auth.rodmena.co.uk"}
 #               and declared NOWHERE: not pyproject, not requirements.txt, not
 #               uv.lock. ledger lost exactly this to a venv rebuild and silently
 #               fell back to 63.1.0. Declared here so a clean deploy cannot.
-VENV_OWNED=${AUTH_VENV_OWNED:-"click>=8.3.3 setuptools>=84.0.0"}
+VENV_OWNED=${AUTH_VENV_OWNED:-"click>=8.3.3 setuptools>=84.1.0"}
 
 APPLY=0
 VERIFY_ONLY=0
@@ -62,6 +62,9 @@ verify() {
     echo "   checkout $(git rev-parse --short HEAD)   installed metadata $INSTALLED   pyproject $SOURCE"
     [ "$INSTALLED" = "$SOURCE" ] || fail "installed metadata $INSTALLED != pyproject $SOURCE (#7: the editable reinstall did not take)"
 
+    grep -qx 'include-system-site-packages = false' "$VENV/pyvenv.cfg" \
+        || fail "$VENV inherits the host's site-packages (#40); rebuild it with scripts/rebuild_venv.sh"
+
     # Both halves for each package, because either alone passes while a finding
     # stands: the venv can own a copy that is still vulnerable, and a fixed
     # version can be the host's.
@@ -72,8 +75,8 @@ verify() {
             || fail "$NAME is not installed"
         WHERE=$("$VENV/bin/python" -c "import $NAME, os; print(os.path.dirname($NAME.__file__))")
         echo "   $NAME $GOT from $WHERE"
-        case "$WHERE" in
-            "$VENV"/*) ;;
+        case "$(realpath "$WHERE")" in
+            "$(realpath "$VENV")"/*) ;;
             *) fail "$NAME resolves from $WHERE, outside the venv -- it is inheriting the host copy" ;;
         esac
         "$VENV/bin/python" - "$GOT" "$FLOOR" <<'PY' || fail "$NAME $GOT is below the required floor $FLOOR"
@@ -86,8 +89,10 @@ PY
     for H in $HOSTS; do
         for EP in health readyz; do
             CODE=$(curl -s -o /dev/null -m 10 -w '%{http_code}' "https://$H/$EP" || echo 000)
-            echo "   https://$H/$EP -> $CODE"
+            HCODE=$(curl -s -o /dev/null -m 10 -I -w '%{http_code}' "https://$H/$EP" || echo 000)
+            echo "   https://$H/$EP -> GET $CODE HEAD $HCODE"
             [ "$CODE" = "200" ] || fail "https://$H/$EP returned $CODE"
+            [ "$HCODE" = "200" ] || fail "HEAD https://$H/$EP returned $HCODE"
         done
     done
     echo "VERIFIED: metadata $INSTALLED, venv owns [$VENV_OWNED], all endpoints 200"

@@ -2,6 +2,34 @@
 Changelog
 =========
 
+Version 3.5.2 (2026-10-25)
+==========================
+
+Changed
+-------
+
+- ``import auth`` no longer imports the HTTP client. ``Client``,
+  ``EnhancedAuthClient``, ``AuthRefused`` and ``AuthTransportError`` load from
+  ``auth.client`` the first time they are used, and ``from auth import Client``
+  returns the same objects as before. A process that serves auth or embeds it
+  without the client no longer loads requests or urllib3.
+- python-json-logger 4.x is accepted (``>=3.1.0,<5``).
+- New ``server`` extra with the packages the hosted deployment runs:
+  gunicorn with setproctitle, supervice, click and setuptools.
+
+Deployment
+----------
+
+- ``deploy/requirements-vm2.txt`` is a hash-pinned lock exported from
+  ``uv.lock``. It pins werkzeug 3.1.9, certifi 2026.10.23, urllib3 2.8.0 and
+  setuptools 84.2.1, and contains no pillow, pyjwt, filelock or brotli.
+- ``scripts/rebuild_venv.sh`` builds a venv that does not see the host's
+  site-packages, compiles psycopg-c against the system libpq, and starts a
+  trial server from it before ``--swap`` points ``/opt/auth/venv`` at it.
+  ``--rollback`` restores the previous venv.
+- ``scripts/deploy.sh --verify-only`` fails when the venv inherits the host's
+  site-packages, and checks HEAD as well as GET on ``/health`` and ``/readyz``.
+
 Version 3.5.1 (2026-10-23)
 ==========================
 
