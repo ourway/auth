@@ -4,7 +4,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "auth"
-version = "3.7.2"
+version = "3.8.0"
 description = "Authorization for humans"
 readme = "README.md"
 requires-python = ">=3.10"
@@ -90,6 +90,7 @@ dev = [
 [project.scripts]
 auth-server = "auth.server:main"
 auth-migrate = "auth.migrate:main"
+auth-admin = "auth.admin:main"
 
 [tool.uv]
 constraint-dependencies = [

@@ -58,6 +58,16 @@ if [ "$MIGRATE_RC" != "2" ] || ! printf '%s' "$MIGRATE_OUT" | grep -q "usage: au
     exit 1
 fi
 
+echo "==> auth-admin is installed and refuses to run without an admin database URL"
+set +e
+ADMIN_OUT="$(cd "$WORK_DIR" && env -i PATH="$PATH" "$WORK_DIR/venv/bin/auth-admin" namespaces list 2>&1)"
+ADMIN_RC=$?
+set -e
+if [ "$ADMIN_RC" != "2" ] || ! printf '%s' "$ADMIN_OUT" | grep -q "set AUTH_ADMIN_DATABASE_URL"; then
+    echo "ERROR: auth-admin rc=$ADMIN_RC: $ADMIN_OUT" >&2
+    exit 1
+fi
+
 echo "==> Import + README quick-start on SQLite"
 # Run from the temp dir AND pin every AUTH_ var: pydantic-settings reads a
 # .env from the current working directory, and an unset AUTH_DATABASE_URL

@@ -49,6 +49,8 @@ class AuditAction(Enum):
     GET_AUDIT = "GET_AUDIT"
     GET_ROTATE_KEY = "GET_ROTATE_KEY"
     RECOVER_KEY = "RECOVER_KEY"
+    GET_NAMESPACE = "GET_NAMESPACE"
+    PURGE_NAMESPACE = "PURGE_NAMESPACE"
 
 
 class AuditLog(Base):

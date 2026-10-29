@@ -2,6 +2,26 @@
 Changelog
 =========
 
+Version 3.8.0 (2026-10-29)
+==========================
+
+Added
+-----
+
+- ``DELETE /api/namespace`` erases a namespace in one transaction: roles,
+  permissions, memberships, role links, per-user API keys, settings and the
+  recovery key. The body must be ``{"confirm": "<fingerprint>"}``, where the
+  fingerprint is the first 12 hex characters of the SHA-256 of the client key.
+  ``GET /api/namespace`` returns the fingerprint and the counts a purge would
+  delete. Both are audited (``GET_NAMESPACE``, ``PURGE_NAMESPACE``) and the
+  namespace's earlier audit entries are kept. (issuedb #48)
+- ``auth-admin namespaces list`` and ``auth-admin namespaces purge`` let the
+  operator of an instance find and erase namespaces whose client key nobody
+  holds. Listing reads across namespaces through ``AUTH_ADMIN_DATABASE_URL``
+  and prints fingerprints, counts, role names and times, never keys or user
+  names. A purge runs through the normal application connection bound to that
+  one namespace and is audited with ``"via": "auth-admin"``. (issuedb #48)
+
 Version 3.7.2 (2026-10-29)
 ==========================
 
