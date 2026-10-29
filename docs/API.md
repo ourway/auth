@@ -670,6 +670,27 @@ gated. A strict block on read endpoints is an HTTP **200** — transport-failure
 handling does not cover it. Key-creation-before-grant ordering is a
 transactional contract.
 
+### Deleting a Namespace
+
+#### Get Namespace Summary
+**Endpoint:** `GET /api/namespace` — **Response (wrapped):** `data` = `{"fingerprint": "<12 hex>", "roles": 4, "permissions": 9, "memberships": 12, "api_keys": 3, "settings": true, "recovery_key": true}`
+
+The fingerprint is the first 12 hex characters of the SHA-256 of the lowercased
+client key. The counts are what a purge would delete.
+
+#### Purge Namespace
+**Endpoint:** `DELETE /api/namespace` — **Body:** `{"confirm": "<fingerprint>"}`
+
+Deletes every role, permission, membership, role link, per-user API key, the
+settings row and the recovery key in one transaction, and answers with the
+deleted counts. It cannot be undone. The audit trail is kept and gains a
+`PURGE_NAMESPACE` entry with the counts. Answers 400 and deletes nothing when
+the body is missing, has other fields, or names another fingerprint.
+
+Operators can purge a namespace whose key nobody holds with
+`auth-admin namespaces list` and `auth-admin namespaces purge --fp <hex>
+--confirm <hex>`. See section 9 of the served docs.
+
 ---
 
 ## Error Codes

@@ -295,6 +295,26 @@ off is the audited opt-out for platforms that authenticate their own users.
 | GET | `/api/settings` | wrapped, `data` = `{{"strict_users": false}}` (defaults when never set) |
 | PUT | `/api/settings` | body `{{"strict_users": true}}` → wrapped, `data` = `{{"strict_users": true}}` (idempotent, audited) |
 
+### Deleting a namespace
+
+`DELETE /api/namespace` erases everything in your namespace in one
+transaction: roles, permissions, memberships, per-user API keys, settings and
+the recovery key. Use it when a customer leaves, or at the end of a test run.
+It cannot be undone. Your audit trail stays, including an entry for the purge
+with the counts it deleted. Former per-user keys then validate as
+`unknown_key`, the old recovery key no longer recovers, and the same client key
+opens an empty namespace with the server's default settings.
+
+To confirm, send the namespace fingerprint, the first 12 hex characters of the
+SHA-256 of your client key. `GET /api/namespace` returns it with the counts a
+purge would delete, or compute it yourself:
+`python -c "import hashlib,sys; print(hashlib.sha256(sys.argv[1].lower().encode()).hexdigest()[:12])" "$KEY"`.
+
+| Method | Path | Returns |
+|---|---|---|
+| GET | `/api/namespace` | wrapped, `data` = `{{"fingerprint": "3f6b1c9e6f1a", "roles": 4, "permissions": 9, "memberships": 12, "api_keys": 3, "settings": true, "recovery_key": true}}` |
+| DELETE | `/api/namespace` | body `{{"confirm": "<fingerprint>"}}` → wrapped, `data` = `{{"fingerprint": "...", "memberships": 12, "permissions": 9, "roles": 4, "api_keys": 3, "settings": true, "recovery_key": true, "role_links": 21}}`. 400 and nothing deleted when the body is missing, has other fields, or names another fingerprint |
+
 ### Audit (self-service diagnosis)
 
 Read-only access to YOUR namespace's own audit trail — who granted/revoked what,
@@ -437,3 +457,18 @@ it. Wait for `GET /readyz` to answer 200. If it answers 503 naming
 `AUTH_DATABASE_SCHEMA`, set it to `auth_rbac`; if it names tables without row
 level security, the migrations were not applied. One worker uses about
 120–150 MB.
+
+Operators of an instance can list and purge namespaces whose key nobody holds
+any more with `auth-admin`. It reads across namespaces through
+`AUTH_ADMIN_DATABASE_URL`, which must be a PostgreSQL role allowed to bypass
+row level security, and it performs the purge through the normal application
+connection (`AUTH_DATABASE_URL`), bound to that one namespace:
+
+    auth-admin namespaces list [--created-from ISO] [--created-to ISO] [--role NAME]
+    auth-admin namespaces purge --fp <12+ hex of the fingerprint> --confirm <the same>
+
+`list` prints the fingerprint, row counts, active role names, creation times
+and the time of the namespace's last audit entry. It never prints a client
+key, a user name or a decrypted value. `purge` refuses a prefix that matches no
+namespace or more than one, and records a `PURGE_NAMESPACE` audit entry with
+`"via": "auth-admin"`.

@@ -9,6 +9,7 @@ resolves exactly as it did before the split.
 from auth.routes import (
     apikeys,
     membership,
+    namespace,
     permissions,
     public,
     roles,
@@ -33,6 +34,7 @@ _ROUTE_MODULES = (
     workflow,
     apikeys,
     tenant,
+    namespace,
 )
 
 

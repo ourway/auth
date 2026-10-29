@@ -4,7 +4,8 @@ SQLAlchemy-based authorization service
 The implementation is split across a linear chain of mixins — see
 :mod:`auth.services.base`, :mod:`auth.services.tenant`,
 :mod:`auth.services.queries`, :mod:`auth.services.rbac`,
-:mod:`auth.services.keys` and :mod:`auth.services.rotation`. This module stays
+:mod:`auth.services.keys`, :mod:`auth.services.rotation` and
+:mod:`auth.services.purge`. This module stays
 the public import path: ``from auth.services.service import
 AuthorizationService`` resolves exactly as it did before the split.
 """
@@ -38,13 +39,14 @@ from auth.services.keys import (
     API_KEYS_PER_USER_CAP,
     ApiKeyMixin,
 )
+from auth.services.purge import PurgeMixin
 from auth.services.queries import QueryMixin
 from auth.services.rbac import RbacMixin
 from auth.services.rotation import RotationMixin
 from auth.services.tenant import TenantMixin
 
 
-class AuthorizationService(RotationMixin):
+class AuthorizationService(PurgeMixin):
     """Authorization service using SQLAlchemy"""
 
 
@@ -58,6 +60,7 @@ __all__ = [
     "AuthPermission",
     "AuthTenantSettings",
     "AuthorizationService",
+    "PurgeMixin",
     "QueryMixin",
     "RbacMixin",
     "RotationMixin",
