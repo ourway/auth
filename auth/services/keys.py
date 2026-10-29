@@ -3,7 +3,7 @@
 from datetime import datetime
 from typing import Any, Dict, List, Optional, Tuple, cast
 
-from sqlalchemy import func
+from sqlalchemy import func, or_
 
 from auth.api_keys import generate_api_key, hash_api_key
 from auth.key_expiry import KeyExpiryError, check_expiry
@@ -16,6 +16,8 @@ from auth.services.rbac import RbacMixin
 # Active per-user API keys allowed per (tenant, user) — bounds namespace abuse
 # while staying far above any legitimate "one key per device/CI job" usage.
 API_KEYS_PER_USER_CAP = 25
+
+_api_key_table = AuthApiKey.__table__
 
 # A validate only rewrites last_used_at when it is at least this stale, so the
 # hot path does at most one row-update per key per window.
@@ -78,12 +80,13 @@ class ApiKeyMixin(RbacMixin):
         """Mint and store an API key for ``user`` in this tenant's namespace.
 
         Returns the one-time secret plus metadata, or ``None`` when the user
-        already holds ``API_KEYS_PER_USER_CAP`` active keys. The tenant lock
-        serializes against key rotation so the new row cannot strand under a
-        creator that is being moved.
+        already holds ``API_KEYS_PER_USER_CAP`` keys that are neither revoked
+        nor expired. The tenant lock serializes against key rotation so the
+        new row cannot strand under a creator that is being moved.
         """
+        now = _utcnow()
         if expires_at is not None:
-            check_expiry(expires_at, _utcnow())
+            check_expiry(expires_at, now)
         self._lock_tenant()
         active = (
             self.db.query(func.count(AuthApiKey.id))
@@ -91,6 +94,12 @@ class ApiKeyMixin(RbacMixin):
                 AuthApiKey.creator == self.client,
                 AuthApiKey._user == self._get_encrypted_user(user),
                 AuthApiKey.is_active,
+            )
+            .filter(
+                or_(
+                    _api_key_table.c.expires_at.is_(None),
+                    _api_key_table.c.expires_at > now,
+                )
             )
             .scalar()
             or 0

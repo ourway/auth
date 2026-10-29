@@ -266,15 +266,18 @@ Keys for your *users*, held in your namespace. The `api_key` secret appears
 only in the creating response (auth stores its SHA-256, nothing recoverable).
 Listing shows revoked keys too (`is_active: false`) so a UI can render
 history. Validate answers `valid: false` with a `reason` rather than erroring;
-a key from another tenant is indistinguishable from an unknown one. At most 25
-active keys per user — revoke to free a slot. `expires_at` is UTC; a value with
-an offset is converted and one without is read as UTC. From the moment it
+a key from another tenant is indistinguishable from an unknown one. A user can
+hold at most 25 keys that are neither revoked nor expired. Revoking a key frees
+its slot, and so does reaching its `expires_at`. `expires_at` is UTC; a value
+with an offset is converted and one without is read as UTC. From the moment it
 passes, validate and check_permission answer `{{"valid": false, "reason":
-"expired"}}`.
+"expired"}}`. An expired key still lists `is_active: true` until it is revoked,
+so compare `expires_at` with the current UTC time, or ask validate, to know
+whether a key still works.
 
 | Method | Path | Returns |
 |---|---|---|
-| POST | `/api/apikeys/user/<user>` | optional body `{{"label": "laptop", "expires_at": "2027-01-01T00:00:00Z"}}` (both optional; any other field is a 400) → wrapped, `data` = `{{"api_key": "rak_<43 chars, shown ONCE>", "key_id": "<uuid4>", "user": "alice", "label": "laptop", "key_prefix": "rak_ab12cd34", "created": "<iso>", "expires_at": "<iso or null>"}}` (400 once 25 active keys exist, or when expires_at is in the past or more than 365 days ahead) |
+| POST | `/api/apikeys/user/<user>` | optional body `{{"label": "laptop", "expires_at": "2027-01-01T00:00:00Z"}}` (both optional; any other field is a 400) → wrapped, `data` = `{{"api_key": "rak_<43 chars, shown ONCE>", "key_id": "<uuid4>", "user": "alice", "label": "laptop", "key_prefix": "rak_ab12cd34", "created": "<iso>", "expires_at": "<iso or null>"}}` (400 once the user holds 25 keys that are neither revoked nor expired, or when expires_at is in the past or more than 365 days ahead) |
 | PATCH | `/api/apikeys/user/<user>/<key_id>` | body `{{"expires_at": "<ISO-8601>"}}` → wrapped, `data` = the key's listing entry. Shorten-only: the new time must be in the future, earlier than the current expiry, and at most 365 days ahead; 400 otherwise, also for a revoked key; 404 JSON if no such key |
 | GET | `/api/apikeys/user/<user>` | wrapped, `data` = `{{"count": 1, "keys": [{{"key_id": "<uuid4>", "key_prefix": "rak_ab12cd34", "label": "laptop", "is_active": true, "created": "<iso>", "revoked_at": null, "expires_at": null, "last_used_at": "<iso>"}}]}}` |
 | DELETE | `/api/apikeys/user/<user>/<key_id>` | wrapped, `data` = `{{"revoked": true, "already_revoked": false}}` (repeat calls idempotent; 404 JSON if no such key for that user in your namespace) |

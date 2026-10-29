@@ -559,7 +559,8 @@ are the only endpoints that read a JSON request body.
 > `validate → user → has_permission` now. See `docs/DEPRECATIONS.md`.
 
 #### Create API Key
-Mint a key for a user. At most 25 active keys per user (400 beyond that).
+Mint a key for a user. A user can hold at most 25 keys that are neither revoked
+nor expired (400 beyond that). An expired key frees its slot without being revoked.
 
 **Endpoint:** `POST /api/apikeys/user/{user}`
 

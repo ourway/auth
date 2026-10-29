@@ -2,6 +2,19 @@
 Changelog
 =========
 
+Version 3.7.2 (2026-10-29)
+==========================
+
+Changed
+-------
+
+- An expired per-user API key no longer counts toward the cap of 25 keys per
+  user. Until now an expired key held its slot until someone revoked it, so a
+  user whose keys expired could be refused a new one by keys that no longer
+  worked. Revoked keys still do not count. An expired key keeps
+  ``is_active: true`` and ``revoked_at: null`` in the listing, as before.
+  (issuedb #47)
+
 Version 3.7.1 (2026-10-27)
 ==========================
 
