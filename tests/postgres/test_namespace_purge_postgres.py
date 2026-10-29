@@ -54,15 +54,7 @@ def _summary(client, key):
     return client.get("/api/namespace", headers=_h(key)).get_json()["data"]
 
 
-def test_runs_as_a_role_bound_by_row_level_security():
-    with engine.connect() as conn:
-        flags = conn.exec_driver_sql(
-            "SELECT rolsuper, rolbypassrls FROM pg_roles WHERE rolname = current_user"
-        ).one()
-    assert tuple(flags) == (False, False)
-
-
-def test_purge_under_rls_erases_one_namespace_and_leaves_the_other(client):
+def test_purge_erases_one_namespace_and_leaves_the_other(client):
     key, secret = _seed(client)
     other, other_secret = _seed(client)
     before_other = _summary(client, other)
@@ -104,8 +96,14 @@ def test_a_failure_part_way_rolls_back_everything(client, monkeypatch):
 def test_listing_needs_the_privileged_connection(client):
     url = admin.admin_url(os.environ)
     if url is None:
-        pytest.skip("AUTH_ADMIN_DATABASE_URL not set")
+        pytest.skip("AUTH_ADMIN_DATABASE_URL not set; make test-postgres sets it")
     from sqlalchemy import create_engine
+
+    with engine.connect() as conn:
+        flags = conn.exec_driver_sql(
+            "SELECT rolsuper, rolbypassrls FROM pg_roles WHERE rolname = current_user"
+        ).one()
+    assert tuple(flags) == (False, False)
 
     key, _ = _seed(client)
     assert admin.list_namespaces(engine) == []
