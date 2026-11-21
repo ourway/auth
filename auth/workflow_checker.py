@@ -80,7 +80,11 @@ class WorkflowPermissionChecker:
                 if user and user not in unique_users:
                     unique_users.add(user)
                     result.append(
-                        {"user": user, "workflow": workflow_name, "can_run": True}
+                        {
+                            "user": user,
+                            "workflow": workflow_name,
+                            "can_run": item.get("key_backed", True),
+                        }
                     )
 
             return result

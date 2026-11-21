@@ -30,6 +30,10 @@ contract): decisions are gated — `has_permission`, the membership check,
 `user_permissions` (a key-less subject answers `count: 0` with the reason), workflow
 `can_run`, and membership ADDs (409 since 2.5.1). Listings are NOT gated —
 `user_roles`, `members`, `roles`, `which_users_can`, `which_roles_can`, key listings.
+Since 3.9.0 the listings stay unfiltered but, under strict mode, each entry of
+`members`, `which_users_can` and `workflow/users` carries `key_backed: true|false`:
+the same answer the decision gate would give for that user. Filter on it before
+treating a listing as "who may".
 Deletes/revocations are never gated anywhere. **Consumers must check `result` on
 membership writes** — ignoring it converts strict mode into silent dead-key
 provisioning (two consumers found this trap in their own code; the 409 exists so

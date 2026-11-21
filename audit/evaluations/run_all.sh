@@ -26,6 +26,7 @@ probe_audit_partition_runway.py
 probe_test_isolation_guard.py
 probe_client_distinguishes_refusal.py
 probe_rotate_key_recovery.py
+probe_pentest_v1_regressions.py
 probe_rls_cross_tenant_isolation.py
 probe_rls_no_leak_across_pooled_connections.py
 probe_rls_covers_every_tenant_table.py

@@ -105,7 +105,7 @@ def _fit(value: Optional[str], column: str) -> Optional[str]:
     """Clamp a value to its audit column width (no-op for None)."""
     if value is None:
         return None
-    return str(value)[: _AUDIT_MAXLEN[column]]
+    return str(value).replace("\x00", "")[: _AUDIT_MAXLEN[column]]
 
 
 def client_fingerprint(token: Optional[str]) -> str:

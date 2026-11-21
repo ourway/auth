@@ -16,6 +16,7 @@ import http.server
 import os
 import sys
 import threading
+import uuid
 
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 from _harness import Probe  # noqa: E402
@@ -63,7 +64,7 @@ def main():
     # 4xx: auth answered and refused.
     srv = serve(400, b'{"error":"invalid user name","code":"bad_request"}')
     port = srv.server_address[1]
-    c = Client(api_key="550e8400-e29b-41d4-a716-446655440000",
+    c = Client(api_key=str(uuid.uuid4()),
                service_url=f"http://127.0.0.1:{port}", circuit_breaker_enabled=False)
     try:
         c.get_user_roles("auth0|abc")
@@ -79,7 +80,7 @@ def main():
     srv.shutdown()
 
     # Genuine transport failure: nothing listening.
-    c2 = Client(api_key="550e8400-e29b-41d4-a716-446655440000",
+    c2 = Client(api_key=str(uuid.uuid4()),
                 service_url="http://127.0.0.1:1", circuit_breaker_enabled=False,
                 max_retries=0, timeout=2)
     try:

@@ -109,7 +109,15 @@ class QueryMixin(TenantMixin):
             if membership.is_active:
                 # Return membership format (user, role) for members endpoint
                 members.append({"user": membership.user, "role": group.role})
-        return members
+        return self._annotate_key_backed(members)
+
+    def _annotate_key_backed(self, entries: List[Dict[str, Any]]) -> List[Dict[str, Any]]:
+        if not entries or not self.strict_users_enabled():
+            return entries
+        backed = self.key_backed_users([entry["user"] for entry in entries])
+        for entry in entries:
+            entry["key_backed"] = entry["user"] in backed
+        return entries
 
     def which_roles_can(self, name: str) -> List[Dict[str, Any]]:
         """Get roles that have a specific permission"""

@@ -2,6 +2,55 @@
 Changelog
 =========
 
+Version 3.9.0 (2026-11-21)
+==========================
+
+Remediation of the external penetration test of 3.8.0 (``pantest_v1``, 13
+low findings). Namespace isolation, row-level security, rotate/recover and
+per-user key validation were not broken by the test. (issuedb #50)
+
+Changed
+-------
+
+- Errors that auth raises under ``/api/`` are the JSON envelope
+  ``{"success": false, "code", "message", "details", "timestamp"}`` instead of
+  Flask HTML pages. 401 adds ``WWW-Authenticate: Bearer``; 405 keeps ``Allow``.
+  Message text is unchanged. The degraded 503 marker ``Service degraded`` now
+  starts at byte 36 of the body (was 102), still inside the first 200 bytes.
+- ``POST /api/keys/rotate`` takes no body: empty, ``{}`` and ``null`` are
+  accepted, anything else is 400 and nothing moves. ``POST /api/keys/recover``
+  and ``PUT /api/settings`` answer 400 naming any unknown field.
+- ``GET /api/audit``: ``offset`` above 9223372036854775807 and an ``action``
+  that is not 1-50 letters or underscores answer 400 (both were 500).
+- ``/readyz`` shows ``pool`` and ``audit_partitions`` only to peers inside
+  ``AUTH_READYZ_DETAIL_CIDRS`` (default loopback). Everyone else gets
+  ``status``, ``reason`` when unready, and ``audit_runway``
+  (``ok``/``attention``/``unchecked``). Status codes are unchanged.
+- CORS answers ``Access-Control-Allow-Origin: *`` instead of echoing the
+  request's ``Origin`` (``null`` included). Credentials stay disallowed.
+- The ``Authorization`` header follows RFC 9110 §11.1: a case-insensitive
+  ``Bearer`` scheme, one or more spaces, the key. Other whitespace between
+  them (NBSP, control separators) is now 401.
+- The two example client keys the documentation used to print are refused
+  with 400, at the gate and as ``recover``'s ``new_client_key``. Neither held
+  data or any write in its audit trail.
+
+Added
+-----
+
+- Under ``strict_users``, entries of ``/api/members/<role>``,
+  ``/api/which_users_can/<name>`` and ``/api/workflow/users/<workflow>`` carry
+  ``key_backed``. The listings stay unfiltered (SPEC 0008 §5).
+- ``Cache-Control: no-store`` on every ``/api/`` response and a
+  ``Content-Security-Policy`` on every response.
+
+Fixed
+-----
+
+- A path parameter containing a NUL character answers 400. It was silently
+  dropped before validation, so ``POST /api/role/a%00b`` created a role named
+  ``ab``. NUL is also stripped from every value written to the audit log.
+
 Version 3.8.0 (2026-10-29)
 ==========================
 

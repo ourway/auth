@@ -6,7 +6,7 @@ import auth.keycheck as keycheck
 from auth.main import create_app
 
 MARKER = "Service degraded"
-MARKER_OFFSET = 102
+MARKER_OFFSET = 36
 
 REAL_DETAILS = [
     "the configured AUTH_ENCRYPTION_KEY cannot decrypt this deployment's canary "
@@ -65,13 +65,8 @@ def test_degraded_api_carries_the_marker_at_a_stable_offset(client, client_key, 
     assert resp.status_code == 503
     assert body.index(MARKER) == MARKER_OFFSET
     assert MARKER_OFFSET < 200
-    # Werkzeug HTML-escapes the description, so an apostrophe in the detail
-    # arrives as &#39; -- markupsafe's form, not the stdlib's &#x27;. A consumer
-    # matching raw detail text against a real response will miss; the marker,
-    # which contains no escapable character, will not.
-    from markupsafe import escape
-
-    assert str(escape(detail)) in body
+    assert resp.mimetype == "application/json"
+    assert resp.get_json()["message"] == f"{MARKER}: {detail}"
 
 
 def test_degraded_readyz_and_health_also_refuse(client, degraded):
