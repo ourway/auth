@@ -18,7 +18,7 @@ roles/permissions tables — see section 8 for where it fits and where it doesn'
 
 Every request needs a **client key** — any valid UUID4 — sent as a bearer token:
 
-    Authorization: Bearer 3f6b1c9e-6f1a-4a5e-9c2e-2b7a5d0e1f34
+    Authorization: Bearer <your-client-key>
 
 The key is **not** checked against a stored secret. Any well-formed UUID4 is
 accepted and opens its own isolated namespace: roles, users and permissions
@@ -31,8 +31,11 @@ created under one key are invisible to every other key. Practical consequences:
 - Anyone holding your key has full read/write access to your namespace. Treat it
   like a password: keep it out of source control, logs and URLs.
 
-Bad keys fail fast: a missing or non-`Bearer` header gives **401**, a token that
-is not a UUID4 gives **400**.
+Bad keys fail fast: a missing header, a scheme other than `Bearer`, or anything
+but single spaces between scheme and key gives **401**; a token that is not a
+UUID4 gives **400**. The scheme is case-insensitive (RFC 9110 §11.1), so
+`bearer <key>` is the same request as `Bearer <key>`. The example keys these
+docs used to print are refused with 400: generate your own.
 
 ## 2. Quickstart — the order matters
 
@@ -101,11 +104,14 @@ wrapper. There is no way to guess which — use the table in section 4.
     wrapped   {{"success": true, "code": 200, "message": "...",
                "data": ..., "timestamp": "2026-07-20T03:11:34.288114"}}
 
-**Most errors are HTML, not JSON.** A bad header (401), a key that is not a
-UUID4 (400), an invalid name (400) and an unknown route (404) answer with Flask's
-error pages, `Content-Type: text/html`. Parsing them as JSON will throw, so
-branch on the status code first. The strict-mode 409 and the per-user API-key
-errors (the 400 at the 25-key limit, the 404 for an unknown key) are JSON.
+**Errors from the application are JSON.** Since 3.9.0 every error auth itself
+raises under `/api/` — a bad header (401), a key that is not a UUID4 (400), an
+invalid name (400), an unknown route (404), a wrong method (405) — answers
+`{{"success": false, "code": N, "message": "...", "details": {{}}, "timestamp": "..."}}`.
+A 401 carries `WWW-Authenticate: Bearer` and a 405 keeps `Allow`. Names echoed in
+a message are HTML-escaped (`&lt;`). The proxy in front of auth can still answer
+with an HTML page (413 body too large, 429 rate limited, 502/504, a duplicated
+`Authorization` header), so branch on the status code before parsing.
 
 **`has_permission` is also the membership answer.** The membership check reuses
 the permission payload, so `GET /api/membership/<user>/<role>` replies with
@@ -176,7 +182,10 @@ nothing changed for them at upgrade — and the audited per-tenant opt-out
 platforms that authenticate their own callers. Gated decisions:
 has_permission, the membership check, user_permissions (answers `count: 0` +
 reason), workflow can_run. NOT gated: user_roles, members and every other
-listing. Membership adds for key-less subjects answer **409**
+listing. Listings are configuration, not decisions: under strict_users each
+entry of `members`, `which_users_can` and `workflow/users` carries
+`key_backed`, so filter on it (or call `has_permission`) before treating a
+listing as "who may". Membership adds for key-less subjects answer **409**
 `{{"result": false, "reason": "user_not_key_backed"}}` — a refused grant must
 not look like success; check `result` on writes regardless. Create the key
 first, then grant roles: key creation committing before the grant is a
@@ -193,7 +202,14 @@ recommended backend flow: issue keys to your users, derive the user from
 
 ## 4. Endpoints
 
-All paths need the `Authorization` header except `/ping` and `/health`.
+All `/api/` paths need the `Authorization` header except `POST /api/keys/recover`
+(the rotate key in the body authenticates it). `/ping`, `/health`, `/readyz` and
+the documentation pages need none. `/readyz` answers `{{"status": "ready",
+"audit_runway": "ok"}}` publicly (`audit_runway` is `ok`, `attention` or
+`unchecked`); pool and partition detail are shown only on the host itself.
+Every `/api/` response carries `Cache-Control: no-store`, because bodies can hold
+a key shown only once. CORS answers `Access-Control-Allow-Origin: *` and never
+allows credentials.
 `<user>`, `<role>`/`<group>` and `<name>` go in the path, never in a body. The
 only endpoints that read a JSON body are the per-user API-key ones (create's
 optional `label`; validate's `api_key` — secrets never belong in URLs, which
@@ -215,7 +231,7 @@ get logged).
 | DELETE | `/api/membership/<user>/<role>` | bare `{{"result": true}}` |
 | GET | `/api/membership/<user>/<role>` | wrapped, `data` = `{{"has_permission": true}}` |
 | GET | `/api/user_roles/<user>` | bare `{{"result": [{{"user": "alice", "role": "engineers"}}]}}` |
-| GET | `/api/members/<role>` | bare `{{"result": [{{"user": "alice", "role": "engineers"}}]}}` |
+| GET | `/api/members/<role>` | bare `{{"result": [{{"user": "alice", "role": "engineers"}}]}}`; under strict_users each entry adds `"key_backed": true\|false` |
 
 ### Permissions (permission on role)
 
@@ -233,7 +249,7 @@ get logged).
 | GET | `/api/has_permission/<user>/<name>` | wrapped, `data` = `{{"has_permission": true}}` |
 | GET | `/api/user_permissions/<user>` | wrapped, `data` = `{{"count": 1, "permissions": [{{"name": "deploy"}}]}}` |
 | GET | `/api/which_roles_can/<name>` | bare `{{"result": [{{"role": "engineers"}}]}}` |
-| GET | `/api/which_users_can/<name>` | bare `{{"result": [{{"user": "alice", "role": "engineers"}}]}}` |
+| GET | `/api/which_users_can/<name>` | bare `{{"result": [{{"user": "alice", "role": "engineers"}}]}}`; under strict_users each entry adds `"key_backed": true\|false` |
 
 `/api/has_permission/<user>/<name>` is the endpoint you want for an access
 check: it is true when the user belongs to any role holding that permission.
@@ -245,7 +261,7 @@ Thin aliases over the permission model — a workflow name is just a permission.
 | Method | Path | Returns |
 |---|---|---|
 | GET | `/api/workflow/user/<user>/can_run/<workflow>` | wrapped, `data` = `{{"has_permission": true}}` |
-| GET | `/api/workflow/users/<workflow>` | wrapped, `data` = `{{"count": 2, "members": [{{"user": "alice", "role": "engineers"}}]}}` |
+| GET | `/api/workflow/users/<workflow>` | wrapped, `data` = `{{"count": 2, "members": [{{"user": "alice", "role": "engineers"}}]}}`; under strict_users each entry adds `"key_backed": true\|false` |
 
 ### API keys (tenant key rotation)
 
@@ -256,9 +272,9 @@ only copy — persist it. See section 3 for the full semantics and threat model.
 
 | Method | Path | Returns |
 |---|---|---|
-| POST | `/api/keys/rotate` | wrapped, `data` = `{{"new_key": "<uuid4>", "migrated": {{"roles": 1, "memberships": 1, "permissions": 1, "api_keys": 0, "settings": 0}}}}` |
+| POST | `/api/keys/rotate` | no body (empty, `{{}}` or `null`; any field is a 400 and nothing moves); wrapped, `data` = `{{"new_key": "<uuid4>", "migrated": {{"roles": 1, "memberships": 1, "permissions": 1, "api_keys": 0, "settings": 0}}}}` |
 | POST | `/api/keys/get_rotate_key` | wrapped, `data` = `{{"rotate_key": "rrk_..."}}`; `409` with `reason: rotate_key_already_issued` if already issued |
-| POST | `/api/keys/recover` | **no Authorization header**; body `{{"rotate_key": "rrk_...", "new_client_key": "<uuid4>"}}`; wrapped, `data` = `{{"client_key": "<uuid4>", "rotate_key": "rrk_..."}}` |
+| POST | `/api/keys/recover` | **no Authorization header**; body `{{"rotate_key": "rrk_...", "new_client_key": "<uuid4>"}}` (`new_client_key` optional; any other field is a 400); wrapped, `data` = `{{"client_key": "<uuid4>", "rotate_key": "rrk_..."}}` |
 
 ### Per-user API keys
 
@@ -293,7 +309,7 @@ off is the audited opt-out for platforms that authenticate their own users.
 | Method | Path | Returns |
 |---|---|---|
 | GET | `/api/settings` | wrapped, `data` = `{{"strict_users": false}}` (defaults when never set) |
-| PUT | `/api/settings` | body `{{"strict_users": true}}` → wrapped, `data` = `{{"strict_users": true}}` (idempotent, audited) |
+| PUT | `/api/settings` | body `{{"strict_users": true}}` (any other field is a 400) → wrapped, `data` = `{{"strict_users": true}}` (idempotent, audited) |
 
 ### Deleting a namespace
 
@@ -312,7 +328,7 @@ purge would delete, or compute it yourself:
 
 | Method | Path | Returns |
 |---|---|---|
-| GET | `/api/namespace` | wrapped, `data` = `{{"fingerprint": "3f6b1c9e6f1a", "roles": 4, "permissions": 9, "memberships": 12, "api_keys": 3, "settings": true, "recovery_key": true}}` |
+| GET | `/api/namespace` | wrapped, `data` = `{{"fingerprint": "9b2e4c7a1d05", "roles": 4, "permissions": 9, "memberships": 12, "api_keys": 3, "settings": true, "recovery_key": true}}` |
 | DELETE | `/api/namespace` | body `{{"confirm": "<fingerprint>"}}` → wrapped, `data` = `{{"fingerprint": "...", "memberships": 12, "permissions": 9, "roles": 4, "api_keys": 3, "settings": true, "recovery_key": true, "role_links": 21}}`. 400 and nothing deleted when the body is missing, has other fields, or names another fingerprint |
 
 ### Audit (self-service diagnosis)
@@ -330,7 +346,7 @@ false`. Neither the secret nor its hash is ever recorded.
 
 | Method | Path | Returns |
 |---|---|---|
-| GET | `/api/audit` | query `?limit=50&offset=0&action=ADD_PERMISSION` → wrapped, `data` = `{{"total": N, "limit": 50, "offset": 0, "entries": [{{"id", "timestamp", "action", "resource", "details", "success", "user", "ip_address", "user_agent"}}]}}` (newest first; `limit` ≤ 500; `action` filters by action name) |
+| GET | `/api/audit` | query `?limit=50&offset=0&action=ADD_PERMISSION` → wrapped, `data` = `{{"total": N, "limit": 50, "offset": 0, "entries": [{{"id", "timestamp", "action", "resource", "details", "success", "user", "ip_address", "user_agent"}}]}}` (newest first; `limit` 1–500; `offset` 0–9223372036854775807; `action` filters by action name, 1–50 letters or underscores, else 400) |
 
 ### Service
 
@@ -368,9 +384,11 @@ containing `/` changes which route matches and yields 404.
 
 `pip install auth` ships a client with retries and connection pooling:
 
+    import os
+
     from auth import Client
 
-    with Client(api_key="3f6b1c9e-6f1a-4a5e-9c2e-2b7a5d0e1f34",
+    with Client(api_key=os.environ["AUTH_CLIENT_KEY"],
                 service_url="https://auth.rodmena.com") as c:
         c.create_role("engineers")
         c.add_permission("engineers", "deploy")

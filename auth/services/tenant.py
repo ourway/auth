@@ -2,7 +2,7 @@
 
 import json
 from datetime import datetime
-from typing import Any, Dict, List, Optional, Tuple, cast
+from typing import Any, Dict, List, Optional, Set, Tuple, cast
 
 from sqlalchemy import desc, or_
 
@@ -144,18 +144,12 @@ class TenantMixin(ServiceBase):
         ]
         return entries, total
 
-    def user_is_key_backed(self, user: str) -> bool:
-        """True when the user holds ≥1 active, unexpired API key here."""
-        row: Any = (
-            self.db.query(AuthApiKey.id)
+    def _live_key_query(self, encrypted_users: List[Any]):
+        return (
+            self.db.query(AuthApiKey._user)
             .filter(
                 AuthApiKey.creator == self.client,
-                AuthApiKey._user == self._get_encrypted_user(user),
-                # Core column rather than the mapped attribute. SQLAlchemy 2.1's
-                # stubs resolve a legacy `x = Column(...)` attribute to Never, so
-                # the bare `AuthApiKey.is_active` poisons the whole chain and every
-                # statement after it reads as unreachable. __table__.c types as a
-                # KeyedColumnElement and emits byte-identical SQL, verified.
+                AuthApiKey._user.in_(encrypted_users),
                 _api_key_table.c.is_active.is_(True),
             )
             .filter(
@@ -164,9 +158,19 @@ class TenantMixin(ServiceBase):
                     _api_key_table.c.expires_at > _utcnow(),
                 )
             )
-            .first()
         )
+
+    def user_is_key_backed(self, user: str) -> bool:
+        """True when the user holds ≥1 active, unexpired API key here."""
+        row: Any = self._live_key_query([self._get_encrypted_user(user)]).first()
         return row is not None
+
+    def key_backed_users(self, users: List[str]) -> Set[str]:
+        by_ciphertext = {self._get_encrypted_user(user): user for user in set(users)}
+        if not by_ciphertext:
+            return set()
+        rows = self._live_key_query(list(by_ciphertext)).distinct().all()
+        return {by_ciphertext[row[0]] for row in rows if row[0] in by_ciphertext}
 
     def _strict_blocks(self, user: str) -> bool:
         """Strict mode on AND the user has no live key → decision is negative."""

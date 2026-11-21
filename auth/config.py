@@ -57,6 +57,7 @@ class Settings(BaseSettings):
     # Security settings
     allow_cors: bool = True
     cors_origins: str = "*"
+    readyz_detail_cidrs: str = "127.0.0.1/32,::1/128"
     enable_audit_logging: bool = True
     # Pepper used to fingerprint the client key before it is written to audit
     # rows or logs. Falls back to jwt_secret_key when empty so the fingerprint

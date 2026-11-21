@@ -15,6 +15,7 @@ created implicitly, but a role must exist before you add members or permissions
 to it.
 
     KEY=$(python3 -c "import uuid; print(uuid.uuid4())")
+    echo "$KEY"   # store it now: a lost key is a lost namespace
     BASE=https://auth.rodmena.com
     curl -X POST -H "Authorization: Bearer $KEY" $BASE/api/role/engineers
     curl -X POST -H "Authorization: Bearer $KEY" $BASE/api/permission/engineers/deploy

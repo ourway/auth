@@ -21,6 +21,7 @@ import os
 import subprocess
 import sys
 import tempfile
+import uuid
 
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 from _harness import Probe, local_env  # noqa: E402
@@ -29,7 +30,7 @@ REPO = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__)
 PYTHON = os.environ.get("AUDIT_PYTHON", os.path.join(REPO, ".venv", "bin", "python"))
 KEY_A = "audit-probe-encryption-key-alpha-000001"
 KEY_B = "audit-probe-encryption-key-BRAVO-000002"
-TENANT = "550e8400-e29b-41d4-a716-446655440000"
+TENANT = str(uuid.uuid4())
 
 STAGE = r'''
 import json, logging, os

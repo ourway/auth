@@ -149,3 +149,29 @@ def validate_user_role_combination(user: str, role: str) -> tuple[bool, str]:
         )
 
     return True, ""
+
+
+BEARER_HEADER_PATTERN = re.compile(r"([A-Za-z]+) +([^ ]+)")
+AUDIT_ACTION_PATTERN = re.compile(r"[A-Za-z_]{1,50}")
+AUDIT_OFFSET_MAX = 9223372036854775807
+PUBLISHED_EXAMPLE_KEYS = frozenset(
+    {
+        "3f6b1c9e-6f1a-4a5e-9c2e-2b7a5d0e1f34",
+        "550e8400-e29b-41d4-a716-446655440000",
+    }
+)
+
+
+def parse_bearer(header: str) -> Optional[str]:
+    match = BEARER_HEADER_PATTERN.fullmatch(header.strip(" \t"))
+    if match is None or match.group(1).lower() != "bearer":
+        return None
+    return match.group(2)
+
+
+def validate_audit_action(action: str) -> bool:
+    return AUDIT_ACTION_PATTERN.fullmatch(action) is not None
+
+
+def is_published_example_key(client_key: str) -> bool:
+    return client_key.lower() in PUBLISHED_EXAMPLE_KEYS

@@ -27,6 +27,9 @@
    validate→check round trips; see runflow's SPEC 0006 request).
 5. Strict-mode enforcement shall apply at decision points only; configuration listings
    (`members`, `roles`, `which_users_can`, key listings) shall remain unfiltered.
+   *(Amended 2026-11-21, issuedb #50 / SPEC 50: while strict mode is on, entries of
+   `members`, `which_users_can` and `workflow/users` shall carry `key_backed`, equal
+   to the decision gate's answer for that user. Additive; still unfiltered.)*
 6. In-process/library callers shall receive an explicit `strict_users` parameter,
    default `False` throughout 2.x, with the flip documented as part of the 3.0 major.
 7. When every platform on the bus has confirmed readiness, auth 3.0.0 shall enable

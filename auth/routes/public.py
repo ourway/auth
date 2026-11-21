@@ -1,14 +1,19 @@
 """Public, unauthenticated routes plus the /api/* authentication gate."""
 
+import ipaddress
 import logging
 import threading
+from datetime import datetime, timezone
 
 from flask import abort, g, jsonify, request
 from sqlalchemy import text
 
 from auth import keycheck
+from auth.config import get_settings
 from auth.database import engine
 from auth.validation import (
+    is_published_example_key,
+    parse_bearer,
     validate_client_key,
 )
 
@@ -57,6 +62,48 @@ def _pool_depth():
         return None
 
 
+def _detail_allowed() -> bool:
+    try:
+        peer = ipaddress.ip_address(request.remote_addr or "")
+        networks = [
+            ipaddress.ip_network(cidr.strip(), strict=False)
+            for cidr in get_settings().readyz_detail_cidrs.split(",")
+            if cidr.strip()
+        ]
+    except ValueError:
+        return False
+    return any(peer in network for network in networks)
+
+
+AUDIT_RUNWAY_MIN_MONTHS = 2
+
+
+def _audit_runway() -> str:
+    state = _audit_partitions()
+    if not state.get("checked"):
+        return "unchecked"
+    if state.get("stranded"):
+        return "attention"
+    newest = state.get("newest") or ""
+    try:
+        year, month = (int(part) for part in newest.rsplit("_", 2)[-2:])
+    except ValueError:
+        return "attention"
+    today = datetime.now(timezone.utc)
+    months_ahead = (year - today.year) * 12 + (month - today.month)
+    return "attention" if months_ahead < AUDIT_RUNWAY_MIN_MONTHS else "ok"
+
+
+def _readyz_body(status: str, pool_depth, reason=None) -> dict:
+    body: dict = {"status": status, "audit_runway": _audit_runway()}
+    if reason is not None:
+        body["reason"] = reason
+    if _detail_allowed():
+        body["pool"] = pool_depth
+        body["audit_partitions"] = _audit_partitions()
+    return body
+
+
 def register(app):
     """Register the public routes on ``app``."""
 
@@ -89,16 +136,23 @@ def register(app):
         if not auth_header:
             abort(401, description="Authorization header is missing.")
 
-        parts = auth_header.split()
-        if len(parts) != 2 or parts[0].lower() != "bearer":
+        client_key = parse_bearer(auth_header)
+        if client_key is None:
             abort(
                 401,
                 description="Invalid Authorization header format. Must be 'Bearer <token>'.",
             )
 
-        client_key = parts[1]
         if not validate_client_key(client_key):
             abort(400, description="Invalid client key. Must be a valid UUID4.")
+        if is_published_example_key(client_key):
+            abort(
+                400,
+                description=(
+                    "This client key is the example published in the documentation. "
+                    "Generate your own UUID4 and keep it secret."
+                ),
+            )
 
         # Canonicalize to lowercase: a UUID4 is case-insensitive, but the raw
         # string is used verbatim as the tenant identifier AND the encryption KDF
@@ -162,12 +216,9 @@ def register(app):
             # A probe is already in flight — almost certainly stalled. Report
             # the previous verdict rather than adding another backend to the
             # queue we are trying to measure.
-            body = {
-                "status": _last_commit_verdict[0],
-                "reason": "commit probe already in flight",
-                "pool": pool_depth,
-                "audit_partitions": _audit_partitions(),
-            }
+            body = _readyz_body(
+                _last_commit_verdict[0], pool_depth, "commit probe already in flight"
+            )
             return jsonify(body), (200 if _last_commit_verdict[0] == "ready" else 503)
         try:
             with engine.begin() as conn:
@@ -181,16 +232,7 @@ def register(app):
         except Exception:
             logger.exception("readiness check failed: commit path unavailable")
             _last_commit_verdict[0] = "unready"
-            return jsonify({
-                "status": "unready",
-                "reason": "commit path",
-                "pool": pool_depth,
-                "audit_partitions": _audit_partitions(),
-            }), 503
+            return jsonify(_readyz_body("unready", pool_depth, "commit path")), 503
         finally:
             _COMMIT_PROBE_LOCK.release()
-        return jsonify({
-            "status": "ready",
-            "pool": pool_depth,
-            "audit_partitions": _audit_partitions(),
-        })
+        return jsonify(_readyz_body("ready", pool_depth))

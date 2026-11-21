@@ -14,9 +14,11 @@ here and at `/docs`.
 
 `pip install auth`, then:
 
+    import os
+
     from auth import Client  # alias of EnhancedAuthClient: pooling, retries, circuit breaker
 
-    KEY = "3f6b1c9e-6f1a-4a5e-9c2e-2b7a5d0e1f34"  # your app's secret UUID4, from config/secrets
+    KEY = os.environ["AUTH_CLIENT_KEY"]  # your app's own secret UUID4, from your secret store
     with Client(api_key=KEY, service_url="https://auth.rodmena.com") as auth:
         auth.create_role("engineers")
         auth.add_permission("engineers", "deploy")

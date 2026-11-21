@@ -39,12 +39,12 @@ def _init_rate_limiter(app, settings):
         return
 
     from auth.audit import client_fingerprint
+    from auth.validation import parse_bearer
 
     def _key():
-        header = request.headers.get("Authorization", "")
-        parts = header.split()
-        if len(parts) == 2 and parts[0].lower() == "bearer":
-            return client_fingerprint(parts[1])
+        token = parse_bearer(request.headers.get("Authorization", ""))
+        if token is not None:
+            return client_fingerprint(token)
         return get_remote_address()
 
     limiter = Limiter(
@@ -94,7 +94,7 @@ def create_app():
     if settings.allow_cors:
         raw_origins = settings.cors_origins or "*"
         if raw_origins == "*":
-            CORS(app)
+            CORS(app, send_wildcard=True)
         else:
             CORS(app, origins=[origin.strip() for origin in raw_origins.split(",")])
 
@@ -124,11 +124,13 @@ def create_app():
             verify_encryption_key(_db)
 
     # Import and register routes
+    from auth import http_hardening
     from auth.docs_page import register_docs_routes
     from auth.routes import register_routes
 
     register_routes(app)
     register_docs_routes(app)
+    http_hardening.register(app)
 
     @app.errorhandler(Exception)
     def _unhandled_exception(e):

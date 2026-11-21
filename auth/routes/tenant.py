@@ -26,8 +26,40 @@ from auth.services.recovery import (
     TargetNamespaceNotEmpty,
     recover_namespace,
 )
+from auth.validation import (
+    AUDIT_OFFSET_MAX,
+    is_published_example_key,
+    validate_audit_action,
+)
 
 logger = logging.getLogger(__name__)
+
+SETTINGS_FIELDS = frozenset({"strict_users"})
+RECOVER_FIELDS = frozenset({"rotate_key", "new_client_key"})
+
+
+def _unknown_fields(body, allowed):
+    return sorted(str(name) for name in set(body) - allowed)
+
+
+ROTATE_NO_BODY = (
+    "rotate takes no body. The server mints the new key and returns it in data.new_key."
+)
+
+
+def _rotate_body_refusal():
+    raw = request.get_data(cache=True).strip()
+    if raw in (b"", b"null"):
+        return None
+    body = request.get_json(silent=True, force=True)
+    if body == {}:
+        return None
+    if isinstance(body, dict):
+        return APIResponse.bad_request(
+            f"Unknown field(s) {', '.join(_unknown_fields(body, frozenset()))}; "
+            + ROTATE_NO_BODY
+        )
+    return APIResponse.bad_request(ROTATE_NO_BODY)
 
 
 def register(app):
@@ -50,6 +82,9 @@ def register(app):
         the decorator — seeing only ``g.client_key`` — cannot capture. Neither
         raw key is ever written to the audit trail.
         """
+        refusal = _rotate_body_refusal()
+        if refusal is not None:
+            return refusal
         old_key = g.client_key
         new_key = str(uuid.uuid4())
         audit_on = get_settings().enable_audit_logging
@@ -119,6 +154,12 @@ def register(app):
             return APIResponse.bad_request(
                 'JSON body required: {"strict_users": true|false}'
             )
+        unknown = _unknown_fields(body, SETTINGS_FIELDS)
+        if unknown:
+            return APIResponse.bad_request(
+                f"Unknown field(s) {', '.join(unknown)}; "
+                "settings accepts only strict_users."
+            )
 
         auth_service = _get_auth_service(db)
         result = auth_service.set_strict_users(body["strict_users"])
@@ -187,10 +228,21 @@ def register(app):
         body = request.get_json(silent=True, force=True)
         if not isinstance(body, dict) or not isinstance(body.get("rotate_key"), str):
             return APIResponse.bad_request('JSON body required: {"rotate_key": "rrk_..."}')
+        unknown = _unknown_fields(body, RECOVER_FIELDS)
+        if unknown:
+            return APIResponse.bad_request(
+                f"Unknown field(s) {', '.join(unknown)}; "
+                "recover accepts only rotate_key and new_client_key."
+            )
 
         new_key = body.get("new_client_key") or str(uuid.uuid4())
         if not isinstance(new_key, str) or not validate_client_key(new_key):
             return APIResponse.bad_request("new_client_key must be a valid UUID4")
+        if is_published_example_key(new_key):
+            return APIResponse.bad_request(
+                "new_client_key is the example published in the documentation; "
+                "generate your own UUID4"
+            )
 
         try:
             result = recover_namespace(db, body["rotate_key"], new_key)
@@ -252,12 +304,19 @@ def register(app):
             return APIResponse.bad_request("limit must be between 1 and 500")
         if offset < 0:
             return APIResponse.bad_request("offset must be >= 0")
+        if offset > AUDIT_OFFSET_MAX:
+            return APIResponse.bad_request(f"offset must be <= {AUDIT_OFFSET_MAX}")
+        action = request.args.get("action") or None
+        if action is not None and not validate_audit_action(action):
+            return APIResponse.bad_request(
+                "action must be 1-50 letters or underscores, e.g. CREATE_ROLE"
+            )
 
         auth_service = _get_auth_service(db)
         entries, total = auth_service.get_audit(
             limit=limit,
             offset=offset,
-            action=request.args.get("action"),
+            action=action,
         )
         return APIResponse.success(
             data={

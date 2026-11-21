@@ -9,11 +9,12 @@ service and surface as HTTP 500.
 
 import os
 import sys
+import uuid
 
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 from _harness import Probe, local_client  # noqa: E402
 
-CANONICAL_V4 = "550e8400-e29b-41d4-a716-446655440000"
+CANONICAL_V4 = str(uuid.uuid4())
 MALFORMED = [
     ("nil uuid", "00000000-0000-0000-0000-000000000000"),
     ("version 1", "550e8400-e29b-11d4-a716-446655440000"),
